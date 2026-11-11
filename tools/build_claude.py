@@ -27,8 +27,8 @@ js = rep(js, "const [db, user] = await Promise.all([window.claude.use('db'), win
 js = rep(js, "  window.claude.use('mcp').then(m =>", "  __rt.use('mcp').then(m =>")
 js = rep(js, "  if (!db) { S.fatal = '記録の保存先につながらなかった。開き直してほしい。'; render(); return; }",
             "  if (!db) { S.fatal = 'Supabaseのコネクタにつながらなかった。claude.aiの設定でSupabaseをつないで、開き直してほしい。'; render(); return; }")
-js = rep(js, "if (err && err.code === 'revoked') S.fatal = 'ログインが切れた。開き直してほしい。';",
-            "if (err && err.code) S.fatal = 'Supabaseから記録を読めなかった（' + err.code + '）。上の「許可」を押すか、開き直してほしい。';")
+js = rep(js, "  S.fatal = '記録を読み込めなかった。今の記録は消えていない（読み込めるまで何も書き込まない）。少し待ってもう一度読み込んでほしい。';",
+            "  S.fatal = 'Supabaseから記録を読めなかった。今の記録は消えていない（読み込めるまで何も書き込まない）。Supabaseの使用を許可しているか確かめて、もう一度読み込んでほしい。';")
 # 設定の「つながり」：ログイン関係は claude.ai 版では使わないので、説明に差し替える
 i = js.index('    <div class="item"><div class="l">Googleカレンダー<small>')
 j = js.index('    <div class="item"><div class="l">PCの見張り役<small>')

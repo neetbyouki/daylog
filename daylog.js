@@ -118,8 +118,10 @@ function dbMsg(e) {
   if (c === 'revoked' || c === 'not_granted') return '保存の権限がなくなった。ページを開き直してほしい。';
   return '保存できなかった。通信が戻ったらもう一度試して。';
 }
-function putDoc(path, data) { if (!S.db) return Promise.resolve(); return enqueue(path, () => S.db.doc(path).set(clean(data))); }
-function delDoc(path) { if (!S.db) return Promise.resolve(); return enqueue(path, () => S.db.doc(path).delete()); }
+// 記録をまだ読み込めていないときに書くと、サーバーの記録を空の内容で上書きしてしまうので、書かない
+function canWrite() { return !!S.db && S.ready && !S.loadFailed; }
+function putDoc(path, data) { if (!canWrite()) return Promise.resolve(); return enqueue(path, () => S.db.doc(path).set(clean(data))); }
+function delDoc(path) { if (!canWrite()) return Promise.resolve(); return enqueue(path, () => S.db.doc(path).delete()); }
 const getDay = d => S.days[d] || { date: d, entries: [] };
 function patchDay(d, patch) { const next = { ...getDay(d), ...patch, date: d }; S.days[d] = next; render(); return putDoc('days/' + d, next); }
 function patchTask(id, patch) { const t = { ...S.tasks[id], ...patch, id }; S.tasks[id] = t; render(); return putDoc('tasks/' + id, t); }
@@ -203,6 +205,17 @@ async function loadEvents(d, force) {
   st.list = failedAll ? st.list : list.sort((a, b) => a.start - b.start);
   st.error = err ? { code: err.code, msg: calErr(err), partial: !failedAll } : null;
   st.loading = false; st.at = Date.now(); render();
+  if (!failedAll) cleanBedDupes(d, st.list);
+}
+// 同じ夜に「🌙 就寝の目安」が2つ以上あったら、記録が指している1つだけ残して消す（以前の不具合で増えた分の片付け）
+let bedCleaning = false;
+async function cleanBedDupes(d, list) {
+  const bt = getDay(d).bedtime; if (bedCleaning || !canWrite() || d !== today() || !bt || !bt.eventId) return;
+  const beds = list.filter(e => e.cal === 'app' && e.title === '🌙 就寝の目安');
+  if (beds.length < 2 || !beds.some(e => e.id === bt.eventId)) return;
+  bedCleaning = true;
+  try { for (const e of beds) if (e.id !== bt.eventId) { try { await deleteEvent(e.id); } catch (_) {} } }
+  finally { bedCleaning = false; loadEvents(d, true); }
 }
 async function createEvent({ summary, start, end, reminder = 15, description }) {
   const r = await S.mcp.callTool(CFG.GCAL, 'create_event', {
@@ -373,7 +386,7 @@ function restoreFocus(fx) {
 const draft = (id, fb = '') => S.drafts[id] != null ? S.drafts[id] : fb;
 
 function mainHTML() {
-  if (S.fatal) return `<div class="center-msg"><h1>Daylog</h1><p class="muted">${esc(S.fatal)}</p></div>`;
+  if (S.fatal) return `<div class="center-msg"><h1>Daylog</h1><p class="muted">${esc(S.fatal)}</p>${S.loadFailed ? '<button class="btn" data-a="reloadPage">もう一度読み込む</button>' : ''}</div>`;
   if (!S.ready) return `<div class="center-msg"><h1>Daylog</h1><p class="thinking">記録を読み込んでいる</p></div>`;
   const views = { today: todayView, cal: calView, tasks: tasksView, memos: memosView, goals: tasksView, sky: skyView, review: skyView, settings: settingsView };
   const body = (views[S.view] || todayView)();
@@ -1331,6 +1344,7 @@ A.entryDelete = id => {
   toast('記録を消した。', true);
 };
 A.undo = () => { const f = S.undo; S.undo = null; S.toast = null; if (f) f(); render(); };
+A.reloadPage = () => location.reload();
 A.reloadEvents = () => loadEvents(S.view === 'today' ? today() : today(), true);
 A.proposeBed = () => proposeBedtime(today(), true);
 A.evMenu = key => { S.evMenu = S.evMenu === key ? null : key; render(); };
@@ -1370,7 +1384,7 @@ A.reSuggest = () => { const d = today(); const mode = getDay(d).mode; if (mode) 
 // 就寝目安が決まったら、自動で.｡oOに「🌙 就寝の目安」を入れる（Claudeの予定済みタスクが45分前にスマホへ通知する）
 function autoBedEvent(d) {
   const day = getDay(d); const bt = day.bedtime;
-  if (!bt || !S.mcp || !S.settings.bedtimeNotify || day.mode === 'rest' || S.busy.bedEv || d !== today()) return;
+  if (!bt || !S.mcp || !canWrite() || !S.settings.bedtimeNotify || day.mode === 'rest' || S.busy.bedEv || d !== today()) return;
   if (bt.eventId && bt.eventTime === bt.time) return;
   A.bedEvent(true);
 }
@@ -1379,13 +1393,31 @@ async function dropBedEvent(d) {
   try { await deleteEvent(bt.eventId); } catch (_) {}
   await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventId: null, eventTime: null } }); loadEvents(d, true);
 }
+const BED_TITLE = '🌙 就寝の目安';
+// その夜（論理日の6時〜翌日の昼）の.｡oOにある就寝目安の予定を探す。読めなかったら null
+async function findBedEvents(d) {
+  try {
+    const r = await S.mcp.callTool(CFG.GCAL, 'list_events', { calendarId: CFG.APP_CAL, startTime: isoLocal(dayStart(d)), endTime: isoLocal(new Date(dayStart(addDays(d, 1)).getTime() + 6 * 3600e3)), pageSize: 100, orderBy: 'startTime' }, { cache: { staleTime: 0, gcTime: 60000, refresh: true } });
+    const list = (r && r.payload && r.payload.events) || [];
+    return list.filter(e => e && e.status !== 'cancelled' && (e.summary || '').trim() === BED_TITLE).map(e => e.id);
+  } catch (_) { return null; }
+}
 A.bedEvent = async quiet => {
-  const d = today(); const bt = getDay(d).bedtime; if (!bt || !S.mcp) return; quiet = quiet === true;
+  const d = today(); const bt = getDay(d).bedtime; if (!bt || !S.mcp || !canWrite()) return; quiet = quiet === true;
+  if (S.busy.bedEv) return;
   S.busy.bedEv = true; render();
   const start = slotDate(d, bt.time); const end = new Date(start.getTime() + 15 * 6e4);
   try {
-    if (bt.eventId && bt.eventId !== 'unknown') { await updateEvent(bt.eventId, { startTime: isoLocal(start), endTime: isoLocal(end), summary: '🌙 就寝の目安' }); await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventTime: bt.time } }); if (!quiet) toast(`通知を${bt.time}に合わせた。`); }
-    else { const id = await createEvent({ summary: '🌙 就寝の目安', start, end, reminder: 45, description: 'Daylogの就寝目安' }); await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventId: id || 'unknown', eventTime: bt.time } }); if (!quiet) toast(`${bt.time}の就寝目安をカレンダーに入れた。45分前に通知が来る。`); }
+    const found = await findBedEvents(d);
+    if (found) {
+      // 1つだけ残す（今の記録が指している予定を優先）。残りは重複なので消す
+      const keep = found.includes(bt.eventId) ? bt.eventId : (found[0] || null);
+      for (const id of found) if (id !== keep) { try { await deleteEvent(id); } catch (_) {} }
+      if (keep !== bt.eventId) await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventId: keep, eventTime: null } });
+    } else if ((!bt.eventId || bt.eventId === 'unknown') && quiet) return; // カレンダーを確かめられないときは、重複を作らないよう自動では入れない
+    const evId = getDay(d).bedtime.eventId;
+    if (evId && evId !== 'unknown') { await updateEvent(evId, { startTime: isoLocal(start), endTime: isoLocal(end), summary: BED_TITLE, overrideReminders: [{ method: 'popup', minutes: 45 }] }); await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventTime: bt.time } }); if (!quiet) toast(`通知を${bt.time}に合わせた。`); }
+    else { const id = await createEvent({ summary: BED_TITLE, start, end, reminder: 45, description: 'Daylogの就寝目安' }); await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventId: id || 'unknown', eventTime: bt.time } }); if (!quiet) toast(`${bt.time}の就寝目安をカレンダーに入れた。45分前に通知が来る。`); }
     pushPCConfig();
   } catch (e) { if (!quiet) toast(calErr(e)); }
   finally { S.busy.bedEv = false; render(); loadEvents(d, true); }
@@ -1759,7 +1791,7 @@ document.documentElement.addEventListener('mouseleave', () => { tip.hidden = tru
 let rzT = 0; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (S.view === 'sky') drawSky(); render(); }, 150); });
 
 /* ───────── 起動 ───────── */
-function markLoaded(k) { S.loaded[k] = true; if (!S.ready && S.loaded.settings && S.loaded.days && S.loaded.tasks && S.loaded.goals) { S.ready = true; onReady(); } render(); }
+function markLoaded(k) { S.loaded[k] = true; if (S.loadFailed) return; if (!S.ready && S.loaded.settings && S.loaded.days && S.loaded.tasks && S.loaded.goals) { S.ready = true; onReady(); } render(); }
 function onReady() { runDaily(); loadEvents(today()); syncPC(); }
 // 昨夜、今日の予定を入れていない（夜モードで送っていない）か
 function needsMorningPlan(d) {
@@ -1818,7 +1850,15 @@ function subscribe(path, key, toMap, opts = {}) {
     // あとから読み込んだ古い日（読み込み範囲より前）は消さずに残す
     if (opts.keepBefore) for (const [id, v] of Object.entries(S[key] || {})) if (id < opts.keepBefore && !(id in m)) m[id] = v;
     S[key] = m; markLoaded(key);
-  }, err => { if (!S.loaded[key]) markLoaded(key); if (err && err.code === 'revoked') S.fatal = 'ログインが切れた。開き直してほしい。'; else toast('記録の一部を読めなかった。開き直すと戻ることがある。'); render(); });
+  }, err => loadErr(key, err));
+}
+// 最初の読み込みに失敗したとき：空の状態で始めると「毎回体調を聞かれる・記録が消える・就寝目安が増える」が起きるので、止めて知らせる
+function loadErr(key, err) {
+  if (err && err.code === 'revoked') { S.fatal = 'ログインが切れた。開き直してほしい。'; render(); return; }
+  if (S.loaded[key]) { toast('記録の一部を読めなかった。開き直すと戻ることがある。'); render(); return; }
+  S.loadFailed = true; S.ready = false;
+  S.fatal = '記録を読み込めなかった。今の記録は消えていない（読み込めるまで何も書き込まない）。少し待ってもう一度読み込んでほしい。';
+  console.error('Daylog load failed', key, err); render();
 }
 async function boot() {
   render();
@@ -1830,7 +1870,7 @@ async function boot() {
   if (!S.owner) { S.fatal = 'Daylogは持ち主だけが使える個人用のページ。'; render(); return; }
   S.db = db;
   window.claude.use('mcp').then(m => { S.mcp = m; if (S.ready) { loadEvents(today()); syncPC(); } render(); });
-  db.doc('settings/main').onSnapshot(snap => { const v = snap.exists ? snap.data() : null; S.settings = { ...DEFAULTS, ...(v || {}), cals: { ...DEFAULTS.cals, ...((v && v.cals) || {}) } }; markLoaded('settings'); }, () => markLoaded('settings'));
+  db.doc('settings/main').onSnapshot(snap => { const v = snap.exists ? snap.data() : null; S.settings = { ...DEFAULTS, ...(v || {}), cals: { ...DEFAULTS.cals, ...((v && v.cals) || {}) } }; markLoaded('settings'); }, err => loadErr('settings', err));
   const cutoff = addDays(today(), -400); S.oldFrom = cutoff;
   subscribe('days', 'days', null, { where: ['date', '>=', cutoff], keepBefore: cutoff });
   subscribe('tasks', 'tasks');

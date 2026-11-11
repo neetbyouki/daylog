@@ -4,7 +4,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SUPABASE_URL = 'https://etsuxjcrnyoevrasdhde.supabase.co';
 // 公開してよい鍵（データは行ごとの権限で本人だけが読み書きできる）
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0c3V4amNybnlvZXZyYXNkaGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNDM5OTQsImV4cCI6MjEwOTkxOTk5NH0.ae7iJE6mtN0-wEbiEAaPS5A7j7n3Y_zd-qRVREoBJ9o';
-const VERSION = '2026-11-11a';
+const VERSION = '2026-11-11b';
 const GCAL = 'Google Calendar', HOST = 'host:Daylog_PC';
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
 
@@ -50,22 +50,42 @@ async function fn(action, body = {}) {
 function makeDb(uid) {
   const cache = new Map(); // collection -> Map(id -> data)
   const listeners = new Set(); // {collection, fn}
-  let loaded = false; const waiters = [];
+  let loaded = false; let failErr = null; const waiters = [];
+  let syncAt = null; let syncing = false;
   const col = c => { if (!cache.has(c)) cache.set(c, new Map()); return cache.get(c); };
   const emit = c => { for (const l of listeners) if (l.collection === c) l.fn(); };
   const ready = () => loaded ? Promise.resolve() : new Promise(r => waiters.push(r));
 
-  (async () => {
+  // 最初の読み込み。失敗したら3回まで試し、それでもだめなら「読めなかった」と知らせる
+  // （以前は失敗しても空のまま始めてしまい、空の内容でサーバーの記録を上書きしていた）
+  const loadAll = async () => {
+    const got = [];
     for (let from = 0; ; from += 1000) {
-      const { data, error } = await sb.from('docs').select('collection,id,data').order('collection').order('id').range(from, from + 999);
-      if (error) { console.error(error); break; }
-      for (const r of data) col(r.collection).set(r.id, r.data);
+      const { data, error } = await sb.from('docs').select('collection,id,data,updated_at').order('collection').order('id').range(from, from + 999);
+      if (error) throw error;
+      got.push(...data);
       if (data.length < 1000) break;
     }
+    return got;
+  };
+  (async () => {
+    let last;
+    for (let i = 0; i < 3; i++) {
+      try {
+        const t0 = new Date(Date.now() - 5 * 60e3).toISOString();
+        const list = await loadAll();
+        for (const r of list) col(r.collection).set(r.id, r.data);
+        syncAt = t0; loaded = true; waiters.splice(0).forEach(r => r());
+        for (const l of listeners) l.fn();
+        return;
+      } catch (e) { last = e; console.warn('load', e); await new Promise(r => setTimeout(r, 1000 * (i + 1))); }
+    }
+    console.error('Daylog load failed', last);
+    failErr = { code: 'load_failed', message: last && last.message };
     loaded = true; waiters.splice(0).forEach(r => r());
-    for (const c of cache.keys()) emit(c);
-    for (const l of listeners) l.fn();
+    for (const l of listeners) l.err && l.err(failErr);
   })();
+  const writable = () => { if (!loaded || failErr) throw { code: 'not_loaded' }; };
 
   sb.channel('docs-' + uid)
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'docs' }, p => {
@@ -80,17 +100,22 @@ function makeDb(uid) {
       col(r.collection).set(r.id, r.data); emit(r.collection);
     })
     .subscribe();
-  // 画面に戻ってきたとき、ほかの端末での変更を取り直す
-  document.addEventListener('visibilitychange', async () => {
-    if (document.visibilityState !== 'visible' || !loaded) return;
-    const since = store.get('daylog-sync-at') || new Date(Date.now() - 864e5).toISOString();
-    const { data } = await sb.from('docs').select('collection,id,data,updated_at').gte('updated_at', since);
-    const touched = new Set();
-    for (const r of data || []) { col(r.collection).set(r.id, r.data); touched.add(r.collection); }
-    store.set('daylog-sync-at', new Date().toISOString());
-    touched.forEach(emit);
-  });
-  store.set('daylog-sync-at', new Date().toISOString());
+  // 画面に戻ってきたとき・開いている間は2分ごとに、ほかの端末での変更を取り直す
+  // （リアルタイムの接続は切れることがあるので、その取りこぼしを拾う。時刻はサーバー側で付く）
+  const sync = async () => {
+    if (document.visibilityState !== 'visible' || !loaded || failErr || !syncAt || syncing) return;
+    syncing = true;
+    try {
+      const t0 = new Date(Date.now() - 5 * 60e3).toISOString();
+      const { data, error } = await sb.from('docs').select('collection,id,data,updated_at').gte('updated_at', syncAt);
+      if (error) return;
+      const touched = new Set();
+      for (const r of data || []) { if (JSON.stringify(col(r.collection).get(r.id)) !== JSON.stringify(r.data)) { col(r.collection).set(r.id, r.data); touched.add(r.collection); } }
+      syncAt = t0; touched.forEach(emit);
+    } finally { syncing = false; }
+  };
+  document.addEventListener('visibilitychange', sync);
+  setInterval(sync, 120000);
 
   const OPS = { '==': (a, b) => a === b, '>=': (a, b) => a >= b, '>': (a, b) => a > b, '<=': (a, b) => a <= b, '<': (a, b) => a < b, '!=': (a, b) => a !== b };
   const snapOf = (c, filters) => {
@@ -101,10 +126,10 @@ function makeDb(uid) {
   };
   const query = (c, filters = []) => ({
     where: (f, op, val) => query(c, [...filters, [f, op, val]]),
-    get: async () => { await ready(); return snapOf(c, filters); },
+    get: async () => { await ready(); if (failErr) throw failErr; return snapOf(c, filters); },
     onSnapshot(cb, err) {
-      const l = { collection: c, fn: () => { if (loaded) { try { cb(snapOf(c, filters)); } catch (e) { console.error(e); } } } };
-      listeners.add(l); if (loaded) l.fn();
+      const l = { collection: c, fn: () => { if (loaded && !failErr) { try { cb(snapOf(c, filters)); } catch (e) { console.error(e); } } }, err };
+      listeners.add(l); if (loaded) { if (failErr) err && err(failErr); else l.fn(); }
       return () => listeners.delete(l);
     },
   });
@@ -116,19 +141,19 @@ function makeDb(uid) {
       const [c, id] = split(path);
       return {
         async set(data) {
-          col(c).set(id, data); emit(c);
-          const { error } = await sb.from('docs').upsert({ user_id: uid, collection: c, id, data, updated_at: new Date().toISOString() });
+          writable(); col(c).set(id, data); emit(c);
+          const { error } = await sb.from('docs').upsert({ user_id: uid, collection: c, id, data });
           if (error) fail(error);
         },
         async delete() {
-          col(c).delete(id); emit(c);
+          writable(); col(c).delete(id); emit(c);
           const { error } = await sb.from('docs').delete().eq('collection', c).eq('id', id);
           if (error) fail(error);
         },
-        async get() { await ready(); const v = col(c).get(id); return { id, exists: v !== undefined, data: () => v }; },
+        async get() { await ready(); if (failErr) throw failErr; const v = col(c).get(id); return { id, exists: v !== undefined, data: () => v }; },
         onSnapshot(cb, err) {
-          const l = { collection: c, fn: () => { if (loaded) { const v = col(c).get(id); try { cb({ id, exists: v !== undefined, data: () => v }); } catch (e) { console.error(e); } } } };
-          listeners.add(l); if (loaded) l.fn();
+          const l = { collection: c, fn: () => { if (loaded && !failErr) { const v = col(c).get(id); try { cb({ id, exists: v !== undefined, data: () => v }); } catch (e) { console.error(e); } } }, err };
+          listeners.add(l); if (loaded) { if (failErr) err && err(failErr); else l.fn(); }
           return () => listeners.delete(l);
         },
       };
