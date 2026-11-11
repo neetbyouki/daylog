@@ -134,6 +134,8 @@ function wakeAt(d) {
   const pcFirst = S.pc[d] && S.pc[d].first && S.pc[addDays(d, -1)] ? S.pc[d].first : null;
   const c = [getDay(d).wakeAt, pcFirst].filter(Boolean); return c.length ? Math.min(...c) : null;
 }
+// 夜モードを終えた時刻（その日の「寝た」の記録）
+const closedAt = d => { const c = getDay(d).close; return c && c.done && c.at ? c.at : null; };
 function sleepAt(d) { const day = getDay(d); return day.sleepAt || (S.pc[d] && S.pc[d].last) || null; }
 function moodOf(d) {
   const day = getDay(d);
@@ -220,7 +222,7 @@ async function cleanBedDupes(d, list) {
 async function createEvent({ summary, start, end, reminder = 15, description }) {
   const r = await S.mcp.callTool(CFG.GCAL, 'create_event', {
     calendarId: CFG.APP_CAL, summary, startTime: isoLocal(start), endTime: isoLocal(end),
-    overrideReminders: [{ method: 'popup', minutes: reminder }], description: description || 'Daylogから追加',
+    overrideReminders: reminder == null ? [] : [{ method: 'popup', minutes: reminder }], useDefaultReminders: false, description: description || 'Daylogから追加',
   });
   const p = (r && r.payload) || {};
   return p.id || (p.event && p.event.id) || null;
@@ -332,7 +334,7 @@ async function pushPCConfig(force) {
   const cfg = {
     autoOpenBoot: !!st.autoOpenBoot, autoOpenGame: false, gameExes: st.gameExes || [],
     bedtime: day.bedtime ? day.bedtime.time : null, bedtimeDate: d,
-    notify: !!st.bedtimeNotify && day.mode !== 'rest', quiet: day.mode === 'rest' && !!st.restQuiet,
+    notify: !!st.bedtimeNotify && day.mode !== 'rest' && !closedAt(d), quiet: day.mode === 'rest' && !!st.restQuiet,
   };
   // 見張り役が使う項目が変わったときだけ送る
   const key = JSON.stringify(cfg);
@@ -464,6 +466,13 @@ function claudeCard(d) {
   const head = `<div class="cl-h"><span class="cl-badge"><span aria-hidden="true">✦</span> Claude</span>${m ? `<span class="cl-mode" style="--c:${m.c}">${m.label}</span>` : ''}<span class="spacer"></span>${mode && claudeReady() ? `<button class="iconbtn" data-act="reSuggest" ${S.busy.sug ? 'disabled' : ''} aria-label="${day.suggest && day.suggest.mode === mode ? '別の一言' : '一言をもらう'}" title="${day.suggest && day.suggest.mode === mode ? '別の一言' : '一言をもらう'}">${ICON.reload}</button>` : ''}</div>`;
   let bed = '';
   if (mode) {
+    const act = closedAt(d) ? ((bt && bt.actual) || closedAt(d)) : null;
+    if (act) {
+      const diff = bt && bt.time ? Math.round((act - slotDate(d, bt.time).getTime()) / 6e4) : null;
+      const diffTxt = diff == null ? '' : Math.abs(diff) < 5 ? '目安どおり' : diff > 0 ? `目安より${fmtMin(diff)}遅い` : `目安より${fmtMin(-diff)}早い`;
+      bed = `<div class="cl-bed"><div class="cl-bk">就寝（夜モードで記録）</div>
+      <div class="row" style="gap:10px"><span class="big-time">${hm(act)}</span>${bt && bt.time ? `<span class="faint" style="font-size:12px">目安 ${bt.time}${diffTxt ? `・${diffTxt}` : ''}</span>` : ''}</div></div>`;
+    } else
     bed = `<div class="cl-bed"><div class="cl-bk">今夜の就寝目安</div>
       <div class="row" style="gap:10px"><span class="big-time">${bt ? bt.time : '—'}</span>${bt && bt.eventId && !restQ ? `<span class="bell" data-tip="45分前にスマホへ通知が来る" aria-label="45分前にスマホへ通知">${ICON.bell}</span>` : ''}<span class="spacer"></span>
       ${S.busy.bed ? '<span class="thinking" style="font-size:12px">考え中</span>' : bt ? `<button class="iconbtn" data-act="proposeBed" aria-label="${claudeReady() ? '考え直す' : '計算し直す'}" title="${claudeReady() ? '考え直す' : '計算し直す'}">${ICON.reload}</button>` : '<button class="cl-link" data-act="proposeBed">目安を出す</button>'}</div>
@@ -474,7 +483,7 @@ function claudeCard(d) {
   if (!claudeReady()) {
     // Claudeがいない日：一言はなし。就寝目安（計算）だけ出す
     if (!mode) return `<section class="card"><div class="cl-bk">今夜の就寝目安</div><div class="faint" style="font-size:13px;margin-top:4px">上で今日の体調を選ぶと、前の晩の就寝時刻と昼寝から目安を出す。</div></section>`;
-    return `<section class="card">${bed.replace('<div class="cl-bed">', '<div class="cl-bed" style="margin-top:0;padding-top:0;border-top:0">')}<div class="faint" style="font-size:11px;margin-top:6px">前の晩の就寝時刻と昼寝から計算した目安。</div></section>`;
+    return `<section class="card">${bed.replace('<div class="cl-bed">', '<div class="cl-bed" style="margin-top:0;padding-top:0;border-top:0">')}${closedAt(d) ? '' : '<div class="faint" style="font-size:11px;margin-top:6px">前の晩の就寝時刻と昼寝から計算した目安。</div>'}</section>`;
   }
   return `<section class="card clcard" aria-label="Claudeから">${head}${say}${bed}</section>`;
 }
@@ -1312,7 +1321,7 @@ A.setMode = async m => {
 const bedTried = {};
 function maybeBed(modeChanged) {
   const d = today(); const day = getDay(d);
-  if (!S.ready || !day.mode || S.busy.bed) return;
+  if (!S.ready || !day.mode || S.busy.bed || closedAt(d)) return;
   if (!day.bedtime) { proposeBedtime(d); return; }
   if (day.bedtime.by === 'calc' && claudeReady() && (modeChanged || !bedTried[d])) { bedTried[d] = true; proposeBedtime(d); }
 }
@@ -1384,7 +1393,7 @@ A.reSuggest = () => { const d = today(); const mode = getDay(d).mode; if (mode) 
 // 就寝目安が決まったら、自動で.｡oOに「🌙 就寝の目安」を入れる（Claudeの予定済みタスクが45分前にスマホへ通知する）
 function autoBedEvent(d) {
   const day = getDay(d); const bt = day.bedtime;
-  if (!bt || !S.mcp || !canWrite() || !S.settings.bedtimeNotify || day.mode === 'rest' || S.busy.bedEv || d !== today()) return;
+  if (!bt || !S.mcp || !canWrite() || !S.settings.bedtimeNotify || day.mode === 'rest' || S.busy.bedEv || d !== today() || closedAt(d)) return;
   if (bt.eventId && bt.eventTime === bt.time) return;
   A.bedEvent(true);
 }
@@ -1403,7 +1412,7 @@ async function findBedEvents(d) {
   } catch (_) { return null; }
 }
 A.bedEvent = async quiet => {
-  const d = today(); const bt = getDay(d).bedtime; if (!bt || !S.mcp || !canWrite()) return; quiet = quiet === true;
+  const d = today(); const bt = getDay(d).bedtime; if (!bt || !S.mcp || !canWrite() || closedAt(d)) return; quiet = quiet === true;
   if (S.busy.bedEv) return;
   S.busy.bedEv = true; render();
   const start = slotDate(d, bt.time); const end = new Date(start.getTime() + 15 * 6e4);
@@ -1737,7 +1746,27 @@ A.nightFinish = async () => {
   const close = { ...(getDay(d).close || {}), done: true, at: now, comment: n.comment || undefined, name: n.name || undefined };
   await patchDay(d, { close: clean(close), sleepAt: now, meds: !!n.meds });
   S.night = null; render(); toast('おやすみ。今日の星座が空に昇った。');
+  recordBedActual(d, now);
 };
+// 夜モードを終えた時刻を「実際に寝た時刻」として記録する。
+// .｡oOの「🌙 就寝の目安」はその時刻へ動かして「🌙 就寝」にする（予定がなければ記録として1つ作る）
+const BED_DONE_TITLE = '🌙 就寝';
+async function recordBedActual(d, at) {
+  const bt = getDay(d).bedtime || {};
+  await patchDay(d, { bedtime: { ...bt, actual: at } });
+  pushPCConfig();
+  if (!S.mcp || !canWrite()) return;
+  const start = new Date(at), end = new Date(at + 15 * 6e4);
+  const desc = `Daylogの就寝記録（夜モードを終えた時刻）${bt.time ? `。目安は${bt.time}` : ''}`;
+  try {
+    let id = bt.eventId && bt.eventId !== 'unknown' ? bt.eventId : null;
+    if (!id) { const found = await findBedEvents(d); id = found && found[0] || null; }
+    if (id) { try { await updateEvent(id, { summary: BED_DONE_TITLE, startTime: isoLocal(start), endTime: isoLocal(end), description: desc, overrideReminders: [], useDefaultReminders: false }); } catch (_) { id = null; } }
+    if (!id) id = await createEvent({ summary: BED_DONE_TITLE, start, end, reminder: null, description: desc });
+    await patchDay(d, { bedtime: { ...getDay(d).bedtime, actual: at, eventId: id || 'unknown', eventTime: hm(at), recorded: true } });
+  } catch (e) { toast('就寝の記録はDaylogに残した。' + calWriteErr(e)); }
+  loadEvents(d, true);
+}
 
 /* ───────── イベント配線 ───────── */
 document.addEventListener('click', e => {
