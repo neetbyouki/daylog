@@ -77,7 +77,7 @@ function Show-Toast([string]$title, [string]$body) {
   } catch {}
 }
 
-$Version = '2.0'
+$Version = '2.1'
 function Write-Event([string]$msg) {
   try { Add-Content -Path (Join-Path $Base 'events.log') -Value ("{0}`t{1}" -f (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'), $msg) -Encoding UTF8 } catch {}
 }
@@ -222,6 +222,16 @@ function Sync-Cloud($cfg) {
   }
 }
 $lastCloud = (Get-Date).AddMinutes(-10)
+# 1日1回、新しいDaylogの全データを backup フォルダに日付つきで置く
+function Save-Backup($cfg) {
+  if (-not $cfg.supabaseUrl -or -not $cfg.deviceToken) { return }
+  $dir = Join-Path $Base 'backup'
+  New-Item -ItemType Directory -Force -Path $dir | Out-Null
+  $file = Join-Path $dir ('backup-' + (Get-Date).ToString('yyyy-MM-dd') + '.json')
+  if (Test-Path $file) { return }
+  $data = Invoke-Daylog $cfg 'pc_backup' @{ p_token = [string]$cfg.deviceToken }
+  if ($data) { ($data | ConvertTo-Json -Depth 30) | Set-Content -Path $file -Encoding UTF8; Write-Event ('backup saved ' + (Split-Path $file -Leaf)) }
+}
 
 $cfg = Get-Config
 Install-Shortcuts $cfg
@@ -259,6 +269,7 @@ while ($true) {
   if (($now - $lastCloud).TotalMinutes -ge 5) {
     $lastCloud = $now
     try { Sync-Cloud $cfg } catch { Write-Event ('cloud sync failed: ' + $_.Exception.Message) }
+    try { Save-Backup $cfg } catch { Write-Event ('backup failed: ' + $_.Exception.Message) }
   }
 
   # 見張り役のファイルが新しくなっていたら、入れ替えて起動し直す
