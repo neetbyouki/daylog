@@ -31,7 +31,8 @@ const __rt = (() => {
     const col = c => { if (!cache.has(c)) cache.set(c, new Map()); return cache.get(c); };
     const emit = c => { for (const l of listeners) if (l.collection === c) l.fn(); };
     const ready = () => loaded ? Promise.resolve() : new Promise(r => waiters.push(r));
-    const absorb = list => { const touched = new Set(); for (const r of list) { if (r.u > since) since = r.u; const cur = col(r.collection).get(r.id); if (JSON.stringify(cur) !== JSON.stringify(r.data)) { col(r.collection).set(r.id, r.data); touched.add(r.collection); } } return touched; };
+    const localAt = new Map(); const recent = k => Date.now() - (localAt.get(k) || 0) < 20000;
+    const absorb = (list, skipRecent) => { const touched = new Set(); let hold = null; for (const r of list) { if (skipRecent && recent(r.collection + '/' + r.id)) { if (hold === null || r.u < hold) hold = r.u; continue; } if (r.u > since) since = r.u; const cur = col(r.collection).get(r.id); if (JSON.stringify(cur) !== JSON.stringify(r.data)) { col(r.collection).set(r.id, r.data); touched.add(r.collection); } } if (hold !== null && since >= hold) since = hold - 1; return touched; };
     const ALL = `select collection, id, data, (extract(epoch from updated_at) * 1000)::bigint as u from public.docs where user_id = ops.me()`;
     const load = async () => {
       // 読み込みは3回まで試す。空の結果を「記録なし」と取り違えないよう、設定の記録があるかも確かめる（取り違えると空の内容で上書きしてしまう）
@@ -51,13 +52,28 @@ const __rt = (() => {
     let failErr = null;
     load().catch(e => { console.error('Daylog load failed', e); failErr = { code: 'load_failed', cause: e }; loaded = true; waiters.splice(0).forEach(r => r()); for (const l of listeners) l.err && l.err(failErr); });
     const writable = () => { if (!loaded || failErr) throw { code: 'not_loaded' }; };
-    // ほかの端末での変更を20秒ごとに取り直す（見ているときだけ）
+    // ほかの端末での変更を15秒ごと・画面に戻ったとき・フォーカスしたときに取り直す（見ているときだけ）。
+    // 1分に1回は、ほかで消された記録も反映する。Web版と同じ間隔
+    let polling = false, pollN = 0;
     const poll = async () => {
-      if (!loaded || failErr || document.visibilityState !== 'visible') return;
-      try { const list = await rows(`select collection, id, data, (extract(epoch from updated_at) * 1000)::bigint as u from public.docs where user_id = ops.me() and updated_at > to_timestamp(${since} / 1000.0)`); absorb(list).forEach(emit); } catch (_) {}
+      if (!loaded || failErr || polling || document.visibilityState !== 'visible') return;
+      polling = true;
+      try {
+        const list = await rows(`select collection, id, data, (extract(epoch from updated_at) * 1000)::bigint as u from public.docs where user_id = ops.me() and updated_at > to_timestamp(${since} / 1000.0)`);
+        const touched = absorb(list, true);
+        if (++pollN % 4 === 0) {
+          const ids = await rows(`select collection, id from public.docs where user_id = ops.me()`);
+          if (Array.isArray(ids) && ids.length) {
+            const have = new Set(ids.map(r => r.collection + '/' + r.id));
+            for (const [c, m] of cache) for (const id of [...m.keys()]) if (!have.has(c + '/' + id) && !recent(c + '/' + id)) { m.delete(id); touched.add(c); }
+          }
+        }
+        touched.forEach(emit);
+      } catch (_) {} finally { polling = false; }
     };
-    setInterval(poll, 20000);
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') poll(); });
+    setInterval(poll, 15000);
+    document.addEventListener('visibilitychange', poll);
+    window.addEventListener('focus', poll);
 
     const OPS = { '==': (a, b) => a === b, '>=': (a, b) => a >= b, '>': (a, b) => a > b, '<=': (a, b) => a <= b, '<': (a, b) => a < b, '!=': (a, b) => a !== b };
     const snapOf = (c, f) => { const docs = []; for (const [id, v] of col(c)) if (f.every(([k, op, val]) => (OPS[op] || OPS['=='])(v && v[k], val))) docs.push({ id, data: () => v, exists: true }); docs.sort((a, b) => (a.id < b.id ? -1 : 1)); return { docs, size: docs.length, empty: !docs.length }; };
@@ -72,8 +88,8 @@ const __rt = (() => {
       doc(path) {
         const [c, id] = split(path);
         return {
-          async set(data) { writable(); col(c).set(id, data); emit(c); await sql(`select ops.put(${q(c)}, ${q(id)}, ${dollar(JSON.stringify(data))}::jsonb) is not null as ok`); },
-          async delete() { writable(); col(c).delete(id); emit(c); await sql(`select ops.del(${q(c)}, ${q(id)}) as ok`); },
+          async set(data) { writable(); col(c).set(id, data); localAt.set(c + '/' + id, Date.now()); emit(c); await sql(`select ops.put(${q(c)}, ${q(id)}, ${dollar(JSON.stringify(data))}::jsonb) is not null as ok`); },
+          async delete() { writable(); col(c).delete(id); localAt.set(c + '/' + id, Date.now()); emit(c); await sql(`select ops.del(${q(c)}, ${q(id)}) as ok`); },
           async get() { await ready(); const v = col(c).get(id); return { id, exists: v !== undefined, data: () => v }; },
           onSnapshot(cb, err) { const l = { collection: c, fn: () => { if (loaded && !failErr) { const v = col(c).get(id); try { cb({ id, exists: v !== undefined, data: () => v }); } catch (e) { console.error(e); } } }, err }; listeners.add(l); if (loaded) { if (failErr) err && err(failErr); else l.fn(); } return () => listeners.delete(l); },
         };
