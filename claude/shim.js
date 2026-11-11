@@ -10,8 +10,15 @@ const __rt = (() => {
     if (txt == null) { const b = r && r.content && r.content.find(c => c.type === 'text'); txt = b ? b.text : '[]'; }
     if (typeof txt !== 'string') return txt;
     try { const j = JSON.parse(txt); if (j && typeof j.result === 'string') txt = j.result; else return j; } catch (_) {}
-    const m = txt.match(/<untrusted-data-[^>]*>\s*([\s\S]*?)\s*<\/untrusted-data/);
-    return JSON.parse(m ? m[1] : txt);
+    // 結果は「…within the below <untrusted-data-ID> boundaries.\n\n<untrusted-data-ID>\n[...]\n</untrusted-data-ID>」の形。
+    // 説明文の中にも同じ開始タグがあるので、閉じタグの直前にある開始タグから読む
+    const close = txt.match(/<\/untrusted-data-([^>\s]+)>/);
+    if (close) {
+      const open = '<untrusted-data-' + close[1] + '>';
+      const a = txt.lastIndexOf(open, close.index);
+      if (a >= 0) return JSON.parse(txt.slice(a + open.length, close.index).trim());
+    }
+    return JSON.parse(txt);
   }
   async function sql(query) {
     const m = await mcp(); if (!m) throw { code: 'server_not_connected' };
@@ -25,13 +32,25 @@ const __rt = (() => {
     const emit = c => { for (const l of listeners) if (l.collection === c) l.fn(); };
     const ready = () => loaded ? Promise.resolve() : new Promise(r => waiters.push(r));
     const absorb = list => { const touched = new Set(); for (const r of list) { if (r.u > since) since = r.u; const cur = col(r.collection).get(r.id); if (JSON.stringify(cur) !== JSON.stringify(r.data)) { col(r.collection).set(r.id, r.data); touched.add(r.collection); } } return touched; };
+    const ALL = `select collection, id, data, (extract(epoch from updated_at) * 1000)::bigint as u from public.docs where user_id = ops.me()`;
     const load = async () => {
-      const list = await rows(`select collection, id, data, (extract(epoch from updated_at) * 1000)::bigint as u from public.docs where user_id = ops.me()`);
-      absorb(list); loaded = true; waiters.splice(0).forEach(r => r());
-      for (const l of listeners) l.fn();
+      // 読み込みは3回まで試す。空の結果を「記録なし」と取り違えないよう、設定の記録があるかも確かめる（取り違えると空の内容で上書きしてしまう）
+      let last;
+      for (let i = 0; i < 3; i++) {
+        try {
+          const list = await rows(ALL);
+          if (!Array.isArray(list)) throw { code: 'bad_result' };
+          if (!list.some(r => r.collection === 'settings')) throw { code: 'empty_result' }; // 記録はすでにあるので、空なら読み取り失敗とみなす
+          absorb(list); loaded = true; waiters.splice(0).forEach(r => r());
+          for (const l of listeners) l.fn();
+          return;
+        } catch (e) { last = e; await new Promise(r => setTimeout(r, 800 * (i + 1))); }
+      }
+      throw last || { code: 'load_failed' };
     };
     let failErr = null;
-    const loading = load().catch(e => { failErr = e; loaded = true; waiters.splice(0).forEach(r => r()); for (const l of listeners) l.err && l.err(e); });
+    load().catch(e => { console.error('Daylog load failed', e); failErr = { code: 'load_failed', cause: e }; loaded = true; waiters.splice(0).forEach(r => r()); for (const l of listeners) l.err && l.err(failErr); });
+    const writable = () => { if (!loaded || failErr) throw { code: 'not_loaded' }; };
     // ほかの端末での変更を20秒ごとに取り直す（見ているときだけ）
     const poll = async () => {
       if (!loaded || failErr || document.visibilityState !== 'visible') return;
@@ -53,8 +72,8 @@ const __rt = (() => {
       doc(path) {
         const [c, id] = split(path);
         return {
-          async set(data) { col(c).set(id, data); emit(c); await sql(`select ops.put(${q(c)}, ${q(id)}, ${dollar(JSON.stringify(data))}::jsonb) is not null as ok`); },
-          async delete() { col(c).delete(id); emit(c); await sql(`select ops.del(${q(c)}, ${q(id)}) as ok`); },
+          async set(data) { writable(); col(c).set(id, data); emit(c); await sql(`select ops.put(${q(c)}, ${q(id)}, ${dollar(JSON.stringify(data))}::jsonb) is not null as ok`); },
+          async delete() { writable(); col(c).delete(id); emit(c); await sql(`select ops.del(${q(c)}, ${q(id)}) as ok`); },
           async get() { await ready(); const v = col(c).get(id); return { id, exists: v !== undefined, data: () => v }; },
           onSnapshot(cb, err) { const l = { collection: c, fn: () => { if (loaded && !failErr) { const v = col(c).get(id); try { cb({ id, exists: v !== undefined, data: () => v }); } catch (e) { console.error(e); } } }, err }; listeners.add(l); if (loaded) { if (failErr) err && err(failErr); else l.fn(); } return () => listeners.delete(l); },
         };
