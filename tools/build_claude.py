@@ -32,7 +32,7 @@ js = rep(js, "  S.fatal = '記録を読み込めなかった。今の記録は�
 # 設定の「つながり」：ログイン関係は claude.ai 版では使わないので、説明に差し替える
 i = js.index('    <div class="item"><div class="l">Googleカレンダー<small>')
 j = js.index('    <div class="item"><div class="l">PCの見張り役<small>')
-js = js[:i] + '    <div class="item"><div class="l">このページ<small>claude.ai版。データはアプリ版（https://neetbyouki.github.io/daylog/）と同じ。もう一方で書いた分は20秒ほどで出てくる。</small></div></div>\n' + js[j:]
+js = js[:i] + '    <div class="item"><div class="l">このページ<small>claude.ai版。データはアプリ版（https://neetbyouki.github.io/daylog/）と同じ。もう一方で書いた分は15秒ほどで出てくる。</small></div></div>\n' + js[j:]
 k = js.index('    <div class="item"><div class="l">ログイン中<small>')
 js = js[:k] + js[js.index('\n', k) + 1:]
 

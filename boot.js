@@ -4,7 +4,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SUPABASE_URL = 'https://etsuxjcrnyoevrasdhde.supabase.co';
 // 公開してよい鍵（データは行ごとの権限で本人だけが読み書きできる）
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0c3V4amNybnlvZXZyYXNkaGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNDM5OTQsImV4cCI6MjEwOTkxOTk5NH0.ae7iJE6mtN0-wEbiEAaPS5A7j7n3Y_zd-qRVREoBJ9o';
-const VERSION = '2026-11-11c';
+const VERSION = '2026-11-11d';
 const GCAL = 'Google Calendar', HOST = 'host:Daylog_PC';
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
 
@@ -47,11 +47,14 @@ async function fn(action, body = {}) {
 }
 
 // ── データベース（今までの「コレクション／ドキュメント」の形をそのまま再現する）
-function makeDb(uid) {
+function makeDb(uid, token) {
   const cache = new Map(); // collection -> Map(id -> data)
   const listeners = new Set(); // {collection, fn}
   let loaded = false; let failErr = null; const waiters = [];
-  let syncAt = null; let syncing = false;
+  let syncAt = null; let syncing = false; let syncN = 0;
+  const localAt = new Map(); // 'collection/id' -> この端末で書いた時刻（書き込み中の古い内容で上書きし返さないため）
+  const recent = k => Date.now() - (localAt.get(k) || 0) < 20000;
+  const newest = list => list.reduce((m, r) => (r.updated_at && r.updated_at > m ? r.updated_at : m), syncAt || '');
   const col = c => { if (!cache.has(c)) cache.set(c, new Map()); return cache.get(c); };
   const emit = c => { for (const l of listeners) if (l.collection === c) l.fn(); };
   const ready = () => loaded ? Promise.resolve() : new Promise(r => waiters.push(r));
@@ -75,7 +78,7 @@ function makeDb(uid) {
         const t0 = new Date(Date.now() - 5 * 60e3).toISOString();
         const list = await loadAll();
         for (const r of list) col(r.collection).set(r.id, r.data);
-        syncAt = t0; loaded = true; waiters.splice(0).forEach(r => r());
+        syncAt = newest(list) || t0; loaded = true; waiters.splice(0).forEach(r => r());
         for (const l of listeners) l.fn();
         return;
       } catch (e) { last = e; console.warn('load', e); await new Promise(r => setTimeout(r, 1000 * (i + 1))); }
@@ -87,35 +90,62 @@ function makeDb(uid) {
   })();
   const writable = () => { if (!loaded || failErr) throw { code: 'not_loaded' }; };
 
-  sb.channel('docs-' + uid)
-    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'docs' }, p => {
-      const o = p.old || {}; if (o.user_id && o.user_id !== uid) return;
-      if (o.collection && cache.has(o.collection) && cache.get(o.collection).has(o.id)) { cache.get(o.collection).delete(o.id); emit(o.collection); }
-    })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'docs', filter: `user_id=eq.${uid}` }, p => {
-      if (p.eventType === 'DELETE') return;
-      const r = p.new; if (!r || !r.collection) return;
-      const cur = col(r.collection).get(r.id);
-      if (JSON.stringify(cur) === JSON.stringify(r.data)) return;
-      col(r.collection).set(r.id, r.data); emit(r.collection);
-    })
-    .subscribe();
-  // 画面に戻ってきたとき・開いている間は2分ごとに、ほかの端末での変更を取り直す
-  // （リアルタイムの接続は切れることがあるので、その取りこぼしを拾う。時刻はサーバー側で付く）
+  // ── ほかの端末（スマホ・claude.ai版）での変更を取り込む
+  // ① 15秒ごと・画面に戻ったとき・フォーカスしたときに、前回より新しい記録だけ取り直す（確実な方）
+  // ② リアルタイム通知でもすぐ取り込む（つながっているとき）。切れたら つなぎ直す
   const sync = async () => {
     if (document.visibilityState !== 'visible' || !loaded || failErr || !syncAt || syncing) return;
     syncing = true;
     try {
-      const t0 = new Date(Date.now() - 5 * 60e3).toISOString();
       const { data, error } = await sb.from('docs').select('collection,id,data,updated_at').gte('updated_at', syncAt);
       if (error) return;
-      const touched = new Set();
-      for (const r of data || []) { if (JSON.stringify(col(r.collection).get(r.id)) !== JSON.stringify(r.data)) { col(r.collection).set(r.id, r.data); touched.add(r.collection); } }
-      syncAt = t0; touched.forEach(emit);
-    } finally { syncing = false; }
+      const touched = new Set(); let hold = null;
+      for (const r of data || []) {
+        // この端末で書いたばかりの記録は、書き込みが届くまで待ってから見比べる（次回また取る）
+        if (recent(r.collection + '/' + r.id)) { if (!hold || r.updated_at < hold) hold = r.updated_at; continue; }
+        if (JSON.stringify(col(r.collection).get(r.id)) !== JSON.stringify(r.data)) { col(r.collection).set(r.id, r.data); touched.add(r.collection); }
+      }
+      syncAt = hold || newest(data || []);
+      // 1分に1回、ほかで消された記録も反映する（idだけ取る）
+      if (++syncN % 4 === 0) {
+        const { data: ids, error: e2 } = await sb.from('docs').select('collection,id');
+        if (!e2 && ids) {
+          const have = new Set(ids.map(r => r.collection + '/' + r.id));
+          for (const [c, m] of cache) for (const id of [...m.keys()]) if (!have.has(c + '/' + id) && !recent(c + '/' + id)) { m.delete(id); touched.add(c); }
+        }
+      }
+      touched.forEach(emit);
+    } catch (e) { console.warn('sync', e); } finally { syncing = false; }
   };
   document.addEventListener('visibilitychange', sync);
-  setInterval(sync, 120000);
+  window.addEventListener('focus', sync);
+  window.addEventListener('online', sync);
+  setInterval(sync, 15000);
+
+  let ch = null; let retry = null;
+  const live = () => {
+    if (ch) { sb.removeChannel(ch); ch = null; }
+    ch = sb.channel('docs-' + uid)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'docs' }, p => {
+        const o = p.old || {}; if (o.user_id && o.user_id !== uid) return;
+        if (o.collection && cache.has(o.collection) && cache.get(o.collection).has(o.id)) { cache.get(o.collection).delete(o.id); emit(o.collection); }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'docs', filter: `user_id=eq.${uid}` }, p => {
+        if (p.eventType === 'DELETE') return;
+        const r = p.new; if (!r || !r.collection || recent(r.collection + '/' + r.id)) return;
+        const cur = col(r.collection).get(r.id);
+        if (JSON.stringify(cur) === JSON.stringify(r.data)) return;
+        col(r.collection).set(r.id, r.data); emit(r.collection);
+      })
+      .subscribe(st => {
+        if (st === 'SUBSCRIBED') { sync(); return; }
+        if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') { clearTimeout(retry); retry = setTimeout(live, 20000); }
+      });
+  };
+  // ログインの鍵をリアルタイム側にも渡してからつなぐ（渡さないと本人の記録の通知が届かない）
+  if (token) sb.realtime.setAuth(token);
+  live();
+  sb.auth.onAuthStateChange((ev, ses) => { if (ses && ses.access_token && (ev === 'TOKEN_REFRESHED' || ev === 'SIGNED_IN')) sb.realtime.setAuth(ses.access_token); });
 
   const OPS = { '==': (a, b) => a === b, '>=': (a, b) => a >= b, '>': (a, b) => a > b, '<=': (a, b) => a <= b, '<': (a, b) => a < b, '!=': (a, b) => a !== b };
   const snapOf = (c, filters) => {
@@ -141,12 +171,12 @@ function makeDb(uid) {
       const [c, id] = split(path);
       return {
         async set(data) {
-          writable(); col(c).set(id, data); emit(c);
+          writable(); col(c).set(id, data); localAt.set(c + '/' + id, Date.now()); emit(c);
           const { error } = await sb.from('docs').upsert({ user_id: uid, collection: c, id, data });
           if (error) fail(error);
         },
         async delete() {
-          writable(); col(c).delete(id); emit(c);
+          writable(); col(c).delete(id); localAt.set(c + '/' + id, Date.now()); emit(c);
           const { error } = await sb.from('docs').delete().eq('collection', c).eq('id', id);
           if (error) fail(error);
         },
@@ -219,7 +249,7 @@ async function start() {
   }
   $boot.textContent = '予定を読み込み中…';
   window.__daylogCals = await loadCalendars();
-  const db = makeDb(session.user.id);
+  const db = makeDb(session.user.id, session.access_token);
   const mcp = makeMcp(db);
   const user = { id: session.user.id, email: session.user.email, isOwner: async () => true };
   window.claude = {
