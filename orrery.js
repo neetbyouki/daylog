@@ -17,126 +17,246 @@
   };
 
   /* ────────────── 音 ──────────────
+     pluggnb（プラッグ＋R&B）寄りの、キラキラ・ピロピロしたアンビエント
      まとまりのための決まり
-     1. 音階はひとつだけ（Dのメジャー・ペンタトニック）。どの音どうしが重なっても濁らない
-     2. 鳴るタイミングは 8分音符の拍（84BPM）にそろえる。ばらばらの時刻の記録でもリズムになる
-     3. 1拍に鳴る音は4つまで。全体でも同時に18音まで（今日の星は優先）。同じ楽器・同じ高さの重なりは1つにまとめる
-     4. 種類ごとに楽器を分ける（日記＝ガラスの鐘、タスク＝カリンバ、習慣・目標＝高いチャイム、夜モード＝低い鈴）
-     5. 低いドローン（根音と5度）がずっと下で鳴り、6時間ごとに低音が区切りを打つ
-     6. 残響でひとつの空間にまとめ、最後にコンプレッサーで音量のでこぼこを抑える
-     7. 不調・休養の日の星は、同じ音階のまま少しくぐもった音にする（悲しい音にはしない） */
-  const SCALE = [0, 2, 4, 7, 9];
-  const ROOT = 146.83; // D3
-  const BPM = 84, STEP = 60 / BPM / 2;
-  const noteHz = idx => { idx = clamp(Math.round(idx), 0, 22); return ROOT * Math.pow(2, (Math.floor(idx / 5) * 12 + SCALE[((idx % 5) + 5) % 5]) / 12); };
-  const AU = { ctx: null, out: null, wet: null, dry: null, drone: null, slots: new Map(), voices: 0, on: store.get('sound', true), vol: 0.75 };
+     1. 調は D メジャーだけ。和音は Gmaj7 → F#m7 → Em9 → Dmaj9 を1小節ずつ回す（R&Bの柔らかい和音）
+     2. 星の音は、そのとき鳴っている和音の音にだけ寄せる（どの星が鳴っても和音からはみ出さない）
+     3. 鳴るタイミングは16分音符の拍にそろえる（75BPM・半分のノリ＝pluggnbの速さ）。1拍に4音、全体で同時22音まで
+     4. 楽器：日記＝キラキラのベル（左右にはねる残響つき）＋気分がいい日は「ピロピロ」と和音を駆け上がる音
+              タスク＝短いプラック＋装飾音、習慣・目標＝高いグラス、夜モード＝やわらかい膨らむ音
+     5. 下には、ゆらぐ和音のパッド、808の低音、細かいハイハット（作業ではひかえめ、睡眠では無し）、
+        ときどき遠くで光る小さな音（グリッター）、ごく小さなノイズ（空気の質感）
+     6. 大きな残響（4.5秒）と左右のディレイでひとつの空間にまとめ、最後にコンプレッサーで音量をならす
+     7. 不調・休養の日の星は、同じ和音のまま少しくぐもらせる（悲しい音にはしない）
+     使い方（音のモード）
+     ・聴く：いちばん華やか
+     ・作業：ビートを弱め、ピンクノイズと16Hzのうなり（左右の耳でわずかに違う高さ＝バイノーラル。イヤホンで効く）
+     ・睡眠：ビート無し・ゆっくり・暗め。うなりは 6Hz から 2Hz へ15分かけて下がる。ブラウンノイズ。タイマーで静かに消える */
+  const D3 = 146.83;
+  const PROG = [ // D からの半音（和音の音）
+    { name: 'Gmaj7', root: 5, tones: [5, 9, 12, 16, 19] },
+    { name: 'F#m7', root: 4, tones: [4, 7, 11, 14, 16] },
+    { name: 'Em9', root: 2, tones: [2, 5, 9, 12, 18] },
+    { name: 'Dmaj9', root: 0, tones: [0, 4, 7, 11, 16] },
+  ];
+  const SMODES = {
+    listen: { label: '聴く', bpm: 75, kick: 0.26, hat: 0.05, pad: 0.05, padCut: 1700, noise: 'pink', noiseG: 0.004, glitter: 0.07, arp: true, star: 1, beat: null },
+    work: { label: '作業', bpm: 75, kick: 0.12, hat: 0.022, pad: 0.045, padCut: 1300, noise: 'pink', noiseG: 0.012, glitter: 0.04, arp: true, star: 0.8, beat: { hz: 16, gain: 0.035 } },
+    sleep: { label: '睡眠', bpm: 56, kick: 0, hat: 0, pad: 0.055, padCut: 650, noise: 'brown', noiseG: 0.03, glitter: 0.015, arp: false, star: 0.55, beat: { from: 6, to: 2, minutes: 15, gain: 0.04 } },
+  };
+  const hzOf = semi => D3 * Math.pow(2, semi / 12);
+  const AU = { ctx: null, on: store.get('sound', true), vol: 0.8, voices: 0, slots: new Map(), smode: store.get('smode', 'listen'), timerMin: store.get('timer', 60) };
   function audioInit() {
     if (AU.ctx) return AU.ctx;
     const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
     try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } catch (_) {} // iPhoneのマナーモードに従う
     const ctx = AU.ctx = new C();
     const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -20; comp.knee.value = 18; comp.ratio.value = 3.5; comp.attack.value = 0.006; comp.release.value = 0.35;
-    const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 9000;
+    comp.threshold.value = -18; comp.knee.value = 20; comp.ratio.value = 3; comp.attack.value = 0.008; comp.release.value = 0.4;
+    const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 11000;
     const master = ctx.createGain(); master.gain.value = AU.on ? AU.vol : 0;
     comp.connect(tone); tone.connect(master); master.connect(ctx.destination);
-    // 残響：その場で作る、2.8秒で消えていく広がり
-    const len = Math.floor(ctx.sampleRate * 2.8); const ir = ctx.createBuffer(2, len, ctx.sampleRate);
-    for (let ch = 0; ch < 2; ch++) { const a = ir.getChannelData(ch); for (let i = 0; i < len; i++) { const t = i / len; a[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 3.2) * (i < ctx.sampleRate * 0.012 ? i / (ctx.sampleRate * 0.012) : 1); } }
+    // 残響：その場で作る、4.5秒で消えていく広がり（高い音から先に消える）
+    const sr = ctx.sampleRate, len = Math.floor(sr * 4.5); const ir = ctx.createBuffer(2, len, sr);
+    for (let ch = 0; ch < 2; ch++) { const a = ir.getChannelData(ch); let lp = 0; for (let i = 0; i < len; i++) { const t = i / len; lp += ((Math.random() * 2 - 1) - lp) * (0.9 - t * 0.75); a[i] = lp * Math.pow(1 - t, 2.6) * (i < sr * 0.02 ? i / (sr * 0.02) : 1); } }
     const conv = ctx.createConvolver(); conv.buffer = ir;
-    const wet = ctx.createGain(); wet.gain.value = 0.42; const dry = ctx.createGain(); dry.gain.value = 0.8;
-    conv.connect(wet); wet.connect(comp); dry.connect(comp);
-    AU.out = master; AU.comp = comp; AU.wet = conv; AU.dry = dry;
+    const revRet = ctx.createGain(); revRet.gain.value = 0.55; conv.connect(revRet); revRet.connect(comp);
+    // 左右にはねるディレイ（付点8分）
+    const beat = 60 / 75; const dl = ctx.createDelay(2), dr = ctx.createDelay(2); dl.delayTime.value = beat * 0.75; dr.delayTime.value = beat * 0.75;
+    const fb = ctx.createGain(); fb.gain.value = 0.38; const dlp = ctx.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 3200;
+    const merger = ctx.createChannelMerger(2); const dlyIn = ctx.createGain();
+    dlyIn.connect(dl); dl.connect(dlp); dlp.connect(dr); dr.connect(fb); fb.connect(dl);
+    dl.connect(merger, 0, 0); dr.connect(merger, 0, 1); const dlyRet = ctx.createGain(); dlyRet.gain.value = 0.32; merger.connect(dlyRet); dlyRet.connect(comp); dlyRet.connect(conv);
+    const dry = ctx.createGain(); dry.gain.value = 0.85; dry.connect(comp);
+    Object.assign(AU, { master, comp, rev: conv, dly: dlyIn, dry });
     return ctx;
   }
-  function setSound(on) {
-    AU.on = on; store.set('sound', on);
-    if (AU.ctx && AU.out) AU.out.gain.setTargetAtTime(on ? AU.vol : 0, AU.ctx.currentTime, 0.08);
+  const M = () => SMODES[AU.smode] || SMODES.listen;
+  const stepLen = () => 60 / M().bpm / 4; // 16分音符
+  const barLen = () => 60 / M().bpm * 4;
+  // 今の小節の和音（再生を始めた時刻からの小節数で回す）
+  const chordAt = t => PROG[((Math.floor(((t || 0) - (AU.t0 || 0)) / barLen()) % 4) + 4) % 4];
+  // 欲しい高さに一番近い、和音の音
+  function snap(semi, chord) {
+    let best = semi, bd = 99;
+    for (let o = -24; o <= 36; o += 12) for (const c of chord.tones) { const v = c + o; const d = Math.abs(v - semi); if (d < bd) { bd = d; best = v; } }
+    return best;
   }
-  // 1つの声：右左の位置と、くぐもり具合を付けて、乾いた音と残響の両方へ
-  function voiceOut(t, pan, dark, dur) {
+  // 1つの声：左右の位置・くぐもり・残響とディレイへの送り
+  function voice(t, { pan = 0, dark = false, dur = 2, rev = 0.5, dly = 0, cut = 9000 }) {
     const ctx = AU.ctx; const g = ctx.createGain(); g.gain.value = 0;
-    let node = g;
-    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = dark ? 1900 : 7200; f.Q.value = 0.3;
-    g.connect(f); node = f;
-    let p = null; if (ctx.createStereoPanner) { p = ctx.createStereoPanner(); p.pan.value = clamp(pan, -0.85, 0.85); node.connect(p); node = p; }
-    node.connect(AU.dry); node.connect(AU.wet);
-    AU.voices++; setTimeout(() => { AU.voices = Math.max(0, AU.voices - 1); try { g.disconnect(); } catch (_) {} }, (t - ctx.currentTime + dur + 0.3) * 1000);
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = dark ? Math.min(cut, 1800) : cut; f.Q.value = 0.4;
+    g.connect(f); let node = f;
+    if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = clamp(pan, -0.9, 0.9); node.connect(p); node = p; }
+    node.connect(AU.dry);
+    if (rev) { const s = ctx.createGain(); s.gain.value = rev; node.connect(s); s.connect(AU.rev); }
+    if (dly) { const s = ctx.createGain(); s.gain.value = dly; node.connect(s); s.connect(AU.dly); }
+    AU.voices++; setTimeout(() => { AU.voices = Math.max(0, AU.voices - 1); try { g.disconnect(); } catch (_) {} }, (t - ctx.currentTime + dur + 0.5) * 1000);
     return g;
   }
-  const env = (gp, t, peak, atk, dec) => { gp.setValueAtTime(0.0001, t); gp.exponentialRampToValueAtTime(peak, t + atk); gp.exponentialRampToValueAtTime(0.0001, t + atk + dec); };
+  const env = (gp, t, peak, atk, dec) => { gp.setValueAtTime(0.0001, t); gp.exponentialRampToValueAtTime(Math.max(peak, 0.0002), t + atk); gp.exponentialRampToValueAtTime(0.0001, t + atk + dec); };
+  const osc = (type, hz, t, stop, dest, gain = 1, detune = 0) => { const o = AU.ctx.createOscillator(); o.type = type; o.frequency.value = hz; o.detune.value = detune; const g = AU.ctx.createGain(); g.gain.value = gain; o.connect(g); g.connect(dest); o.start(t); o.stop(stop); return o; };
   const INST = {
-    // 日記：ガラスの鐘（FMで金属的な倍音を少しだけ）
-    diary(t, hz, v, pan, dark) {
-      const ctx = AU.ctx, dur = 3.2; const g = voiceOut(t, pan, dark, dur);
-      const c = ctx.createOscillator(); c.type = 'sine'; c.frequency.value = hz;
-      const m = ctx.createOscillator(); m.type = 'sine'; m.frequency.value = hz * 3.5;
-      const mi = ctx.createGain(); mi.gain.setValueAtTime(hz * 1.6, t); mi.gain.exponentialRampToValueAtTime(hz * 0.02, t + 1.1);
-      m.connect(mi); mi.connect(c.frequency); c.connect(g);
-      const o2 = ctx.createOscillator(); o2.frequency.value = hz * 2.003; const g2 = ctx.createGain(); g2.gain.value = 0.18; o2.connect(g2); g2.connect(g);
-      env(g.gain, t, 0.22 * v, 0.005, dur);
-      [c, m, o2].forEach(o => { o.start(t); o.stop(t + dur + 0.1); });
+    // キラキラのベル（FMの金属的な倍音＋1オクターブ上のきらめき）。左右にはねる
+    bell(t, hz, v, o) {
+      const dur = 2.6; const g = voice(t, { ...o, dur, rev: 0.55, dly: 0.35 });
+      const c = AU.ctx.createOscillator(); c.frequency.value = hz;
+      const m = AU.ctx.createOscillator(); m.frequency.value = hz * 3.01; const mi = AU.ctx.createGain(); mi.gain.setValueAtTime(hz * 1.2, t); mi.gain.exponentialRampToValueAtTime(hz * 0.01, t + 0.8);
+      m.connect(mi); mi.connect(c.frequency); c.connect(g); c.start(t); m.start(t); c.stop(t + dur + 0.1); m.stop(t + dur + 0.1);
+      osc('sine', hz * 2, t, t + dur, g, 0.22); osc('triangle', hz * 4.0, t, t + 0.4, g, 0.05);
+      env(g.gain, t, 0.15 * v, 0.004, dur);
     },
-    // タスク：カリンバ（短く、木の響き）
-    task(t, hz, v, pan, dark) {
-      const ctx = AU.ctx, dur = 1.1; const g = voiceOut(t, pan, dark, dur);
-      const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = hz;
-      const o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = hz * 4.02; const g2 = ctx.createGain(); g2.gain.setValueAtTime(0.25, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-      o2.connect(g2); g2.connect(g); o.connect(g);
-      env(g.gain, t, 0.26 * v, 0.003, dur);
-      [o, o2].forEach(x => { x.start(t); x.stop(t + dur + 0.1); });
+    // ピロピロ：細い矩形波の短い音（少しだけビブラート）
+    piro(t, hz, v, o) {
+      const dur = 0.32; const g = voice(t, { ...o, dur, rev: 0.4, dly: 0.45, cut: 4200 });
+      const a = osc('square', hz, t, t + dur + 0.05, g, 0.5); const b = osc('sine', hz * 2, t, t + dur + 0.05, g, 0.35);
+      const lfo = AU.ctx.createOscillator(); lfo.frequency.value = 9; const lg = AU.ctx.createGain(); lg.gain.value = 9; lfo.connect(lg); lg.connect(a.detune); lg.connect(b.detune); lfo.start(t); lfo.stop(t + dur + 0.05);
+      env(g.gain, t, 0.07 * v, 0.003, dur);
     },
-    // 習慣・目標：高いチャイム（きらめき）
-    gold(t, hz, v, pan, dark) {
-      const ctx = AU.ctx, dur = 3.8; const g = voiceOut(t, pan, dark, dur);
-      [[1, 1], [2.0, 0.35], [3.01, 0.18]].forEach(([r, a]) => { const o = ctx.createOscillator(); o.frequency.value = hz * r; const ga = ctx.createGain(); ga.gain.value = a; o.connect(ga); ga.connect(g); o.start(t); o.stop(t + dur + 0.1); });
-      env(g.gain, t, 0.13 * v, 0.01, dur);
+    // タスク：短いプラック
+    pluck(t, hz, v, o) {
+      const dur = 0.9; const g = voice(t, { ...o, dur, rev: 0.45, dly: 0.2, cut: 5000 });
+      osc('triangle', hz, t, t + dur, g, 1); osc('sine', hz * 2, t, t + 0.25, g, 0.3);
+      env(g.gain, t, 0.17 * v, 0.003, dur);
     },
-    // 夜モード：低い鈴（ゆっくりうなる）
-    night(t, hz, v, pan) {
-      const ctx = AU.ctx, dur = 5.2; const g = voiceOut(t, pan, true, dur);
-      [[1, 1], [2.76, 0.32], [5.4, 0.12], [1.004, 0.6]].forEach(([r, a]) => { const o = ctx.createOscillator(); o.frequency.value = hz * r; const ga = ctx.createGain(); ga.gain.value = a; o.connect(ga); ga.connect(g); o.start(t); o.stop(t + dur + 0.1); });
-      env(g.gain, t, 0.2 * v, 0.02, dur);
+    // 習慣・目標：高いグラス
+    glass(t, hz, v, o) {
+      const dur = 3.4; const g = voice(t, { ...o, dur, rev: 0.7, dly: 0.3 });
+      osc('sine', hz, t, t + dur, g, 1); osc('sine', hz * 2.001, t, t + dur, g, 0.3); osc('sine', hz * 3.003, t, t + 1.2, g, 0.1);
+      env(g.gain, t, 0.09 * v, 0.02, dur);
     },
-    // 6時間ごとの区切り：やわらかい低音
-    bass(t, hz, v) {
-      const ctx = AU.ctx, dur = 2.4; const g = voiceOut(t, 0, true, dur);
-      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = hz; o.connect(g);
-      env(g.gain, t, 0.2 * v, 0.03, dur); o.start(t); o.stop(t + dur + 0.1);
+    // 夜モード：やわらかく膨らむ音
+    swell(t, hz, v, o) {
+      const dur = 4.5; const g = voice(t, { ...o, dark: true, dur, rev: 0.8, cut: 1400 });
+      osc('sawtooth', hz, t, t + dur + 0.6, g, 0.4, -7); osc('sawtooth', hz, t, t + dur + 0.6, g, 0.4, 7); osc('sine', hz / 2, t, t + dur + 0.6, g, 0.6);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06 * v, t + 0.9); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    },
+    // 808：低い正弦波が少し下がる。わずかに歪ませて芯を出す
+    kick(t, hz, v) {
+      const ctx = AU.ctx, dur = 1.5; const g = ctx.createGain(); g.gain.value = 0;
+      const sh = ctx.createWaveShaper(); const cv = new Float32Array(256); for (let i = 0; i < 256; i++) { const x = i / 128 - 1; cv[i] = Math.tanh(x * 1.8); } sh.curve = cv;
+      const o = ctx.createOscillator(); o.frequency.setValueAtTime(hz * 2.2, t); o.frequency.exponentialRampToValueAtTime(hz, t + 0.06);
+      o.connect(sh); sh.connect(g); g.connect(AU.dry); o.start(t); o.stop(t + dur + 0.1);
+      env(g.gain, t, v, 0.004, dur);
+      AU.voices++; setTimeout(() => { AU.voices = Math.max(0, AU.voices - 1); }, (t - ctx.currentTime + dur + 0.3) * 1000);
+    },
+    // ハイハット：高い所だけ残したノイズの、ごく短い音
+    hat(t, v, pan = 0) {
+      const ctx = AU.ctx; const src = ctx.createBufferSource(); src.buffer = noiseBuf('white');
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7500;
+      const g = ctx.createGain(); env(g.gain, t, v, 0.001, 0.045);
+      let node = g; if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = pan; g.connect(p); node = p; }
+      src.connect(hp); hp.connect(g); node.connect(AU.dry); src.start(t, Math.random() * 1.5); src.stop(t + 0.08);
     },
   };
-  // 拍にそろえて鳴らす。返り値は実際に鳴る時刻（画面の光と合わせるため）。鳴らさなかったら null
-  function playNote(inst, idx, v, pan, dark, prio = 1) {
+  const NB = {};
+  function noiseBuf(kind) {
+    if (NB[kind]) return NB[kind];
+    const ctx = AU.ctx, len = ctx.sampleRate * 4; const b = ctx.createBuffer(1, len, ctx.sampleRate); const a = b.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, last = 0;
+    for (let i = 0; i < len; i++) {
+      const w = Math.random() * 2 - 1;
+      if (kind === 'pink') { b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852; b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898; a[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926; }
+      else if (kind === 'brown') { last = (last + 0.02 * w) / 1.02; a[i] = last * 3.5; }
+      else a[i] = w;
+    }
+    // つなぎ目のぷつっという音を消す
+    for (let i = 0; i < 2000; i++) { const k = i / 2000; a[i] *= k; a[len - 1 - i] *= k; }
+    return (NB[kind] = b);
+  }
+
+  /* ── 下で鳴り続ける層：パッド・ノイズ・うなり・ビート（小節ごとに先回りして予約する） ── */
+  const TR = { on: false, timer: 0, nextBar: 0, bar: 0, layers: null, endAt: 0 };
+  function bedStart() {
+    const ctx = AU.ctx; if (!ctx || TR.on) return; const m = M();
+    TR.on = true; AU.t0 = ctx.currentTime + 0.12; TR.nextBar = AU.t0; TR.bar = 0;
+    const L = TR.layers = { nodes: [] };
+    // ノイズ（空気の質感・作業ではピンク、睡眠ではブラウン）
+    const ns = ctx.createBufferSource(); ns.buffer = noiseBuf(m.noise); ns.loop = true;
+    const nf = ctx.createBiquadFilter(); nf.type = 'lowpass'; nf.frequency.value = m.noise === 'brown' ? 900 : 5200;
+    const ng = ctx.createGain(); ng.gain.value = 0; ng.gain.setTargetAtTime(m.noiseG, ctx.currentTime, 2);
+    ns.connect(nf); nf.connect(ng); ng.connect(AU.comp); ns.start(); L.nodes.push(ns); L.noiseG = ng;
+    // うなり（バイノーラル）：左は D3、右は D3＋うなりの数。左右を分けて直接出す（残響を通さない）
+    if (m.beat) {
+      const merger = ctx.createChannelMerger(2); const bg = ctx.createGain(); bg.gain.value = 0; bg.gain.setTargetAtTime(m.beat.gain, ctx.currentTime, 3);
+      const l = ctx.createOscillator(); l.frequency.value = D3; const r = ctx.createOscillator();
+      const start = m.beat.hz || m.beat.from; r.frequency.value = D3 + start;
+      if (m.beat.from) { r.frequency.setValueAtTime(D3 + m.beat.from, ctx.currentTime); r.frequency.linearRampToValueAtTime(D3 + m.beat.to, ctx.currentTime + m.beat.minutes * 60); }
+      l.connect(merger, 0, 0); r.connect(merger, 0, 1); merger.connect(bg); bg.connect(AU.master); l.start(); r.start();
+      L.nodes.push(l, r); L.beatG = bg;
+    }
+    sched(); TR.timer = setInterval(sched, 120);
+  }
+  function bedStop(fade = 0.6) {
+    if (!TR.on) return; TR.on = false; clearInterval(TR.timer);
+    const ctx = AU.ctx, L = TR.layers; TR.layers = null; if (!L) return;
+    [L.noiseG, L.beatG, L.padG].forEach(g => { if (g) g.gain.setTargetAtTime(0.0001, ctx.currentTime, fade); });
+    setTimeout(() => L.nodes.forEach(n => { try { n.stop(); } catch (_) {} }), fade * 6000);
+  }
+  // 小節を先回りして予約する（パッドの和音・808・ハイハット・グリッター）
+  function sched() {
+    const ctx = AU.ctx; if (!TR.on || !ctx) return; const m = M();
+    while (TR.nextBar < ctx.currentTime + 0.6) {
+      const t = TR.nextBar, bar = TR.bar, ch = PROG[bar % 4], bl = barLen(), st = stepLen();
+      padChord(t, ch, bl, m);
+      if (m.kick) { INST.kick(t, hzOf(ch.root - 24), m.kick); if (bar % 2 === 1) INST.kick(t + st * 10, hzOf(ch.root - 24), m.kick * 0.7); }
+      if (m.hat) for (let i = 0; i < 16; i += 2) {
+        INST.hat(t + i * st, m.hat * (i % 4 === 0 ? 1 : 0.6), i % 4 ? 0.25 : -0.15);
+        if (bar % 4 === 3 && i === 12) for (let k = 1; k < 4; k++) INST.hat(t + i * st + k * st * 2 / 3, m.hat * 0.5, 0.35); // 3連のロール
+      }
+      // 遠くで光る小さな音（和音の音の高いところ）
+      for (let i = 0; i < 16; i++) if (Math.random() < m.glitter) {
+        const semi = ch.tones[Math.floor(Math.random() * ch.tones.length)] + 24 + (Math.random() < 0.4 ? 12 : 0);
+        INST.glass(t + i * st, hzOf(semi), 0.35, { pan: Math.random() * 1.6 - 0.8 });
+      }
+      TR.nextBar += bl; TR.bar++;
+    }
+  }
+  function padChord(t, ch, bl, m) {
+    const ctx = AU.ctx; const g = ctx.createGain(); const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = m.padCut; f.Q.value = 0.6;
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.15; const lg = ctx.createGain(); lg.gain.value = m.padCut * 0.25; lfo.connect(lg); lg.connect(f.frequency);
+    g.connect(f); f.connect(AU.dry); const rs = ctx.createGain(); rs.gain.value = 0.7; f.connect(rs); rs.connect(AU.rev);
+    const end = t + bl + 1.6;
+    ch.tones.slice(0, 4).forEach((semi, i) => { const hz = hzOf(semi - 12 + (i === 0 ? 0 : 0)); osc('sawtooth', hz, t, end, g, 0.25, -9); osc('sawtooth', hz, t, end, g, 0.25, 9); osc('triangle', hz, t, end, g, 0.35); });
+    lfo.start(t); lfo.stop(end);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(m.pad, t + 0.9); g.gain.setValueAtTime(m.pad, t + bl); g.gain.exponentialRampToValueAtTime(0.0001, end);
+    if (TR.layers) TR.layers.padG = g;
+  }
+
+  // 星を鳴らす：和音に寄せた高さで、16分の拍にそろえる。返り値は鳴る時刻（画面の光と合わせる）。鳴らさなかったら null
+  function starSound(kind, semiWant, v, pan, dark, prio = 1, mood = null) {
     const ctx = AU.ctx; if (!ctx || !AU.on || ctx.state !== 'running') return null;
-    const hz = inst === 'bass' ? noteHz(idx) / 2 : noteHz(idx);
-    let t = Math.ceil((ctx.currentTime + 0.04) / STEP) * STEP;
-    for (let spill = 0; spill < 3; spill++, t += STEP) {
+    const m = M(); const st = stepLen();
+    let t = Math.ceil((ctx.currentTime + 0.03) / st) * st;
+    for (let spill = 0; spill < 3; spill++, t += st) {
+      const ch = chordAt(t); const semi = snap(semiWant, ch);
       const key = t.toFixed(3); const slot = AU.slots.get(key) || [];
-      if (slot.some(s => s.inst === inst && Math.abs(s.hz - hz) < 1)) return t; // 同じ音はまとめる
+      if (slot.some(s => s.kind === kind && s.semi === semi)) return t; // 同じ音はまとめる
       if (slot.length >= 4) continue;
-      if (AU.voices >= 18 && prio < 2) return null; // 鳴っている音が多すぎるときは、今日以外の星を休ませる
-      slot.push({ inst, hz }); AU.slots.set(key, slot);
-      const tt = t + Math.random() * 0.012; // ほんの少しだけ揺らす（機械っぽさを消す）
-      INST[inst](tt, hz, v * (0.9 + Math.random() * 0.2), pan, dark);
-      if (AU.slots.size > 64) { const now = ctx.currentTime; for (const k of AU.slots.keys()) if (Number(k) < now - 1) AU.slots.delete(k); }
+      if (AU.voices >= 22 && prio < 2) return null; // 鳴っている音が多すぎるときは、今日以外の星を休ませる
+      slot.push({ kind, semi }); AU.slots.set(key, slot);
+      const tt = t + Math.random() * 0.01; const vv = v * m.star * (0.9 + Math.random() * 0.2); const o = { pan, dark };
+      if (kind === 'diary') {
+        INST.bell(tt, hzOf(semi), vv, o);
+        // ピロピロ：気分がいい記録は、和音の音を16分の3連で駆け上がる
+        if (m.arp && (mood == null || mood >= 3)) {
+          const up = ch.tones.map(x => x + 12 * Math.ceil((semi - x) / 12)).filter(x => x >= semi).sort((a, b) => a - b);
+          const seq = [...new Set([...up, ...up.map(x => x + 12)])].slice(1, mood >= 5 ? 6 : 4);
+          seq.forEach((s2, i) => INST.piro(tt + (i + 1) * st * 2 / 3, hzOf(s2), vv * (0.9 - i * 0.12), { pan: pan + (i % 2 ? 0.3 : -0.3), dark }));
+        }
+      } else if (kind === 'task') {
+        INST.pluck(tt, hzOf(semi), vv, o);
+        if (m.arp) INST.piro(tt + st / 2, hzOf(snap(semi + 3, ch)), vv * 0.6, o); // 小さな装飾音
+      } else if (kind === 'gold') INST.glass(tt, hzOf(semi), vv * 1.2, o);
+      else INST.swell(tt, hzOf(semi), vv, o);
+      if (AU.slots.size > 96) { const now = ctx.currentTime; for (const k of AU.slots.keys()) if (Number(k) < now - 1) AU.slots.delete(k); }
       return tt;
     }
     return null;
   }
-  function drone(on) {
-    const ctx = AU.ctx; if (!ctx) return;
-    if (on && !AU.drone) {
-      const g = ctx.createGain(); g.gain.value = 0;
-      const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420; f.Q.value = 0.7;
-      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.06; const lg = ctx.createGain(); lg.gain.value = 140; lfo.connect(lg); lg.connect(f.frequency);
-      const os = [[ROOT / 2, 'triangle', 0.5], [ROOT * 0.75, 'triangle', 0.35], [ROOT / 2 * 1.003, 'sine', 0.4]].map(([hz, ty, a]) => { const o = ctx.createOscillator(); o.type = ty; o.frequency.value = hz; const ga = ctx.createGain(); ga.gain.value = a; o.connect(ga); ga.connect(f); o.start(); return o; });
-      f.connect(g); g.connect(AU.dry); g.connect(AU.wet); lfo.start();
-      g.gain.setTargetAtTime(0.05, ctx.currentTime, 1.2);
-      AU.drone = { g, os: [...os, lfo] };
-    } else if (!on && AU.drone) {
-      const d = AU.drone; AU.drone = null; d.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.4);
-      setTimeout(() => d.os.forEach(o => { try { o.stop(); } catch (_) {} }), 2500);
-    }
+  function setSound(on) {
+    AU.on = on; store.set('sound', on);
+    if (AU.ctx && AU.master) AU.master.gain.setTargetAtTime(on ? AU.vol : 0, AU.ctx.currentTime, 0.1);
   }
 
   /* ────────────── 天球 ────────────── */
@@ -185,13 +305,13 @@
     }
     if (E.playT == null) E.playT = hourOf(Date.now());
   }
-  // 星の音の高さ：空の高い所（昔の日）ほど高い音。日記は気分で上下、夜モードは低く
+  // 星の音の高さ（D3からの半音。このあと和音の音に寄せる）：空の高い所（昔の日）ほど高い。日記は気分で上下、夜モードは低く
   function starNote(s) {
-    const base = 5 + Math.round(s.ring.f * 5);
-    if (s.k === 'diary') return base + 5 + (s.mood ? [-2, -1, 0, 1, 2][clamp(s.mood, 1, 5) - 1] : 0);
-    if (s.k === 'task') return base + 5 + (s.small ? 3 : 1);
-    if (s.k === 'gold') return base + 10;
-    return base - 3; // night
+    const up = Math.round(s.ring.f * 10);
+    if (s.k === 'diary') return 14 + up + (s.mood ? [-4, -2, 0, 2, 4][clamp(s.mood, 1, 5) - 1] : 0);
+    if (s.k === 'task') return 12 + up + (s.small ? 7 : 3);
+    if (s.k === 'gold') return 26 + Math.round(s.ring.f * 7);
+    return -2 + Math.round(s.ring.f * 4); // night
   }
   const darkDay = r => r.info && (r.info.mode === 'bad' || r.info.mode === 'rest');
 
@@ -375,17 +495,23 @@
     if (E.mode === 'outside' && idle && !E.drag && !reduce()) E.yaw += dt * 0.05; // ゆっくり自転
     // 何もしないまま1分たったら止まる（電池のため）。触れば動き出す
     if (!E.play && !E.gyroOn && Date.now() - E.lastInteract > 60000 && !E.flashes.length) { draw(); E.raf = 0; return; }
-    if (E.play) {
-      const prev = E.playT; E.playT = (E.playT + dt * E.speed * (24 / 36)) % 24; // 1倍で 36秒＝1日
-      crossings(prev, E.playT);
-    }
+    if (E.play) advance(dt);
     draw();
     E.raf = requestAnimationFrame(tick);
   }
+  function advance(dt) {
+    const prev = E.playT; E.playT = (E.playT + dt * E.speed * (24 / 36)) % 24; // 1倍で 36秒＝1日
+    crossings(prev, E.playT);
+    // 睡眠タイマー：最後の90秒で静かに消えて止まる
+    if (TR.endAt && AU.ctx) {
+      const left = TR.endAt - Date.now();
+      if (left <= 0) { setPlay(false); setMsg('おやすみ。音を止めた。'); }
+      else if (left < 90000 && !TR.fading) { TR.fading = true; AU.master.gain.setTargetAtTime(0.0001, AU.ctx.currentTime, 25); }
+      updateTimerText();
+    }
+  }
   function crossings(a, b) {
     const between = h => (a <= b ? h > a && h <= b : h > a || h <= b);
-    // 6時間ごとの区切りの低音
-    [0, 6, 12, 18].forEach((h, i) => { if (between(h)) playNote('bass', [0, 4, 3, 4][i] + 5, 0.9, 0, true, 2); }); // 根音・5度・4度・5度
     const cam = camera();
     for (const s of E.stars) {
       if (!between(s.h)) continue;
@@ -400,9 +526,15 @@
       if (p) pan = (p.x / E.w - 0.5) * 1.6;
       // 今日に近い日ほど少し大きく
       v *= 0.75 + 0.25 * (1 - s.ring.f);
-      const t = playNote(s.k, starNote(s), v, pan, darkDay(s.ring), s.ring.isToday ? 2 : 1);
+      const t = starSound(s.k, starNote(s), v, pan, darkDay(s.ring), s.ring.isToday ? 2 : 1, s.mood);
       if (t != null) E.flashes.push({ s, t0: performance.now() + Math.max(0, (t - AU.ctx.currentTime) * 1000) });
     }
+  }
+  // 画面を離れても（作業・睡眠のとき）時間を進めて鳴らし続ける
+  let bgTimer = 0, bgLast = 0;
+  function bgRun(on) {
+    clearInterval(bgTimer); bgTimer = 0;
+    if (on) { bgLast = performance.now(); bgTimer = setInterval(() => { const n = performance.now(); const dt = Math.min(0.5, (n - bgLast) / 1000); bgLast = n; if (E.play) advance(dt); E.flashes.length = 0; }, 100); }
   }
   function startLoop() { if (!E.raf) { E.lastTs = 0; E.raf = requestAnimationFrame(tick); } }
   function stopLoop() { if (E.raf) cancelAnimationFrame(E.raf); E.raf = 0; }
@@ -425,7 +557,7 @@
     const r = pick(x, y);
     if (r && r.star) {
       E.sel = r.star; E.selRing = r.star.ring.d;
-      ensureAudio(); const t = playNote(r.star.k, starNote(r.star), 0.9, (x / E.w - 0.5) * 1.6, darkDay(r.star.ring), 2);
+      ensureAudio(); const t = starSound(r.star.k, starNote(r.star), 0.9, (x / E.w - 0.5) * 1.6, darkDay(r.star.ring), 2, r.star.mood);
       if (t != null) E.flashes.push({ s: r.star, t0: performance.now() + Math.max(0, (t - AU.ctx.currentTime) * 1000) });
     } else if (r && r.ring) { E.sel = null; E.selRing = E.selRing === r.ring.d ? null : r.ring.d; }
     else { E.sel = null; E.selRing = null; }
@@ -463,10 +595,40 @@
   }
   function hideHint() { const h = E.el && E.el.querySelector('.orr-hint'); if (h && !h.hidden) { h.hidden = true; store.set('hinted', true); } }
   function ensureAudio() { const ctx = audioInit(); if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {}); return ctx; }
-  function togglePlay() {
-    E.play = !E.play;
-    if (E.play) { ensureAudio(); drone(AU.on); startLoop(); } else drone(false);
+  function togglePlay() { setPlay(!E.play); }
+  function setPlay(on) {
+    E.play = on;
+    if (on) {
+      ensureAudio(); if (AU.master) { TR.fading = false; AU.master.gain.cancelScheduledValues(AU.ctx.currentTime); AU.master.gain.setTargetAtTime(AU.on ? AU.vol : 0, AU.ctx.currentTime, 0.1); }
+      if (AU.on) bedStart();
+      TR.endAt = AU.smode === 'sleep' ? Date.now() + AU.timerMin * 60000 : 0;
+      wake(AU.smode === 'sleep'); startLoop();
+    } else { bedStop(); TR.endAt = 0; wake(false); dim(false); }
     syncControls();
+  }
+  // 音のモードを変える（鳴っていたら、下の層を作り直す）
+  function setSmode(v) {
+    if (!SMODES[v]) return; AU.smode = v; store.set('smode', v);
+    if (v === 'sleep' && E.speed > 1) E.speed = 0.5;
+    if (E.play) { bedStop(0.3); setTimeout(() => { if (E.play && AU.on) bedStart(); }, 400); TR.endAt = v === 'sleep' ? Date.now() + AU.timerMin * 60000 : 0; wake(v === 'sleep'); }
+    syncControls();
+  }
+  // 睡眠のとき：画面が消えないようにする（音が止まらないように）。暗い幕で画面の明るさを抑える
+  let lock = null;
+  async function wake(on) {
+    try { if (on && !lock && navigator.wakeLock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); } else if (!on && lock) { await lock.release(); lock = null; } } catch (_) {}
+  }
+  function dim(on) {
+    let d = document.querySelector('.orr-dim');
+    if (!on) { if (d) d.remove(); return; }
+    if (!d) { d = document.createElement('div'); d.className = 'orr-dim'; d.setAttribute('role', 'button'); d.setAttribute('aria-label', '暗い幕を閉じる'); d.innerHTML = '<div class="orr-dim-t"></div><div class="orr-dim-s"></div><div class="orr-dim-h">タップで戻る</div>'; d.addEventListener('click', () => dim(false)); document.body.appendChild(d); }
+    updateTimerText();
+  }
+  function updateTimerText() {
+    const left = TR.endAt ? Math.max(0, Math.ceil((TR.endAt - Date.now()) / 60000)) : null;
+    const txt = left != null ? `残り ${left}分` : '';
+    const a = E.el && E.el.querySelector('.orr-left'); if (a && a.textContent !== txt) a.textContent = txt;
+    const d = document.querySelector('.orr-dim'); if (d) { const n = new Date(); d.querySelector('.orr-dim-t').textContent = `${pad2(n.getHours())}:${pad2(n.getMinutes())}`; d.querySelector('.orr-dim-s').textContent = txt ? `睡眠の音 ・ ${txt}` : ''; }
   }
   // スマホの傾きで見回す（iPhoneは最初に許可がいる）
   async function toggleGyro() {
@@ -517,6 +679,11 @@
           <button class="orr-btn ic" data-o="sound" aria-label="音"></button>
         </div>
       </div>
+      <div class="orr-sound">
+        <div class="orr-seg2" role="group" aria-label="音の使い方"><button data-o="smode" data-v="listen">聴く</button><button data-o="smode" data-v="work">作業</button><button data-o="smode" data-v="sleep">睡眠</button></div>
+        <div class="orr-snote"></div>
+        <div class="orr-sleep" hidden><div class="orr-seg2 sm" role="group" aria-label="睡眠タイマー"><button data-o="timer" data-v="30">30分</button><button data-o="timer" data-v="60">60分</button><button data-o="timer" data-v="90">90分</button></div><span class="orr-left"></span><button class="orr-btn wide" data-o="dim">画面を暗くする</button></div>
+      </div>
       <div class="orr-detail" aria-live="polite" hidden></div>`;
     el.addEventListener('click', e => {
       const b = e.target.closest('[data-o]'); if (!b) return; const o = b.dataset.o, v = b.dataset.v;
@@ -524,17 +691,32 @@
       if (o === 'mode') { E.mode = v; store.set('mode', v); if (v === 'inside') { E.lookYaw = azim(E.playT); E.lookPitch = 0.35; } else if (E.gyroOn) toggleGyro(); syncControls(); draw(); }
       else if (o === 'range') { E.range = Number(v); store.set('range', E.range); if (E.api.need) E.api.need(E.range); buildData(); E.sel = null; renderDetail(); syncControls(); draw(); }
       else if (o === 'play') togglePlay();
-      else if (o === 'speed') { E.speed = E.speed === 1 ? 2 : E.speed === 2 ? 4 : E.speed === 4 ? 0.5 : 1; syncControls(); }
+      else if (o === 'speed') { E.speed = AU.smode === 'sleep' ? (E.speed === 0.5 ? 1 : 0.5) : E.speed === 1 ? 2 : E.speed === 2 ? 4 : E.speed === 4 ? 0.5 : 1; syncControls(); }
       else if (o === 'now') { E.playT = hourOf(Date.now()); if (E.mode === 'inside') E.lookYaw = azim(E.playT); draw(); }
-      else if (o === 'sound') { setSound(!AU.on); if (AU.on) { ensureAudio(); if (E.play) drone(true); } else drone(false); syncControls(); }
+      else if (o === 'sound') { setSound(!AU.on); if (AU.on) { ensureAudio(); if (E.play) bedStart(); } else bedStop(); syncControls(); }
+      else if (o === 'smode') setSmode(v);
+      else if (o === 'timer') { AU.timerMin = Number(v); store.set('timer', AU.timerMin); if (E.play && AU.smode === 'sleep') { TR.endAt = Date.now() + AU.timerMin * 60000; TR.fading = false; AU.master && AU.master.gain.setTargetAtTime(AU.on ? AU.vol : 0, AU.ctx.currentTime, 0.2); } syncControls(); updateTimerText(); }
+      else if (o === 'dim') { if (!E.play) setPlay(true); dim(true); }
       else if (o === 'gyro') toggleGyro();
       else if (o === 'close') { E.sel = null; E.selRing = null; renderDetail(); draw(); }
     });
     E.el = el; E.cv = el.querySelector('canvas'); E.ctx = E.cv.getContext('2d');
     bindCanvas(E.cv);
-    document.addEventListener('visibilitychange', () => { if (document.hidden) { if (E.play) { E.play = false; drone(false); syncControls(); } if (AU.ctx && AU.ctx.state === 'running') AU.ctx.suspend().catch(() => {}); } else if (E.el && E.el.isConnected) startLoop(); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // 聴くモードは止める。作業・睡眠は鳴らし続ける（iPhoneは画面を消すと止まることがある）
+        if (E.play && AU.smode === 'listen') setPlay(false);
+        if (!E.play && AU.ctx && AU.ctx.state === 'running') AU.ctx.suspend().catch(() => {});
+        if (E.play) bgRun(true);
+      } else { bgRun(false); if (E.play) { ensureAudio(); if (AU.smode === 'sleep') wake(true); } if (E.el && E.el.isConnected) startLoop(); else if (E.play) bgRun(true); }
+    });
     window.addEventListener('resize', () => { if (E.el && E.el.isConnected) { resize(); draw(); } });
   }
+  const SNOTE = {
+    listen: 'キラキラのベル、ピロピロ駆け上がる音、やわらかい808とハイハット。',
+    work: '🎧 イヤホン推奨：左右でわずかに高さの違う音（16Hzのうなり）とピンクノイズ。ビートはひかえめ。ほかの画面に移っても鳴り続ける。',
+    sleep: '🎧 イヤホン推奨：6Hzから2Hzへゆっくり下がるうなりとブラウンノイズ。ビートなし・ゆっくり。タイマーで静かに消える。',
+  };
   function syncControls() {
     const el = E.el; if (!el) return;
     el.querySelectorAll('[data-o="mode"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === E.mode)));
@@ -544,6 +726,12 @@
     const sb = el.querySelector('[data-o="sound"]'); sb.innerHTML = AU.on ? IC.sound : IC.mute; sb.setAttribute('aria-label', AU.on ? '音を消す' : '音を出す'); sb.setAttribute('aria-pressed', String(AU.on));
     const gb = el.querySelector('[data-o="gyro"]'); gb.hidden = E.mode !== 'inside' || !('DeviceOrientationEvent' in window); gb.setAttribute('aria-pressed', String(E.gyroOn));
     el.classList.toggle('inside', E.mode === 'inside');
+    el.querySelectorAll('[data-o="smode"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === AU.smode)));
+    el.querySelectorAll('[data-o="timer"]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.v) === AU.timerMin)));
+    el.querySelector('.orr-sleep').hidden = AU.smode !== 'sleep';
+    el.querySelector('.orr-snote').textContent = SNOTE[AU.smode];
+    el.classList.toggle('sleepy', AU.smode === 'sleep');
+    updateTimerText();
   }
   function renderDetail() {
     const box = E.el && E.el.querySelector('.orr-detail'); if (!box) return; const api = E.api;
@@ -575,19 +763,24 @@
       if (E.el.parentElement !== host) host.appendChild(E.el);
       if (api.need) api.need(E.range);
       const sig = signature(api); if (sig !== E.sig) { E.sig = sig; buildData(); }
-      E.lastInteract = Date.now(); resize(); syncControls(); renderDetail(); draw(); startLoop();
+      bgRun(false); E.lastInteract = Date.now(); resize(); syncControls(); renderDetail(); draw(); startLoop();
     },
     refresh(api) {
       if (!E.el || !E.el.isConnected) return; E.api = api;
       const sig = signature(api); if (sig !== E.sig) { E.sig = sig; buildData(); renderDetail(); draw(); }
     },
     detach() {
-      stopLoop(); if (E.play) { E.play = false; drone(false); syncControls(); }
+      stopLoop();
       if (E.gyroOn) { E.gyroOn = false; window.removeEventListener('deviceorientation', onOrient); }
+      // 作業・睡眠で鳴っているときは、ほかの画面でも鳴らし続ける。聴くモードは止める
+      if (E.play && AU.smode !== 'listen') { bgRun(true); return; }
+      if (E.play) setPlay(false);
       if (AU.ctx && AU.ctx.state === 'running') AU.ctx.suspend().catch(() => {});
     },
     // 音の大きさを測る（確認用）：最大値と平均の強さ
-    _meter() { if (!AU.ctx) return null; if (!AU.an) { AU.an = AU.ctx.createAnalyser(); AU.an.fftSize = 2048; AU.out.connect(AU.an); AU.peak = 0; AU.sum = 0; AU.n = 0; const buf = new Float32Array(2048); setInterval(() => { AU.an.getFloatTimeDomainData(buf); let pk = 0, ss = 0; for (const v of buf) { pk = Math.max(pk, Math.abs(v)); ss += v * v; } AU.peak = Math.max(AU.peak, pk); AU.sum += Math.sqrt(ss / buf.length); AU.n++; }, 40); } return { peak: AU.peak, rms: AU.n ? AU.sum / AU.n : 0 }; },
-    _debug: () => ({ rings: E.rings.length, stars: E.stars.length, mode: E.mode, play: E.play, playT: E.playT, audio: AU.ctx ? AU.ctx.state : 'none', voices: AU.voices }),
+    _meter() { if (!AU.ctx) return null; if (!AU.an) { AU.an = AU.ctx.createAnalyser(); AU.an.fftSize = 2048; AU.master.connect(AU.an); AU.peak = 0; AU.sum = 0; AU.n = 0; const buf = new Float32Array(2048); setInterval(() => { AU.an.getFloatTimeDomainData(buf); let pk = 0, ss = 0; for (const v of buf) { pk = Math.max(pk, Math.abs(v)); ss += v * v; } AU.peak = Math.max(AU.peak, pk); AU.sum += Math.sqrt(ss / buf.length); AU.n++; }, 40); } return { peak: AU.peak, rms: AU.n ? AU.sum / AU.n : 0 }; },
+    // 出ている音を録音する（確認用）
+    _stream() { if (!AU.ctx) return null; if (!AU.rec) { AU.rec = AU.ctx.createMediaStreamDestination(); AU.master.connect(AU.rec); } return AU.rec.stream; },
+    _debug: () => ({ rings: E.rings.length, stars: E.stars.length, mode: E.mode, play: E.play, playT: E.playT, audio: AU.ctx ? AU.ctx.state : 'none', voices: AU.voices, smode: AU.smode, bed: TR.on, bars: TR.bar, endAt: TR.endAt }),
   };
 })();
