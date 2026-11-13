@@ -7,3 +7,7 @@
 3. GitHub に push（Web版が1〜2分で更新される。`boot.js` の VERSION も上げる）
 4. `python3 tools/build_claude.py <カレンダーidのJSON> <出力.html>` で claude.ai 版を作り、アーティファクト（Daylog）に公開
 5. データベースの形を変えたときは、両方の版で読めるか確かめる（データは同じ `public.docs`）
+
+## 見た目（Nova）を変えるとき
+- 編集するのは theme/nova.css。`python3 tools/build_theme.py` で index.html の `<style id="nova">` に反映する（各セレクタに html:not(.classic) が付く）
+- 「前の見た目」は index.html の元のスタイルそのまま。設定の「見た目」で切り替える（settings.look）

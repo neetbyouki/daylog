@@ -386,7 +386,18 @@ document.addEventListener('compositionstart', () => { composing = true; compAt =
 document.addEventListener('compositionupdate', () => { compAt = Date.now(); });
 document.addEventListener('compositionend', () => { composing = false; render(); });
 document.addEventListener('focusout', () => { if (composing) { composing = false; render(); } });
+// 見た目：新しい（Nova）／前の見た目（classic）。開いた直後のちらつきを防ぐため端末にも覚える
+function applyLook() {
+  const classic = (S.settings && S.settings.look) === 'classic';
+  document.documentElement.classList.toggle('classic', classic);
+  try { localStorage.setItem('daylog-look', classic ? 'classic' : 'nova'); } catch (_) {}
+  const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = classic ? '#0b0e1b' : '#000000';
+  const mode = S.ready ? (getDay(today()).mode || '') : '';
+  if (document.documentElement.dataset.mode !== mode) document.documentElement.dataset.mode = mode;
+}
+try { if (localStorage.getItem('daylog-look') === 'classic') document.documentElement.classList.add('classic'); } catch (_) {}
 function paint() {
+  applyLook();
   // 日本語入力の途中では描き直さない（ただし入力が止まって4秒たったら描き直す）
   if (composing) { if (Date.now() - compAt < 4000) { setTimeout(render, 500); return; } composing = false; }
   const fx = captureFocus();
@@ -425,12 +436,21 @@ function mainHTML() {
   return `<div class="frame ${S.view === 'today' ? 'has-composer' : ''}">${navHTML()}<main class="main">${body}</main></div>`;
 }
 function navTaskDot() { const d = today(); return openTasks().some(t => t.deadline && diffDays(d, t.deadline) <= 1); }
+// 線のアイコン（新しい見た目で使う）
+const svgI = d => `<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const NAV_ICON = {
+  today: svgI('<circle cx="12" cy="12" r="3.6"/><path d="M12 3.2v2.2M12 18.6v2.2M3.2 12h2.2M18.6 12h2.2M5.8 5.8l1.5 1.5M16.7 16.7l1.5 1.5M5.8 18.2l1.5-1.5M16.7 7.3l1.5-1.5"/>'),
+  tasks: svgI('<circle cx="12" cy="12" r="8.6"/><path d="M8.4 12.3l2.5 2.5 4.8-5.1"/>'),
+  memos: svgI('<path d="M4.5 19.5l1.1-4.2L15.7 5.2a2.1 2.1 0 0 1 3 3L8.6 18.4l-4.1 1.1z"/><path d="M13.8 7.1l3 3"/>'),
+  cal: svgI('<rect x="3.6" y="5.2" width="16.8" height="15" rx="3.4"/><path d="M3.6 10h16.8M8.2 3.2v3.6M15.8 3.2v3.6"/>'),
+  sky: svgI('<circle cx="12" cy="12" r="5"/><path d="M5.1 15.9c-1.9 1.9-2.6 3.5-1.9 4.2 1.2 1.2 5.9-1.5 10.5-6.1s7.3-9.3 6.1-10.5c-.7-.7-2.3 0-4.2 1.9"/>'),
+};
 function navHTML() {
   const tabs = [['today', '◐', '今日'], ['tasks', '◇', 'タスク'], ['memos', '≡', 'メモ'], ['cal', '▦', 'カレンダー'], ['sky', '✦', '星空']];
-  return `<nav class="nav" aria-label="画面の切り替え">${tabs.map(([k, g, l]) => `<button data-act="go" data-arg="${k}" ${S.view === k ? 'aria-current="page"' : ''}><span class="g" aria-hidden="true">${g}</span>${l}${k === 'tasks' && navTaskDot() ? '<i class="navdot" aria-label="締切が近いタスクがある"></i>' : ''}</button>`).join('')}</nav>`;
+  return `<nav class="nav" aria-label="画面の切り替え">${tabs.map(([k, g, l]) => `<button data-act="go" data-arg="${k}" ${S.view === k ? 'aria-current="page"' : ''}><span class="g" aria-hidden="true">${g}</span>${NAV_ICON[k]}${l}${k === 'tasks' && navTaskDot() ? '<i class="navdot" aria-label="締切が近いタスクがある"></i>' : ''}</button>`).join('')}</nav>`;
 }
 function headerHTML(title, sub, actions = '') {
-  return `<header class="top"><div><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="top-actions">${dbStateHTML()}${actions}<button class="icon-btn" data-act="toggleSettings" aria-pressed="${S.view === 'settings'}" aria-label="${S.view === 'settings' ? '設定を閉じる' : '設定'}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></header>`;
+  return `<header class="top"><div><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="top-actions">${dbStateHTML()}${actions}<button class="icon-btn" data-act="toggleSettings" aria-pressed="${S.view === 'settings'}" aria-label="${S.view === 'settings' ? '設定を閉じる' : '設定'}"><svg class="gi" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9M4 12h3.5M11.5 12H20"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/><circle cx="9.5" cy="12" r="2"/></svg><svg class="ico-classic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></header>`;
 }
 
 /* 月の満ち欠け */
@@ -963,7 +983,9 @@ function gameChart(days) {
 function settingsView() {
   const st = S.settings;
   const sw = (key, label, small) => `<div class="item"><div class="l">${label}${small ? `<small>${small}</small>` : ''}</div><button class="switch" role="switch" aria-checked="${!!st[key]}" data-act="toggleSetting" data-arg="${key}" aria-label="${label}"></button></div>`;
-  let h = headerHTML('設定', 'もう一度右上の歯車を押すと、もとの画面に戻る');
+  let h = headerHTML('設定', 'もう一度右上のボタンを押すと、もとの画面に戻る');
+  const look = st.look === 'classic' ? 'classic' : 'nova';
+  h += `<h2 class="sec"><span>見た目</span></h2><div class="card settings"><div class="item"><div class="l">画面の見た目<small>記録はどちらでも同じ。いつでも切り替えられる。</small></div><div class="seg" role="group" aria-label="画面の見た目"><button data-act="setLook" data-arg="nova" aria-pressed="${look === 'nova'}">新しい見た目</button><button data-act="setLook" data-arg="classic" aria-pressed="${look === 'classic'}">前の見た目</button></div></div></div>`;
   h += `<h2 class="sec"><span>朝と夜</span></h2><div class="card settings">
     <div class="item"><div class="l">「起きる」予定の時刻<small>夜モードで翌朝の予定として.｡oOに入る。夜モードでその日だけ変えることもできる。</small></div><input class="field" type="time" id="set-wake" value="${esc(st.wakeTime)}" data-onchg="setWake" aria-label="起きる時刻"></div>
     ${pushItemHTML()}
@@ -1373,6 +1395,7 @@ function toast(msg, action) { S.toast = { msg, action, id: uid() }; render(); co
 function toastHTML() { const t = S.toast; if (!t) return ''; return `<div class="toast" role="status"><span>${esc(t.msg)}</span>${t.action ? `<button class="link" data-act="undo">元に戻す</button>` : ''}</div>`; }
 
 const A = {};
+A.setLook = v => { patchSettings({ look: v === 'classic' ? 'classic' : 'nova' }); applyLook(); };
 /* ── Daylogから直接通知（ホーム画面のDaylog・アプリ版） ── */
 S.push = { state: null, busy: false, msg: '' };
 async function refreshPush() {

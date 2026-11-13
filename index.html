@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Daylog</title>
-<meta name="theme-color" content="#0b0e1b">
+<meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,7 +14,8 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Shippori+Mincho+B1:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Shippori+Mincho+B1:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400..700&display=swap">
 <style>
 /* Layout: one quiet column under a night sky. Tabs sit at the bottom on phones and become a rail on wide screens. */
 :root{
@@ -66,6 +67,7 @@ button{cursor:pointer}
 .nav button .g{font-size:18px;line-height:1;font-family:"Segoe UI Symbol","Apple Symbols",var(--f-body)}
 .nav button[aria-current="page"]{color:var(--fg)}
 .nav button[aria-current="page"] .g{color:var(--lav)}
+.gi{display:none}
 @media (min-width:960px){
   .frame,.frame.has-composer{padding-bottom:24px;padding-left:96px}
   .nav{top:0;bottom:0;right:auto;width:84px;height:auto;grid-template-columns:1fr;grid-auto-rows:72px;align-content:center;border-top:0;border-right:1px solid var(--line);padding-bottom:0}
@@ -568,6 +570,146 @@ body{padding-top:env(safe-area-inset-top,0px)}
 .login .gbtn{display:inline-flex;align-items:center;gap:10px;background:var(--fg);color:#111;border:0;border-radius:999px;padding:12px 22px;font-size:15px;font-weight:700}
 .login .small{font-size:12px;color:var(--fg-3);margin-top:18px}
 .boot{text-align:center;color:var(--fg-3);margin-top:30vh;font-size:13px}
+</style>
+<style id="nova">
+/* 自動生成：theme/nova.css → tools/build_theme.py */
+html:not(.classic){--ink:#000; --sky:#0d0e11; --panel:#121316; --panel-2:#1a1c20; --line:#1e2025; --line-2:#2b2e35;
+  --fg:#f2f4f8; --fg-2:#a4aab6; --fg-3:#6a707c;
+  --lav:#4d8dff; --blue:#8ec5ff; --gold:#f2c46d; --mint:#62dcbc; --rose:#ff8f8f;
+  --mood:#5b9cff; --body:#3fd0b0; --game:#5b8fd9; --warn:#ffb35c; --good:#62dcbc; --main:#e39ad0;
+  --m0:#0f1218; --m1:#132241; --m2:#193468; --m3:#2350a8; --m4:#3b78ec; --m5:#9bcbff;
+  --f-body:"Google Sans Flex","Figtree","Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif;
+  --f-disp:"Google Sans Flex","Figtree","Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif;
+  --f-mono:"Google Sans Flex","Figtree","Zen Kaku Gothic New",sans-serif;
+  --f-tale:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho",serif;
+  --r:22px; --nav-h:64px;
+  --blue-g:linear-gradient(180deg,#6aa6ff 0%,#2f6bff 100%);
+  --glass:rgba(24,26,31,.72); --glass-line:rgba(255,255,255,.08);
+  --orb:47,107,255;}
+html:not(.classic)[data-mode="normal"]{--orb:58,160,255}
+html:not(.classic)[data-mode="bad"]{--orb:255,150,64}
+html:not(.classic)[data-mode="rest"]{--orb:31,182,166}
+html:not(.classic) body{background:#000;background-image:none;font-feature-settings:"palt" 1;letter-spacing:.01em}
+html:not(.classic) body::before{content:"";position:fixed;z-index:0;pointer-events:none;top:-210px;right:-190px;width:460px;height:460px;border-radius:50%;
+  background:radial-gradient(circle,rgba(var(--orb),.0) 0 14%,rgba(var(--orb),.75) 19%,rgba(var(--orb),.08) 27%,rgba(var(--orb),.6) 36%,rgba(var(--orb),.05) 46%,rgba(var(--orb),.42) 56%,rgba(var(--orb),0) 70%);
+  filter:blur(16px);opacity:.55;transition:background .8s}
+html:not(.classic) body::after{content:"";position:fixed;z-index:0;pointer-events:none;top:-210px;right:-190px;width:460px;height:460px;border-radius:50%;
+  background:conic-gradient(from 200deg,transparent 0 18deg,#ffd27a 34deg,#ff8f8f 46deg,#9be8d2 58deg,#8ec5ff 70deg,transparent 88deg 360deg);
+  -webkit-mask:radial-gradient(circle,transparent 0 55.2%,#000 55.6% 56.2%,transparent 56.8%);mask:radial-gradient(circle,transparent 0 55.2%,#000 55.6% 56.2%,transparent 56.8%);
+  filter:blur(.6px);opacity:.7}
+html:not(.classic) .frame{position:relative;z-index:1}
+html:not(.classic) :focus-visible{outline:2px solid #8ec5ff}
+html:not(.classic) .mono{font-variant-numeric:tabular-nums}
+html:not(.classic) .eyebrow{letter-spacing:.02em}
+html:not(.classic) .nav{left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));height:var(--nav-h);padding:0 6px;border:1px solid var(--glass-line);border-radius:28px;background:var(--glass);backdrop-filter:blur(22px) saturate(1.4);-webkit-backdrop-filter:blur(22px) saturate(1.4);box-shadow:0 12px 40px -12px rgba(0,0,0,.9)}
+html:not(.classic) .nav button{font-size:10.5px;gap:3px;color:var(--fg-3);letter-spacing:0}
+html:not(.classic) .nav button .g{display:none}
+html:not(.classic) .icon-btn .gi{display:block}
+html:not(.classic) .icon-btn .ico-classic{display:none}
+html:not(.classic) .nav button .gi{display:block;width:44px;height:28px;padding:4px 12px;border-radius:999px;transition:background .2s,color .2s}
+html:not(.classic) .nav button[aria-current="page"]{color:var(--fg)}
+html:not(.classic) .nav button[aria-current="page"] .gi{background:rgba(77,141,255,.2);color:#b9d7ff}
+html:not(.classic) .navdot{margin:-34px 0 0 20px}
+html:not(.classic) .frame{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 30px)}
+html:not(.classic) .frame.has-composer{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 140px)}
+html:not(.classic) .composer{bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 14px);background:none;padding-top:0}
+@media (min-width:960px){html:not(.classic) .nav{top:16px;bottom:16px;left:16px;right:auto;width:76px;height:auto;padding:8px 0;border-radius:30px;grid-auto-rows:70px}
+html:not(.classic) .frame,html:not(.classic) .frame.has-composer{padding-left:108px}
+html:not(.classic) .composer{left:108px;bottom:16px}}
+html:not(.classic) .top{padding-block:14px 6px}
+html:not(.classic) .top h1{font-family:var(--f-disp);font-weight:500;font-size:30px;letter-spacing:-.01em;line-height:1.15;font-variant-numeric:tabular-nums}
+html:not(.classic) .top .sub{color:var(--fg-2);margin-top:6px}
+html:not(.classic) .icon-btn{border:1px solid var(--glass-line);background:rgba(255,255,255,.05);color:var(--fg-2);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+html:not(.classic) .icon-btn:hover{color:var(--fg);border-color:rgba(255,255,255,.16)}
+html:not(.classic) .icon-btn[aria-pressed="true"]{color:#fff;background:#2f6bff;border-color:#2f6bff}
+html:not(.classic) .night-btn{height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--glass-line);background:rgba(255,255,255,.06);color:var(--fg);font-weight:500;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+html:not(.classic) .night-btn svg{color:#8ec5ff}
+html:not(.classic) .night-btn:hover{border-color:rgba(142,197,255,.5)}
+html:not(.classic) h2.sec{font-size:13px;font-weight:500;letter-spacing:0;color:var(--fg-2);margin:28px 0 10px}
+html:not(.classic) .modes{gap:4px;padding:4px;margin-top:16px;border-radius:999px;background:var(--panel);border:1px solid var(--line)}
+html:not(.classic) .mode{border:0;background:transparent;border-radius:999px;padding:9px 4px;font-size:14px;color:var(--fg-2);transition:background .25s,color .25s}
+html:not(.classic) .mode:hover{color:var(--fg)}
+html:not(.classic) .mode[aria-pressed="true"]{color:#fff;background:linear-gradient(180deg,color-mix(in oklab,var(--c) 92%,#fff) 0%,color-mix(in oklab,var(--c) 70%,#000) 100%);box-shadow:0 6px 18px -8px var(--c)}
+html:not(.classic) .card{border-radius:var(--r)}
+html:not(.classic) .card:not(.goals):not(.clcard){background:var(--panel);border:1px solid var(--line);padding:14px 16px}
+html:not(.classic) .btn{border-radius:999px;border:1px solid var(--line-2);background:var(--panel-2);padding:7px 14px}
+html:not(.classic) .btn:hover{border-color:#3a4150}
+html:not(.classic) .btn.primary{background:var(--blue-g);border-color:transparent;color:#fff;font-weight:600;box-shadow:0 6px 20px -8px rgba(47,107,255,.9)}
+html:not(.classic) .btn.ghost{background:transparent;border-color:transparent}
+html:not(.classic) .btn.sm{padding:4px 11px}
+html:not(.classic) .btn.danger{background:var(--warn);border-color:var(--warn);color:#2a1c05}
+html:not(.classic) .link{color:#8ec5ff}
+html:not(.classic) .big-time{font-family:var(--f-disp);font-size:28px;font-weight:500;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+html:not(.classic) .field{background:var(--sky);border:1px solid var(--line-2);border-radius:14px}
+html:not(.classic) .field:focus{border-color:#4d8dff}
+html:not(.classic) .empty{border-radius:var(--r);border-color:var(--line-2)}
+html:not(.classic) .tl::before{background:linear-gradient(180deg,transparent,#23262d 24px,#23262d calc(100% - 24px),transparent)}
+html:not(.classic) .tl time{font-family:var(--f-body);font-variant-numeric:tabular-nums}
+html:not(.classic) .ev:not(.bedline):not(.free) .tl-b{border-left:0;border-radius:16px;padding:8px 12px 8px 14px;background:color-mix(in oklab,var(--c) 7%,var(--panel));box-shadow:inset 3px 0 0 var(--c),inset 0 0 0 1px color-mix(in oklab,var(--c) 14%,transparent)}
+html:not(.classic) .ev .t{font-weight:500}
+html:not(.classic) .ev .m{font-family:var(--f-body);font-variant-numeric:tabular-nums}
+html:not(.classic) .ev.canceled .tl-b{background:transparent;box-shadow:inset 0 0 0 1px var(--line-2)}
+html:not(.classic) .kids{border-left-color:color-mix(in oklab,var(--c) 35%,transparent)}
+html:not(.classic) .sub time{font-family:var(--f-body);font-variant-numeric:tabular-nums}
+html:not(.classic) .tl li.now::after{background:radial-gradient(circle at 35% 35%,#fff 0,#b9d7ff 35%,#2f6bff 100%);border-color:transparent;box-shadow:0 0 0 4px rgba(77,141,255,.18),0 0 18px rgba(77,141,255,.85)}
+html:not(.classic) .tl li.now time{color:#b9d7ff}
+html:not(.classic) .tl li.now .tl-b{border-top:1px solid transparent;border-image:linear-gradient(90deg,rgba(77,141,255,.9),rgba(77,141,255,0)) 1}
+html:not(.classic) .nowmark{border-top:1.5px solid transparent;border-image:linear-gradient(90deg,rgba(77,141,255,.9),rgba(77,141,255,.05)) 1}
+html:not(.classic) .nowmark::before{background:radial-gradient(circle at 35% 35%,#fff 0,#b9d7ff 35%,#2f6bff 100%);box-shadow:0 0 0 4px rgba(77,141,255,.18),0 0 18px rgba(77,141,255,.85)}
+html:not(.classic) .nowmark span{font-family:var(--f-body);font-variant-numeric:tabular-nums;color:#b9d7ff}
+html:not(.classic) .tl li.hr .tl-b{border-top-color:rgba(255,255,255,.055)}
+html:not(.classic) .tl li.hr::after{background:#2b2e35}
+html:not(.classic) .allday span{border-radius:999px}
+html:not(.classic) .composer .in{border-radius:26px;background:var(--glass);border:1px solid var(--glass-line);backdrop-filter:blur(22px) saturate(1.4);-webkit-backdrop-filter:blur(22px) saturate(1.4);padding:6px 6px 6px 16px;box-shadow:0 12px 40px -14px rgba(0,0,0,.95)}
+html:not(.classic) .composer .btn.primary{padding:9px 18px}
+html:not(.classic) .toggle{border-radius:999px}
+html:not(.classic) .toggle[aria-pressed="true"]{border-color:#4d8dff;color:#b9d7ff;background:rgba(77,141,255,.14)}
+html:not(.classic) .task,html:not(.classic) .memo,html:not(.classic) .taskadd,html:not(.classic) .tile,html:not(.classic) .chart,html:not(.classic) .stats,html:not(.classic) .wk,html:not(.classic) .mo{border-radius:20px}
+html:not(.classic) .task,html:not(.classic) .memo{padding:12px 14px}
+html:not(.classic) .check{border-radius:999px}
+html:not(.classic) .check:not(.gold).on{background:#4d8dff;border-color:#4d8dff;color:#fff}
+html:not(.classic) .bar i{background:var(--blue-g)}
+html:not(.classic) .card.goals{border-radius:var(--r)}
+html:not(.classic) .goals-title,html:not(.classic) .gc-g,html:not(.classic) .card.goals .goal.concept .title{font-family:var(--f-tale)}
+html:not(.classic) .wseg,html:not(.classic) .seg{border-radius:999px}
+html:not(.classic) .wseg button[aria-pressed="true"],html:not(.classic) .seg button[aria-pressed="true"]{background:rgba(77,141,255,.18);color:#d8e8ff}
+html:not(.classic) .cname,html:not(.classic) .nm-title,html:not(.classic) .rise .nm,html:not(.classic) .revhead h2{font-family:var(--f-tale)}
+html:not(.classic) .skybox,html:not(.classic) .rise{border-radius:24px}
+html:not(.classic) .wk-h.is-today b,html:not(.classic) .mo-c.is-today .n{background:#2f6bff;color:#fff}
+html:not(.classic) .wk-col.is-today{background-color:rgba(77,141,255,.05)}
+html:not(.classic) .mo-c.sel{background:rgba(77,141,255,.1)}
+html:not(.classic) .wk-now{background:#4d8dff;box-shadow:0 0 8px #4d8dff}
+html:not(.classic) .wk-now::before{background:#4d8dff}
+html:not(.classic) .wk-ev,html:not(.classic) .ev-chip{border-radius:8px}
+html:not(.classic) .cal7 .c.today{outline-color:#4d8dff}
+html:not(.classic) .calchip{border-radius:999px}
+html:not(.classic) .switch{background:#1a1c20;border-color:var(--line-2)}
+html:not(.classic) .switch[aria-checked="true"]{background:#2f6bff;border-color:#2f6bff}
+html:not(.classic) .switch[aria-checked="true"]::after{background:#fff}
+html:not(.classic) .wd button{border-radius:999px}
+html:not(.classic) .wd button[aria-pressed="true"]{border-color:#4d8dff;background:rgba(77,141,255,.16)}
+html:not(.classic) .overlay{background:rgba(0,0,0,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+html:not(.classic) .sheet .card{border-radius:28px;padding:20px}
+html:not(.classic) .sheet h3{font-family:var(--f-disp);font-weight:500}
+html:not(.classic) .steps-dots i.on{background:#4d8dff}
+html:not(.classic) .steps-dots i.done{background:#27467f}
+html:not(.classic) .scale button{border-radius:14px;font-family:var(--f-body)}
+html:not(.classic) .bigcheck{border-radius:20px}
+html:not(.classic) .toast{border-radius:999px;background:var(--glass);border-color:var(--glass-line);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);padding:10px 18px}
+html:not(.classic) .tip{background:#0d0e11;border-radius:12px}
+html:not(.classic) .dbstate{border-radius:999px}
+html:not(.classic) .card.clcard{background:var(--panel);border:1px solid var(--line);box-shadow:none;position:relative;overflow:hidden}
+html:not(.classic) .card.clcard::before{content:"";position:absolute;left:18px;right:18px;top:0;height:1px;background:linear-gradient(90deg,transparent,#8ec5ff,#ffd27a,transparent);opacity:.7}
+html:not(.classic) .cl-badge{color:#8ec5ff;letter-spacing:.02em}
+html:not(.classic) .cl-say{font-family:var(--f-body);border-left-color:#4d8dff}
+html:not(.classic) .cl-bed{border-top-color:var(--line)}
+html:not(.classic) .cl-bk{letter-spacing:.02em}
+html:not(.classic) .claude{border-left-color:#4d8dff}
+html:not(.classic) .login h1,html:not(.classic) .center-msg h1{font-family:var(--f-disp);font-weight:500;letter-spacing:-.01em}
+html:not(.classic) .card.goals{background:radial-gradient(120% 110% at 100% 0%,rgba(242,196,109,.13) 0%,transparent 55%),var(--panel);border:1px solid rgba(242,196,109,.16);box-shadow:none}
+html:not(.classic) .gedit{border-radius:999px}
+html:not(.classic) .skybox{background:radial-gradient(120% 90% at 50% 40%,#0b1430 0%,#000 78%);border-color:var(--line)}
+html:not(.classic) .rise{background:radial-gradient(120% 100% at 50% 100%,#0d1a3d 0%,#000 75%)}
 </style>
 </head>
 <body>
