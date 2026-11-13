@@ -18,7 +18,7 @@
 :root[data-mode="bad"]{--orb:255,150,64}
 :root[data-mode="rest"]{--orb:31,182,166}
 body{background:#000;background-image:none;font-feature-settings:"palt" 1;letter-spacing:.01em}
-/* 右上に、その日の調子の色で灯る光の輪（ここだけ目立たせる） */
+/* 星空の画面の右上に、その日の調子の色で灯る光の輪（ここだけ目立たせる） */
 body::before{content:"";position:fixed;z-index:0;pointer-events:none;top:-210px;right:-190px;width:460px;height:460px;border-radius:50%;
   background:radial-gradient(circle,rgba(var(--orb),.0) 0 14%,rgba(var(--orb),.75) 19%,rgba(var(--orb),.08) 27%,rgba(var(--orb),.6) 36%,rgba(var(--orb),.05) 46%,rgba(var(--orb),.42) 56%,rgba(var(--orb),0) 70%);
   filter:blur(16px);opacity:.55;transition:background .8s}
@@ -26,6 +26,8 @@ body::after{content:"";position:fixed;z-index:0;pointer-events:none;top:-210px;r
   background:conic-gradient(from 200deg,transparent 0 18deg,#ffd27a 34deg,#ff8f8f 46deg,#9be8d2 58deg,#8ec5ff 70deg,transparent 88deg 360deg);
   -webkit-mask:radial-gradient(circle,transparent 0 55.2%,#000 55.6% 56.2%,transparent 56.8%);mask:radial-gradient(circle,transparent 0 55.2%,#000 55.6% 56.2%,transparent 56.8%);
   filter:blur(.6px);opacity:.7}
+/* 光の輪は星空の画面だけ */
+:root:not([data-view="sky"]) body::before,:root:not([data-view="sky"]) body::after{display:none}
 .frame{position:relative;z-index:1}
 :focus-visible{outline:2px solid #8ec5ff}
 .mono{font-variant-numeric:tabular-nums}

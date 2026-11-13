@@ -394,6 +394,7 @@ function applyLook() {
   const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = classic ? '#0b0e1b' : '#000000';
   const mode = S.ready ? (getDay(today()).mode || '') : '';
   if (document.documentElement.dataset.mode !== mode) document.documentElement.dataset.mode = mode;
+  if (document.documentElement.dataset.view !== S.view) document.documentElement.dataset.view = S.view || '';
 }
 try { if (localStorage.getItem('daylog-look') === 'classic') document.documentElement.classList.add('classic'); } catch (_) {}
 function paint() {

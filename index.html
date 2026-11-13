@@ -597,6 +597,7 @@ html:not(.classic) body::after{content:"";position:fixed;z-index:0;pointer-event
   background:conic-gradient(from 200deg,transparent 0 18deg,#ffd27a 34deg,#ff8f8f 46deg,#9be8d2 58deg,#8ec5ff 70deg,transparent 88deg 360deg);
   -webkit-mask:radial-gradient(circle,transparent 0 55.2%,#000 55.6% 56.2%,transparent 56.8%);mask:radial-gradient(circle,transparent 0 55.2%,#000 55.6% 56.2%,transparent 56.8%);
   filter:blur(.6px);opacity:.7}
+html:not(.classic):not([data-view="sky"]) body::before,html:not(.classic):not([data-view="sky"]) body::after{display:none}
 html:not(.classic) .frame{position:relative;z-index:1}
 html:not(.classic) :focus-visible{outline:2px solid #8ec5ff}
 html:not(.classic) .mono{font-variant-numeric:tabular-nums}
