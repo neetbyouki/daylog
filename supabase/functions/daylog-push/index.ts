@@ -47,7 +47,8 @@ const DEFAULT_CALS: Record<string, boolean> = { app: true, star: true, i1lz: tru
 async function upcomingEvents(uid: string, settings: any, now: number) {
   // 5分以内に読んだ分があればそれを使う（毎分Googleに聞かない）
   const { data: c } = await admin.from("push_cache").select("data,fetched_at").eq("user_id", uid).maybeSingle();
-  if (c && now - Date.parse(c.fetched_at) < 5 * M && (c.data as any).until > now + (BED_BEFORE + 5) * M) return (c.data as any).events as any[];
+  const age = c ? now - Date.parse(c.fetched_at) : -1;
+  if (c && age >= 0 && age < 5 * M && (c.data as any).until > now + (BED_BEFORE + 5) * M) return (c.data as any).events as any[];
   const tok = await accessToken(uid); if (!tok) return [];
   const g = async (path: string, q: Record<string, string> = {}) => {
     const u = new URL("https://www.googleapis.com/calendar/v3" + path); for (const [k, v] of Object.entries(q)) u.searchParams.set(k, v);
@@ -67,7 +68,7 @@ async function upcomingEvents(uid: string, settings: any, now: number) {
       events.push({ cal: cal.key, id: e.id, title: e.summary || "（タイトルなし）", start: Date.parse(e.start.dateTime), end: Date.parse((e.end && e.end.dateTime) || e.start.dateTime) });
     }
   }
-  await admin.from("push_cache").upsert({ user_id: uid, data: { events, until }, fetched_at: new Date(now).toISOString() });
+  if (Math.abs(Date.now() - now) < M) await admin.from("push_cache").upsert({ user_id: uid, data: { events, until }, fetched_at: new Date(now).toISOString() }); // 試しの時刻で呼んだときは覚えない
   return events;
 }
 
