@@ -104,6 +104,21 @@ const S = {
 
 window.__daylogState = S;
 /* ───────── 書き込み ───────── */
+// 記録置き場の状態（送信待ち・オフライン・送れなかった）を受け取る
+S.dbState = { pending: 0, offline: false, error: null };
+window.addEventListener('daylog-db', e => {
+  const s = e.detail || {}; const prevErr = S.dbState.error;
+  S.dbState = s;
+  if (s.error && (!prevErr || prevErr.at !== s.error.at)) toast('書き込みを1つ保存できなかった（受け付けてもらえない内容だった）。もう一度試してほしい。');
+  render();
+});
+function dbStateHTML() {
+  const s = S.dbState || {};
+  if (s.offline) return `<span class="dbstate off" title="電波がないので、書いた分は端末にためている。つながったら自動で送る" aria-label="オフライン。未送信${s.pending || 0}件">オフライン${s.pending ? ` ・${s.pending}` : ''}</span>`;
+  // 書いてすぐ送れたものは出さない（数秒たっても残っているときだけ）
+  if (s.pending > 0 && s.oldest && Date.now() - s.oldest > 4000) return `<span class="dbstate" title="送信待ち${s.pending}件（自動で送る）" aria-label="送信待ち${s.pending}件">⇡${s.pending}</span>`;
+  return '';
+}
 const queues = new Map();
 function enqueue(key, fn) {
   const prev = queues.get(key) || Promise.resolve();
@@ -121,17 +136,32 @@ function dbMsg(e) {
 // 記録をまだ読み込めていないときに書くと、サーバーの記録を空の内容で上書きしてしまうので、書かない
 function canWrite() { return !!S.db && S.ready && !S.loadFailed; }
 function putDoc(path, data) { if (!canWrite()) return Promise.resolve(); return enqueue(path, () => S.db.doc(path).set(clean(data))); }
+// 変えたところだけ送る（サーバー側で足し合わせる。ほかの端末で同時に変えたところを消さない）
+function updDoc(path, patch) { if (!canWrite()) return Promise.resolve(); return enqueue(path, () => S.db.doc(path).update(clean(patch))); }
 function delDoc(path) { if (!canWrite()) return Promise.resolve(); return enqueue(path, () => S.db.doc(path).delete()); }
 const getDay = d => S.days[d] || { date: d, entries: [] };
-function patchDay(d, patch) { const next = { ...getDay(d), ...patch, date: d }; S.days[d] = next; render(); return putDoc('days/' + d, next); }
-function patchTask(id, patch) { const t = { ...S.tasks[id], ...patch, id }; S.tasks[id] = t; render(); return putDoc('tasks/' + id, t); }
-function patchGoal(id, patch) { const g = { ...S.goals[id], ...patch, id }; S.goals[id] = g; render(); return putDoc('goals/' + id, g); }
-function patchSettings(patch) { S.settings = { ...S.settings, ...patch }; render(); return putDoc('settings/main', S.settings); }
+function patchDay(d, patch) {
+  const prev = getDay(d); const p = { ...patch, date: d };
+  if (Array.isArray(patch.entries)) {
+    // 記録は1件ずつ「いつ変えたか（u）」を付けて送る。消した記録は「消した印」を送る（サーバーで足し合わせるため）
+    const old = new Map((prev.entries || []).map(e => [e.id, e])); const now = Date.now();
+    p.entries = patch.entries.map(e => { const o = old.get(e.id); return !o || JSON.stringify(o) !== JSON.stringify(e) ? { ...e, u: now } : e; });
+    const keep = new Set(p.entries.map(e => e.id));
+    const gone = (prev.entries || []).filter(e => !keep.has(e.id)).map(e => e.id);
+    if (gone.length) p.entriesDel = [...new Set([...(prev.entriesDel || []), ...gone])];
+  }
+  const next = { ...prev, ...p }; S.days[d] = next; render();
+  return updDoc('days/' + d, p);
+}
+function patchTask(id, patch) { const t = { ...S.tasks[id], ...patch, id }; S.tasks[id] = t; render(); return updDoc('tasks/' + id, { ...patch, id }); }
+function patchGoal(id, patch) { const g = { ...S.goals[id], ...patch, id }; S.goals[id] = g; render(); return updDoc('goals/' + id, { ...patch, id }); }
+function patchSettings(patch) { S.settings = { ...S.settings, ...patch }; render(); return updDoc('settings/main', patch); }
 
 /* ───────── 集計 ───────── */
 function wakeAt(d) {
   // PCの記録は前の日の記録があるときだけ「起きた時刻」に使う（入れた初日は寝ていた時間がわからないため）
   const pcFirst = S.pc[d] && S.pc[d].first && S.pc[addDays(d, -1)] ? S.pc[d].first : null;
+  if (getDay(d).wakeFix && getDay(d).wakeAt) return getDay(d).wakeAt; // 手で直した時刻を優先
   const c = [getDay(d).wakeAt, pcFirst].filter(Boolean); return c.length ? Math.min(...c) : null;
 }
 // 夜モードを終えた時刻（その日の「寝た」の記録）
@@ -222,7 +252,7 @@ async function cleanBedDupes(d, list) {
 async function createEvent({ summary, start, end, reminder = 15, description }) {
   const r = await S.mcp.callTool(CFG.GCAL, 'create_event', {
     calendarId: CFG.APP_CAL, summary, startTime: isoLocal(start), endTime: isoLocal(end),
-    overrideReminders: reminder == null ? [] : [{ method: 'popup', minutes: reminder }], useDefaultReminders: false, description: description || 'Daylogから追加',
+    overrideReminders: reminder == null || S.settings.pushOn ? [] : [{ method: 'popup', minutes: reminder }], useDefaultReminders: false, description: description || 'Daylogから追加',
   });
   const p = (r && r.payload) || {};
   return p.id || (p.event && p.event.id) || null;
@@ -400,7 +430,7 @@ function navHTML() {
   return `<nav class="nav" aria-label="画面の切り替え">${tabs.map(([k, g, l]) => `<button data-act="go" data-arg="${k}" ${S.view === k ? 'aria-current="page"' : ''}><span class="g" aria-hidden="true">${g}</span>${l}${k === 'tasks' && navTaskDot() ? '<i class="navdot" aria-label="締切が近いタスクがある"></i>' : ''}</button>`).join('')}</nav>`;
 }
 function headerHTML(title, sub, actions = '') {
-  return `<header class="top"><div><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="top-actions">${actions}<button class="icon-btn" data-act="toggleSettings" aria-pressed="${S.view === 'settings'}" aria-label="${S.view === 'settings' ? '設定を閉じる' : '設定'}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></header>`;
+  return `<header class="top"><div><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="top-actions">${dbStateHTML()}${actions}<button class="icon-btn" data-act="toggleSettings" aria-pressed="${S.view === 'settings'}" aria-label="${S.view === 'settings' ? '設定を閉じる' : '設定'}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></header>`;
 }
 
 /* 月の満ち欠け */
@@ -471,7 +501,8 @@ function claudeCard(d) {
       const diff = bt && bt.time ? Math.round((act - slotDate(d, bt.time).getTime()) / 6e4) : null;
       const diffTxt = diff == null ? '' : Math.abs(diff) < 5 ? '目安どおり' : diff > 0 ? `目安より${fmtMin(diff)}遅い` : `目安より${fmtMin(-diff)}早い`;
       bed = `<div class="cl-bed"><div class="cl-bk">就寝（夜モードで記録）</div>
-      <div class="row" style="gap:10px"><span class="big-time">${hm(act)}</span>${bt && bt.time ? `<span class="faint" style="font-size:12px">目安 ${bt.time}${diffTxt ? `・${diffTxt}` : ''}</span>` : ''}</div></div>`;
+      ${S.timeFix && S.timeFix.key === 'sleep:' + d ? timeFixHTML() : ''}
+      <div class="row" style="gap:10px"><span class="big-time">${hm(act)}</span>${fixBtn('sleep:' + d, '寝た時刻を直す')}${bt && bt.time ? `<span class="faint" style="font-size:12px">目安 ${bt.time}${diffTxt ? `・${diffTxt}` : ''}</span>` : ''}</div></div>`;
     } else
     bed = `<div class="cl-bed"><div class="cl-bk">今夜の就寝目安</div>
       <div class="row" style="gap:10px"><span class="big-time">${bt ? bt.time : '—'}</span>${bt && bt.eventId && !restQ ? `<span class="bell" data-tip="45分前にスマホへ通知が来る" aria-label="45分前にスマホへ通知">${ICON.bell}</span>` : ''}<span class="spacer"></span>
@@ -562,7 +593,9 @@ function timelineHTML(d) {
       const x = it.x; const endTxt = x.canceled ? '<span class="evstate">キャンセルした</span>' : x.endedAt ? `〜${hm(x.end)}<span class="evstate">（予定は${hm(x.plannedEnd)}まで）</span>` : `〜${hm(x.end)}`;
       lis.push(`<li class="ev ${isNow ? 'is-now' : ''} ${x.canceled ? 'canceled' : ''} ${x.endedAt ? 'ended' : ''}" style="--c:${c.color}"><time>${hm(x.start)}</time><div class="tl-b"><div class="ev-head" ${x.ghost ? '' : `data-act="calOpen" data-arg="${esc(key)}"`}>${d === today() ? `<button class="evmore" data-act="evMenu" data-arg="${esc(key)}" aria-label="この予定を終える・キャンセルする" aria-expanded="${S.evMenu === key}">⋯</button>` : ''}<div class="t">${esc(x.title)}</div><div class="m">${endTxt}${x.canceled ? '' : bellHTML(x)}</div></div>${S.evMenu === key ? evMenuHTML(d, x, key) : ''}${kidsHTML(list, isNow)}</div></li>`);
     } else if (it.kind === 'wake') {
-      lis.push(`<li class="wk"><time>${hm(it.t)}</time><div class="tl-b"><span>☀ 起きた</span></div></li>`);
+      const y = addDays(d, -1); const sl = sleepAt(y);
+      lis.push(`<li class="wk"><time>${hm(it.t)}</time><div class="tl-b">${S.timeFix && S.timeFix.key === 'wake:' + d ? timeFixHTML() : `<span>☀ 起きた</span>${fixBtn('wake:' + d, '起きた時刻を直す')}`}
+        ${S.timeFix && S.timeFix.key === 'sleep:' + y ? timeFixHTML() : `<span class="wk-prev">前の晩 ${sl ? hm(sl) + ' 就寝' : 'の就寝 —'}${fixBtn('sleep:' + y, '前の晩に寝た時刻を直す')}</span>`}</div></li>`);
     } else {
       const future = d === today() && it.t > now;
       lis.push(`<li class="hr ${it.list.length ? 'has' : ''} ${future ? 'future' : ''}" style="--c:var(--fg-3)"><time>${hm(it.t)}</time><div class="tl-b">${it.list.length ? kidsHTML(it.list, false) : ''}</div></li>`);
@@ -924,7 +957,8 @@ function settingsView() {
   let h = headerHTML('設定', 'もう一度右上の歯車を押すと、もとの画面に戻る');
   h += `<h2 class="sec"><span>朝と夜</span></h2><div class="card settings">
     <div class="item"><div class="l">「起きる」予定の時刻<small>夜モードで翌朝の予定として.｡oOに入る。夜モードでその日だけ変えることもできる。</small></div><input class="field" type="time" id="set-wake" value="${esc(st.wakeTime)}" data-onchg="setWake" aria-label="起きる時刻"></div>
-    ${sw('bedtimeNotify', '就寝目安の通知', '目安が決まると.｡oOに「🌙 就寝の目安」が自動で入る。スマホはGoogleカレンダーのアプリが45分前に知らせる。PCにも30分前に出す。')}
+    ${pushItemHTML()}
+    ${sw('bedtimeNotify', '就寝目安の通知', st.pushOn ? '目安が決まると.｡oOに「🌙 就寝の目安」が入り、45分前にDaylogから通知が来る。PCにも30分前に出す。' : '目安が決まると.｡oOに「🌙 就寝の目安」が自動で入る。スマホはGoogleカレンダーのアプリが45分前に知らせる。PCにも30分前に出す。')}
     <div class="item"><div class="l">参加型の曜日<small>この曜日は、就寝目安を1時より後にする。</small></div><div class="wd">${WD.map((w, i) => `<button data-act="craftDay" data-arg="${i}" aria-pressed="${(st.craftDays || []).includes(i)}">${w}</button>`).join('')}</div></div>
   </div>`;
   h += `<h2 class="sec"><span>続ける仕組み</span></h2><div class="card settings">
@@ -1330,9 +1364,50 @@ function toast(msg, action) { S.toast = { msg, action, id: uid() }; render(); co
 function toastHTML() { const t = S.toast; if (!t) return ''; return `<div class="toast" role="status"><span>${esc(t.msg)}</span>${t.action ? `<button class="link" data-act="undo">元に戻す</button>` : ''}</div>`; }
 
 const A = {};
+/* ── Daylogから直接通知（ホーム画面のDaylog・アプリ版） ── */
+S.push = { state: null, busy: false, msg: '' };
+async function refreshPush() {
+  if (!window.daylogPush) { S.push.state = 'elsewhere'; render(); return; }
+  try { S.push.state = await window.daylogPush.state(); } catch (_) { S.push.state = 'unsupported'; }
+  render();
+}
+const PUSH_MSG = {
+  'need-home': 'iPhoneは、Safariの共有ボタン →「ホーム画面に追加」から開いたDaylogでオンにできる（iOS 16.4以降）。',
+  unsupported: 'このブラウザは通知に対応していない。',
+  denied: '通知が「許可しない」になっている。端末の設定 → 通知 → Daylog（またはブラウザ）で許可すると使える。',
+  elsewhere: 'この画面（claude.ai版）からは出せない。ホーム画面のDaylog（アプリ版）でオンにすると、どちらで書いた予定でも通知が来る。',
+};
+function pushItemHTML() {
+  const p = S.push; const st = p.state; const on = st === 'on';
+  const btn = p.busy ? '<span class="thinking" style="font-size:12px">設定中</span>'
+    : on ? '<button class="btn sm" data-act="pushTest">テスト</button><button class="btn ghost sm" data-act="pushOff">オフ</button>'
+    : (st === 'off' ? '<button class="btn primary sm" data-act="pushOn">オンにする</button>' : '');
+  const small = on ? 'この端末に、予定の15分前・就寝目安の45分前に通知が来る（Googleカレンダーの通知が無くても届く）。'
+    : st === 'off' ? '予定の15分前・就寝目安の45分前に、Googleカレンダーを通さずDaylogから通知を出す。'
+    : PUSH_MSG[st] || '確認中…';
+  return `<div class="item"><div class="l">Daylogからの通知${on ? ' <span class="pill">オン</span>' : ''}<small>${esc(small)}${p.msg ? `<br>${esc(p.msg)}` : ''}</small></div><div class="row" style="gap:6px">${btn}</div></div>`;
+}
+A.pushOn = async () => {
+  S.push.busy = true; S.push.msg = ''; render();
+  try { await window.daylogPush.enable(); S.push.state = 'on'; if (!S.settings.pushOn) patchSettings({ pushOn: true }); toast('この端末に通知が来るようにした。「テスト」で確かめられる。'); }
+  catch (e) { const c = e && e.code; S.push.msg = PUSH_MSG[c] || '通知をオンにできなかった。' + (e && e.message ? '（' + e.message + '）' : ''); await refreshPush(); }
+  finally { S.push.busy = false; render(); }
+};
+A.pushOff = async () => {
+  S.push.busy = true; render();
+  try { await window.daylogPush.disable(); S.push.state = 'off'; const n = await window.daylogPush.devices().catch(() => 1); if (!n) patchSettings({ pushOn: false }); toast('この端末の通知を止めた。'); }
+  catch (_) { toast('通知を止められなかった。'); }
+  finally { S.push.busy = false; render(); }
+};
+A.pushTest = async () => {
+  S.push.busy = true; render();
+  try { const r = await window.daylogPush.test(); toast(r && r.sent ? 'テストの通知を送った。数秒で届く。' : 'テストの通知を送れなかった。オフ→オンをやり直してほしい。'); }
+  catch (_) { toast('テストの通知を送れなかった。'); }
+  finally { S.push.busy = false; render(); }
+};
 A.toggleSettings = () => (S.view === 'settings' ? A.goBack() : A.go('settings'));
 A.goBack = () => A.go(S.prevView && S.prevView !== 'settings' ? S.prevView : 'today');
-A.go = v => { if (v === 'settings' && S.view !== 'settings') S.prevView = S.view; S.view = v; S.sky.sel = null; S.openTask = null; window.scrollTo(0, 0); render(); if (v === 'today') loadEvents(today()); if (v === 'cal') loadCal(); };
+A.go = v => { if (v === 'settings' && S.view !== 'settings') { S.prevView = S.view; refreshPush(); } S.view = v; S.sky.sel = null; S.openTask = null; window.scrollTo(0, 0); render(); if (v === 'today') loadEvents(today()); if (v === 'cal') loadCal(); };
 A.setMode = async m => {
   const d = today(); const day = getDay(d); const patch = { mode: m, modeAt: Date.now() };
   if (!day.wakeAt && !day.mode) patch.wakeAt = Date.now();
@@ -1362,6 +1437,41 @@ A.entryMenu = id => { S.openEntry = id || null; render(); };
 A.entryEdit = id => { const e = (getDay(today()).entries || []).find(x => x.id === id); if (!e) return; S.editEntry = id; S.openEntry = null; Object.assign(S.drafts, { 'ee-text': e.text || '', 'ee-mood': e.mood || '', 'ee-body': e.body || '', 'ee-nap': e.nap ? 'on' : '' }); render(); setTimeout(() => { const t = $('#ee-text'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }, 50); };
 A.entryEditCancel = () => { S.editEntry = null; render(); };
 A.eeNap = (v, el) => { S.drafts['ee-nap'] = el.checked ? 'on' : ''; };
+/* ── 起きた・寝た時刻を手で直す（さりげない ✎ から） ── */
+const fixBtn = (key, label) => `<button class="fixbtn" data-act="timeFix" data-arg="${key}" aria-label="${label}" title="${label}">✎</button>`;
+function timeFixHTML() {
+  const f = S.timeFix; const label = f.kind === 'wake' ? '起きた時刻' : '寝た時刻';
+  return `<span class="timefix" role="group" aria-label="${label}を直す"><span class="faint">${label}</span><input type="time" class="field" id="tf-time" value="${esc(f.value || '')}" aria-label="${label}"><button class="btn primary sm" data-act="timeFixSave">保存</button><button class="btn ghost sm" data-act="timeFixCancel">やめる</button></span>`;
+}
+A.timeFix = key => {
+  const [kind, d] = key.split(':'); const t = kind === 'wake' ? wakeAt(d) : sleepAt(d);
+  S.timeFix = { key, kind, d, value: t ? hm(t) : '' }; render();
+  setTimeout(() => { const el = $('#tf-time'); if (el) el.focus(); }, 30);
+};
+A.timeFixCancel = () => { S.timeFix = null; render(); };
+A.timeFixSave = async () => {
+  const f = S.timeFix; const el = $('#tf-time'); const v = el ? el.value : '';
+  if (!f || !/^\d{1,2}:\d{2}$/.test(v)) { toast('時刻を入れてほしい。'); return; }
+  S.timeFix = null;
+  if (f.kind === 'wake') {
+    // 起きた時刻：その日の朝（6時より前を選んだら、その日の早朝として扱う）
+    const [h, m] = v.split(':').map(Number); const t = parseYmd(f.d); t.setHours(h, m, 0, 0);
+    await patchDay(f.d, { wakeAt: t.getTime(), wakeFix: true });
+    toast(`起きた時刻を${v}にした。`);
+  } else {
+    // 寝た時刻：その日の夜（0〜6時は次の日の深夜）
+    const t = slotDate(f.d, v).getTime(); const day = getDay(f.d); const bt = day.bedtime;
+    const patch = { sleepAt: t, sleepFix: true };
+    if (bt && (bt.actual || closedAt(f.d))) patch.bedtime = { ...bt, actual: t, eventTime: bt.recorded ? v : bt.eventTime };
+    await patchDay(f.d, patch);
+    // カレンダーの「🌙 就寝」の記録も動かす
+    if (bt && bt.recorded && bt.eventId && bt.eventId !== 'unknown' && S.mcp) {
+      try { await updateEvent(bt.eventId, { startTime: isoLocal(new Date(t)), endTime: isoLocal(new Date(t + 15 * 6e4)) }); loadEvents(f.d, true); } catch (e) { toast(calWriteErr(e)); }
+    }
+    toast(`寝た時刻を${v}にした。`);
+  }
+  render();
+};
 A.entrySave = id => {
   const d = today(); const day = getDay(d); const g = k => S.drafts[k];
   const entries = (day.entries || []).map(e => e.id !== id ? e : clean({ ...e, text: String(g('ee-text') || '').trim(), mood: Number(g('ee-mood')) || undefined, body: Number(g('ee-body')) || undefined, nap: g('ee-nap') ? true : undefined, editedAt: Date.now() }));
@@ -1370,7 +1480,7 @@ A.entrySave = id => {
 A.entryDelete = id => {
   const d = today(); const day = getDay(d); const e = (day.entries || []).find(x => x.id === id); if (!e) return;
   patchDay(d, { entries: day.entries.filter(x => x.id !== id) }); S.openEntry = null;
-  S.undo = () => { const cur = getDay(d); patchDay(d, { entries: [...(cur.entries || []), e].sort((a, b) => a.t - b.t) }); };
+  S.undo = () => { const cur = getDay(d); patchDay(d, { entries: [...(cur.entries || []), { ...e, id: uid() }].sort((a, b) => a.t - b.t) }); };
   toast('記録を消した。', true);
 };
 A.undo = () => { const f = S.undo; S.undo = null; S.toast = null; if (f) f(); render(); };
@@ -1446,7 +1556,7 @@ A.bedEvent = async quiet => {
       if (keep !== bt.eventId) await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventId: keep, eventTime: null } });
     } else if ((!bt.eventId || bt.eventId === 'unknown') && quiet) return; // カレンダーを確かめられないときは、重複を作らないよう自動では入れない
     const evId = getDay(d).bedtime.eventId;
-    if (evId && evId !== 'unknown') { await updateEvent(evId, { startTime: isoLocal(start), endTime: isoLocal(end), summary: BED_TITLE, overrideReminders: [{ method: 'popup', minutes: 45 }] }); await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventTime: bt.time } }); if (!quiet) toast(`通知を${bt.time}に合わせた。`); }
+    if (evId && evId !== 'unknown') { await updateEvent(evId, { startTime: isoLocal(start), endTime: isoLocal(end), summary: BED_TITLE, overrideReminders: S.settings.pushOn ? [] : [{ method: 'popup', minutes: 45 }] }); await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventTime: bt.time } }); if (!quiet) toast(`通知を${bt.time}に合わせた。`); }
     else { const id = await createEvent({ summary: BED_TITLE, start, end, reminder: 45, description: 'Daylogの就寝目安' }); await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventId: id || 'unknown', eventTime: bt.time } }); if (!quiet) toast(`${bt.time}の就寝目安をカレンダーに入れた。45分前に通知が来る。`); }
     pushPCConfig();
   } catch (e) { if (!quiet) toast(calErr(e)); }
