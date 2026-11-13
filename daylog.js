@@ -192,7 +192,7 @@ function habitText(mode) {
 }
 function starsForDay(d) {
   const day = getDay(d); const out = [];
-  (day.entries || []).forEach(e => out.push({ k: 'diary', t: e.t, id: 'e' + e.id, label: (e.nap ? '💤 ' : '') + (e.text || '（スコアだけの記録）') }));
+  (day.entries || []).forEach(e => out.push({ k: 'diary', t: e.t, id: 'e' + e.id, mood: e.mood, label: (e.nap ? '💤 ' : '') + (e.text || '（スコアだけの記録）') }));
   for (const t of Object.values(S.tasks)) {
     if (t.status === 'done' && t.doneAt && logicalDate(t.doneAt) === d) out.push({ k: 'task', t: t.doneAt, id: 't' + t.id, label: 'タスク完了：' + t.title });
     (t.steps || []).forEach(s => { if (s.done && s.doneAt && logicalDate(s.doneAt) === d) out.push({ k: 'task', small: true, t: s.doneAt, id: 's' + s.id, label: 'ステップ完了：' + s.title }); });
@@ -416,6 +416,7 @@ function paint() {
   if (t !== last.toast) { $('#app-toast').innerHTML = t; last.toast = t; }
   restoreFocus(fx);
   if (changedMain) afterMain();
+  else if (S.view === 'sky' && window.DaylogOrrery && skyKind() === 'orrery') window.DaylogOrrery.refresh(orreryApi());
 }
 function captureFocus() {
   const a = document.activeElement; if (!a || !a.id) return null;
@@ -836,6 +837,13 @@ function skyView() {
   const sk = S.sky; const age = moonAge(new Date());
   const [yy, mm] = sk.month.split('-').map(Number);
   let h = headerHTML('星空', `<span class="row" style="gap:5px">${moonSVG(age, 14)}今夜は${moonName(age)}（月齢 ${age.toFixed(1)}）</span>`);
+  h += `<div class="sky-kind"><div class="seg" role="group" aria-label="星空の見かた"><button data-act="skyKind" data-arg="orrery" aria-pressed="${skyKind() === 'orrery'}">天球</button><button data-act="skyKind" data-arg="galaxy" aria-pressed="${skyKind() === 'galaxy'}">銀河</button></div></div>`;
+  if (skyKind() === 'orrery') {
+    h += `<div id="orr-host" class="orr-host"></div>`;
+    h += `<div class="legend"><span><i style="--c:${STAR_C.diary}"></i>日記</span><span><i style="--c:${STAR_C.task}"></i>タスク</span><span><i style="--c:${STAR_C.gold}"></i>習慣・目標</span><span><i style="--c:${STAR_C.night}"></i>夜モード</span>${info('1日が1本の輪。地平線のいちばん大きい輪が今日で、上へ行くほど昔の日。輪の上の位置が時刻（真上から見ると時計）。明るい部分は起きていた時間。▶を押すと光の線が時刻をめぐり、横切った星が鳴る。同じ時刻の星は日をまたいで同時に鳴るので、毎日のくせが和音になる。「見上げる」はドームの中から空を見上げる見かたで、真ん中に近い星ほど大きく鳴る。')}</div>`;
+    h += reviewSection();
+    return h;
+  }
   h += `<div class="crumbs"><button data-act="skyLevel" data-arg="universe" aria-current="${sk.level === 'universe'}">${sk.year}年の宇宙</button><span class="sep">›</span><button data-act="skyLevel" data-arg="month" aria-current="${sk.level === 'month'}">${mm}月の銀河</button>${sk.level === 'day' ? `<span class="sep">›</span><button aria-current="true">${shortLabel(sk.day)}の星座</button>` : ''}</div>`;
   h += `<div class="skybox"><canvas id="sky" aria-label="星空。星をタップするとその記録が読める"></canvas><div class="skynav"><button data-act="skyPrev" aria-label="前へ">‹</button><button data-act="skyNext" aria-label="次へ">›</button></div></div>`;
   h += `<div class="legend"><span><i style="--c:${STAR_C.diary}"></i>日記</span><span><i style="--c:${STAR_C.task}"></i>タスク</span><span><i style="--c:${STAR_C.gold}"></i>習慣・目標</span><span><i style="--c:${STAR_C.night}"></i>夜モード</span><span><i class="neb"></i>星雲</span>${info(sk.level === 'universe' ? '月をタップすると、その月の銀河に入れる。星雲は不調・休養の日。' : sk.level === 'month' ? '星の集まりをタップすると、その日の星座に入れる。中心の金色は今月の目標の星座。星雲は不調・休養の日。' : '星をタップすると、その時の記録が読める。星雲は不調・休養の日。')}</div>`;
@@ -1253,7 +1261,21 @@ function nightHTML() {
 }
 
 /* ───────── キャンバス ───────── */
-function afterMain() { if (S.view === 'sky') drawSky(); }
+// 星空の見かた：天球（天球儀×プラネタリウム）／銀河（前からの見かた）。端末ごとに覚える
+function skyKind() { try { return localStorage.getItem('daylog-sky-kind') === 'galaxy' ? 'galaxy' : 'orrery'; } catch (_) { return 'orrery'; } }
+function orreryApi() {
+  return {
+    today: today(), addDays, dayStars: starsForDay, wake: wakeAt, sleep: sleepAt, colors: STAR_C,
+    dayInfo: d => { const day = getDay(d); return { mode: day.mode || null, name: (day.close && day.close.name) || null }; },
+    need: n => { ensureOlder(addDays(today(), -n)); },
+  };
+}
+function afterMain() {
+  const host = S.view === 'sky' && skyKind() === 'orrery' ? $('#orr-host') : null;
+  if (host && window.DaylogOrrery) window.DaylogOrrery.attach(host, orreryApi());
+  else if (window.DaylogOrrery) window.DaylogOrrery.detach();
+  if (S.view === 'sky' && !host) drawSky();
+}
 function afterOver() { if (S.night && S.night.step === 6) playRise(); }
 function fitCanvas(cv, hRatio, maxH) {
   const w = cv.parentElement.clientWidth; const h = Math.min(maxH, Math.round(w * hRatio));
@@ -1396,6 +1418,7 @@ function toast(msg, action) { S.toast = { msg, action, id: uid() }; render(); co
 function toastHTML() { const t = S.toast; if (!t) return ''; return `<div class="toast" role="status"><span>${esc(t.msg)}</span>${t.action ? `<button class="link" data-act="undo">元に戻す</button>` : ''}</div>`; }
 
 const A = {};
+A.skyKind = v => { try { localStorage.setItem('daylog-sky-kind', v === 'galaxy' ? 'galaxy' : 'orrery'); } catch (_) {} render(); };
 A.setLook = v => { patchSettings({ look: v === 'classic' ? 'classic' : 'nova' }); applyLook(); };
 /* ── Daylogから直接通知（ホーム画面のDaylog・アプリ版） ── */
 S.push = { state: null, busy: false, msg: '' };
