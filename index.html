@@ -179,6 +179,11 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 .tl li.hr.has .kids{margin-top:4px;border-left-color:var(--line-2)}
 .tl li.hr.future{opacity:.45}
 .tl li.hr.future .tl-b{border-top-style:dashed}
+/* 起きた：就寝と同じ、控えめな1行（実線） */
+.tl li.wakeline{padding:3px 0;--c:var(--gold)}
+.tl li.wakeline::after{left:55px;top:8px;width:7px;height:7px;background:color-mix(in oklab,var(--c) 75%,transparent);border:1px solid color-mix(in oklab,var(--c) 75%,transparent)}
+.tl li.wakeline time{font-size:11px;padding-top:0}
+.tl li.wakeline .tl-b{display:flex;flex-wrap:wrap;align-items:center;gap:2px 0;border-top:1px solid color-mix(in oklab,var(--c) 35%,transparent);margin-top:7px;padding:2px 0 0 2px;font-size:11.5px;color:var(--fg-2);letter-spacing:.02em}
 /* 就寝・就寝の目安：予定のカードにせず、控えめな1行 */
 .tl li.ev.bedline{padding:3px 0}
 .tl li.ev.bedline::after{left:55px;top:8px;width:7px;height:7px;background:var(--ink);border:1px solid color-mix(in oklab,var(--c) 70%,transparent)}
@@ -188,14 +193,11 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 .ev.bedline.done .tl-b{border-top-style:solid}
 .ev.bedline.done .bl-t{color:var(--fg-2)}
 .ev.bedline.done::after{background:color-mix(in oklab,var(--c) 70%,transparent)}
-.tl li.wakeline{padding:3px 0}
-.tl li.wakeline::after{background:var(--gold, #e9c46a);border-color:var(--gold, #e9c46a)}
-.tl li.wakeline .tl-b{font-size:12px;color:var(--fg-2)}
 /* 起きた・寝た時刻を直す（さりげない ✎） */
 .fixbtn{background:none;border:0;color:var(--fg-3);opacity:.55;font-size:11px;padding:0 4px;margin-left:2px;cursor:pointer;line-height:1}
 .fixbtn:hover,.fixbtn:focus-visible{opacity:1;color:var(--fg)}
 .wk-prev{margin-left:10px;color:var(--fg-3);font-size:11px}
-.tl li.wakeline .tl-b{display:flex;flex-wrap:wrap;align-items:center;gap:2px 0}
+
 .timefix{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;margin:2px 8px 2px 0;font-size:12px}
 .timefix input[type=time]{padding:3px 6px;font-size:13px;width:auto}
 /* 送信待ち・オフラインの小さな印 */
