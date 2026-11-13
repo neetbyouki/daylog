@@ -17,21 +17,22 @@
   };
 
   /* ────────────── 音 ──────────────
-     pluggnb（プラッグ＋R&B）寄りの、キラキラ・ピロピロしたアンビエント
+     pluggnb（プラッグ＋R&B）寄りの、キラキラ・ピロピロしたアンビエント＋星のさざめき
      まとまりのための決まり
-     1. 調は D メジャーだけ。和音は Gmaj7 → F#m7 → Em9 → Dmaj9 を1小節ずつ回す（R&Bの柔らかい和音）
-     2. 星の音は、そのとき鳴っている和音の音にだけ寄せる（どの星が鳴っても和音からはみ出さない）
-     3. 鳴るタイミングは16分音符の拍にそろえる（75BPM・半分のノリ＝pluggnbの速さ）。1拍に4音、全体で同時22音まで
-     4. 楽器：日記＝キラキラのベル（左右にはねる残響つき）＋気分がいい日は「ピロピロ」と和音を駆け上がる音
-              タスク＝短いプラック＋装飾音、習慣・目標＝高いグラス、夜モード＝やわらかい膨らむ音
-     5. 下には、ゆらぐ和音のパッド、808の低音、細かいハイハット（作業ではひかえめ、睡眠では無し）、
-        ときどき遠くで光る小さな音（グリッター）、ごく小さなノイズ（空気の質感）
-     6. 大きな残響（4.5秒）と左右のディレイでひとつの空間にまとめ、最後にコンプレッサーで音量をならす
-     7. 不調・休養の日の星は、同じ和音のまま少しくぐもらせる（悲しい音にはしない）
-     使い方（音のモード）
-     ・聴く：いちばん華やか
-     ・作業：ビートを弱め、ピンクノイズと16Hzのうなり（左右の耳でわずかに違う高さ＝バイノーラル。イヤホンで効く）
-     ・睡眠：ビート無し・ゆっくり・暗め。うなりは 6Hz から 2Hz へ15分かけて下がる。ブラウンノイズ。タイマーで静かに消える */
+     1. 調は D メジャーだけ。和音は Gmaj7 → F#m7 → Em9 → Dmaj9 を1小節ずつ回す
+     2. 星の音は、そのとき鳴っている和音の音にだけ寄せる（はみ出さない）。高すぎる音は使わない（D6 まで）
+     3. 鳴るタイミングは16分音符の拍にそろえる。1拍に4音、全体で同時24音まで
+     4. 耳が痛くならないように：全体で 4.5kHz より上をなだらかに下げ、8kHz より上は切る。
+        音の立ち上がりは最低でも数ミリ秒かけて「カチッ」を出さない。矩形波は使わない。ハイハットは小さく、角を丸める
+     5. 星のさざめき：和音の高い音が、小さく・ふわっと・ばらばらに光る（画面の背景の星も一緒にまたたく）。
+        ときどき、さらさらと流れる音（ノイズのうねり）が通る
+     6. 大きな残響（4.5秒）と左右のディレイで、ひとつの空間にまとめる。最後にコンプレッサー
+     ボタン（すべて枠の中）
+     ・ビート：あり／なし。🎲 でパターンを入れかえる（808・クラップ・ハイハット。毎回少しずつ違う組み合わせ）
+     ・808：まるい／すべる／あたたかい／はずむ の4種類から選ぶ
+     ・作業：集中向け。16Hz のうなり（左右の耳でわずかに違う高さ＝バイノーラル。イヤホンで効く）。
+            急に目立つ音を減らし、同じ質感がずっと続くようにする
+     ・睡眠：ピンクノイズ。ビートを止め、ゆっくり・暗く・やわらかく。うなりは 4Hz から 2Hz へゆっくり下がる。タイマーで静かに消える */
   const D3 = 146.83;
   const PROG = [ // D からの半音（和音の音）
     { name: 'Gmaj7', root: 5, tones: [5, 9, 12, 16, 19] },
@@ -39,53 +40,72 @@
     { name: 'Em9', root: 2, tones: [2, 5, 9, 12, 18] },
     { name: 'Dmaj9', root: 0, tones: [0, 4, 7, 11, 16] },
   ];
-  const SMODES = {
-    listen: { label: '聴く', bpm: 75, kick: 0.26, hat: 0.05, pad: 0.05, padCut: 1700, noise: 'pink', noiseG: 0.004, glitter: 0.07, arp: true, star: 1, beat: null },
-    work: { label: '作業', bpm: 75, kick: 0.12, hat: 0.022, pad: 0.045, padCut: 1300, noise: 'pink', noiseG: 0.012, glitter: 0.04, arp: true, star: 0.8, beat: { hz: 16, gain: 0.035 } },
-    sleep: { label: '睡眠', bpm: 56, kick: 0, hat: 0, pad: 0.055, padCut: 650, noise: 'brown', noiseG: 0.03, glitter: 0.015, arp: false, star: 0.55, beat: { from: 6, to: 2, minutes: 15, gain: 0.04 } },
-  };
+  const K808 = [
+    { id: 'round', name: 'まるい' },
+    { id: 'glide', name: 'すべる' },
+    { id: 'warm', name: 'あたたかい' },
+    { id: 'bounce', name: 'はずむ' },
+  ];
   const hzOf = semi => D3 * Math.pow(2, semi / 12);
-  const AU = { ctx: null, on: store.get('sound', true), vol: 0.8, voices: 0, slots: new Map(), smode: store.get('smode', 'listen'), timerMin: store.get('timer', 60) };
+  const AU = {
+    ctx: null, on: store.get('sound', true), vol: 0.8, voices: 0, slots: new Map(),
+    smode: ['listen', 'work', 'sleep'].includes(store.get('smode', 'listen')) ? store.get('smode', 'listen') : 'listen',
+    beat: store.get('beat', true), k808: clamp(store.get('k808', 0), 0, K808.length - 1), pat: store.get('pat', 1), timerMin: store.get('timer', 60),
+  };
+  // 今の設定から、各層の大きさを決める
+  function M() {
+    const sleep = AU.smode === 'sleep', work = AU.smode === 'work', beat = AU.beat && !sleep;
+    return {
+      bpm: sleep ? 56 : 75,
+      kick: beat ? (work ? 0.2 : 0.3) : 0, hat: beat ? (work ? 0.012 : 0.018) : 0, clap: beat ? (work ? 0.03 : 0.05) : 0,
+      pad: sleep ? 0.05 : 0.042, padCut: sleep ? 560 : work ? 1000 : 1350,
+      noise: sleep ? 'pink' : null, noiseG: sleep ? 0.05 : 0,
+      shimmer: sleep ? 0.45 : work ? 0.7 : 1, swish: sleep ? 0.4 : work ? 0.5 : 1,
+      arp: sleep ? 0 : work ? 0.5 : 1, star: sleep ? 0.55 : work ? 0.72 : 1, cut: sleep ? 1500 : work ? 3200 : 4200,
+      beatHz: work ? { hz: 16, gain: 0.032 } : sleep ? { from: 4, to: 2, minutes: 15, gain: 0.03 } : null,
+    };
+  }
   function audioInit() {
     if (AU.ctx) return AU.ctx;
     const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
     try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } catch (_) {} // iPhoneのマナーモードに従う
     const ctx = AU.ctx = new C();
     const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -18; comp.knee.value = 20; comp.ratio.value = 3; comp.attack.value = 0.008; comp.release.value = 0.4;
-    const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 11000;
+    comp.threshold.value = -18; comp.knee.value = 20; comp.ratio.value = 3; comp.attack.value = 0.01; comp.release.value = 0.4;
+    // 耳が痛くならないように：4.5kHz から上をなだらかに下げ、8kHz より上は切る
+    const shelf = ctx.createBiquadFilter(); shelf.type = 'highshelf'; shelf.frequency.value = 4500; shelf.gain.value = -7;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 8000; lp.Q.value = 0.5;
     const master = ctx.createGain(); master.gain.value = AU.on ? AU.vol : 0;
-    comp.connect(tone); tone.connect(master); master.connect(ctx.destination);
-    // 残響：その場で作る、4.5秒で消えていく広がり（高い音から先に消える）
+    comp.connect(shelf); shelf.connect(lp); lp.connect(master); master.connect(ctx.destination);
+    // 残響：4.5秒で消えていく広がり（高い音から先に消える）
     const sr = ctx.sampleRate, len = Math.floor(sr * 4.5); const ir = ctx.createBuffer(2, len, sr);
-    for (let ch = 0; ch < 2; ch++) { const a = ir.getChannelData(ch); let lp = 0; for (let i = 0; i < len; i++) { const t = i / len; lp += ((Math.random() * 2 - 1) - lp) * (0.9 - t * 0.75); a[i] = lp * Math.pow(1 - t, 2.6) * (i < sr * 0.02 ? i / (sr * 0.02) : 1); } }
+    for (let ch = 0; ch < 2; ch++) { const a = ir.getChannelData(ch); let l = 0; for (let i = 0; i < len; i++) { const t = i / len; l += ((Math.random() * 2 - 1) - l) * (0.6 - t * 0.5); a[i] = l * Math.pow(1 - t, 2.6) * (i < sr * 0.02 ? i / (sr * 0.02) : 1); } }
     const conv = ctx.createConvolver(); conv.buffer = ir;
-    const revRet = ctx.createGain(); revRet.gain.value = 0.55; conv.connect(revRet); revRet.connect(comp);
+    const revRet = ctx.createGain(); revRet.gain.value = 0.6; conv.connect(revRet); revRet.connect(comp);
     // 左右にはねるディレイ（付点8分）
     const beat = 60 / 75; const dl = ctx.createDelay(2), dr = ctx.createDelay(2); dl.delayTime.value = beat * 0.75; dr.delayTime.value = beat * 0.75;
-    const fb = ctx.createGain(); fb.gain.value = 0.38; const dlp = ctx.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 3200;
+    const fb = ctx.createGain(); fb.gain.value = 0.36; const dlp = ctx.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 2600;
     const merger = ctx.createChannelMerger(2); const dlyIn = ctx.createGain();
     dlyIn.connect(dl); dl.connect(dlp); dlp.connect(dr); dr.connect(fb); fb.connect(dl);
-    dl.connect(merger, 0, 0); dr.connect(merger, 0, 1); const dlyRet = ctx.createGain(); dlyRet.gain.value = 0.32; merger.connect(dlyRet); dlyRet.connect(comp); dlyRet.connect(conv);
+    dl.connect(merger, 0, 0); dr.connect(merger, 0, 1); const dlyRet = ctx.createGain(); dlyRet.gain.value = 0.3; merger.connect(dlyRet); dlyRet.connect(comp); dlyRet.connect(conv);
     const dry = ctx.createGain(); dry.gain.value = 0.85; dry.connect(comp);
-    Object.assign(AU, { master, comp, rev: conv, dly: dlyIn, dry });
+    // 808 は専用の道：低いところだけを残し、残響にはほとんど送らない
+    const bass = ctx.createGain(); bass.gain.value = 1; const blp = ctx.createBiquadFilter(); blp.type = 'lowpass'; blp.frequency.value = 900; bass.connect(blp); blp.connect(comp);
+    Object.assign(AU, { master, comp, rev: conv, dly: dlyIn, dry, bass });
     return ctx;
   }
-  const M = () => SMODES[AU.smode] || SMODES.listen;
   const stepLen = () => 60 / M().bpm / 4; // 16分音符
   const barLen = () => 60 / M().bpm * 4;
-  // 今の小節の和音（再生を始めた時刻からの小節数で回す）
   const chordAt = t => PROG[((Math.floor(((t || 0) - (AU.t0 || 0)) / barLen()) % 4) + 4) % 4];
-  // 欲しい高さに一番近い、和音の音
   function snap(semi, chord) {
+    semi = Math.min(semi, 36); // D6 より上は使わない
     let best = semi, bd = 99;
-    for (let o = -24; o <= 36; o += 12) for (const c of chord.tones) { const v = c + o; const d = Math.abs(v - semi); if (d < bd) { bd = d; best = v; } }
+    for (let o = -24; o <= 36; o += 12) for (const c of chord.tones) { const v = c + o; if (v > 36) continue; const d = Math.abs(v - semi); if (d < bd) { bd = d; best = v; } }
     return best;
   }
-  // 1つの声：左右の位置・くぐもり・残響とディレイへの送り
-  function voice(t, { pan = 0, dark = false, dur = 2, rev = 0.5, dly = 0, cut = 9000 }) {
+  function voice(t, { pan = 0, dark = false, dur = 2, rev = 0.5, dly = 0, cut = 4200 }) {
     const ctx = AU.ctx; const g = ctx.createGain(); g.gain.value = 0;
-    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = dark ? Math.min(cut, 1800) : cut; f.Q.value = 0.4;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = Math.min(dark ? 1500 : cut, M().cut); f.Q.value = 0.3;
     g.connect(f); let node = f;
     if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = clamp(pan, -0.9, 0.9); node.connect(p); node = p; }
     node.connect(AU.dry);
@@ -94,94 +114,138 @@
     AU.voices++; setTimeout(() => { AU.voices = Math.max(0, AU.voices - 1); try { g.disconnect(); } catch (_) {} }, (t - ctx.currentTime + dur + 0.5) * 1000);
     return g;
   }
-  const env = (gp, t, peak, atk, dec) => { gp.setValueAtTime(0.0001, t); gp.exponentialRampToValueAtTime(Math.max(peak, 0.0002), t + atk); gp.exponentialRampToValueAtTime(0.0001, t + atk + dec); };
+  const env = (gp, t, peak, atk, dec) => { gp.setValueAtTime(0.0001, t); gp.exponentialRampToValueAtTime(Math.max(peak, 0.0002), t + Math.max(atk, 0.004)); gp.exponentialRampToValueAtTime(0.0001, t + Math.max(atk, 0.004) + dec); };
   const osc = (type, hz, t, stop, dest, gain = 1, detune = 0) => { const o = AU.ctx.createOscillator(); o.type = type; o.frequency.value = hz; o.detune.value = detune; const g = AU.ctx.createGain(); g.gain.value = gain; o.connect(g); g.connect(dest); o.start(t); o.stop(stop); return o; };
   const INST = {
-    // キラキラのベル（FMの金属的な倍音＋1オクターブ上のきらめき）。左右にはねる
+    // キラキラのベル（FMは控えめ。金属っぽさは少しだけ）。左右にはねる
     bell(t, hz, v, o) {
-      const dur = 2.6; const g = voice(t, { ...o, dur, rev: 0.55, dly: 0.35 });
+      const dur = 2.6; const g = voice(t, { ...o, dur, rev: 0.55, dly: 0.32 });
       const c = AU.ctx.createOscillator(); c.frequency.value = hz;
-      const m = AU.ctx.createOscillator(); m.frequency.value = hz * 3.01; const mi = AU.ctx.createGain(); mi.gain.setValueAtTime(hz * 1.2, t); mi.gain.exponentialRampToValueAtTime(hz * 0.01, t + 0.8);
+      const m = AU.ctx.createOscillator(); m.frequency.value = hz * 3.01; const mi = AU.ctx.createGain(); mi.gain.setValueAtTime(hz * 0.55, t); mi.gain.exponentialRampToValueAtTime(hz * 0.01, t + 0.6);
       m.connect(mi); mi.connect(c.frequency); c.connect(g); c.start(t); m.start(t); c.stop(t + dur + 0.1); m.stop(t + dur + 0.1);
-      osc('sine', hz * 2, t, t + dur, g, 0.22); osc('triangle', hz * 4.0, t, t + 0.4, g, 0.05);
-      env(g.gain, t, 0.15 * v, 0.004, dur);
+      osc('sine', hz * 2, t, t + dur, g, 0.14);
+      env(g.gain, t, 0.14 * v, 0.006, dur);
     },
-    // ピロピロ：細い矩形波の短い音（少しだけビブラート）
+    // ピロピロ：やわらかい三角波の短い音（少しだけビブラート）
     piro(t, hz, v, o) {
-      const dur = 0.32; const g = voice(t, { ...o, dur, rev: 0.4, dly: 0.45, cut: 4200 });
-      const a = osc('square', hz, t, t + dur + 0.05, g, 0.5); const b = osc('sine', hz * 2, t, t + dur + 0.05, g, 0.35);
-      const lfo = AU.ctx.createOscillator(); lfo.frequency.value = 9; const lg = AU.ctx.createGain(); lg.gain.value = 9; lfo.connect(lg); lg.connect(a.detune); lg.connect(b.detune); lfo.start(t); lfo.stop(t + dur + 0.05);
-      env(g.gain, t, 0.07 * v, 0.003, dur);
+      const dur = 0.34; const g = voice(t, { ...o, dur, rev: 0.45, dly: 0.42, cut: 3000 });
+      const a = osc('triangle', hz, t, t + dur + 0.05, g, 0.8); const b = osc('sine', hz * 2, t, t + dur + 0.05, g, 0.18);
+      const lfo = AU.ctx.createOscillator(); lfo.frequency.value = 8; const lg = AU.ctx.createGain(); lg.gain.value = 8; lfo.connect(lg); lg.connect(a.detune); lg.connect(b.detune); lfo.start(t); lfo.stop(t + dur + 0.05);
+      env(g.gain, t, 0.09 * v, 0.006, dur);
     },
-    // タスク：短いプラック
     pluck(t, hz, v, o) {
-      const dur = 0.9; const g = voice(t, { ...o, dur, rev: 0.45, dly: 0.2, cut: 5000 });
-      osc('triangle', hz, t, t + dur, g, 1); osc('sine', hz * 2, t, t + 0.25, g, 0.3);
-      env(g.gain, t, 0.17 * v, 0.003, dur);
+      const dur = 0.9; const g = voice(t, { ...o, dur, rev: 0.45, dly: 0.18, cut: 3600 });
+      osc('triangle', hz, t, t + dur, g, 1); osc('sine', hz * 2, t, t + 0.25, g, 0.2);
+      env(g.gain, t, 0.15 * v, 0.005, dur);
     },
-    // 習慣・目標：高いグラス
     glass(t, hz, v, o) {
-      const dur = 3.4; const g = voice(t, { ...o, dur, rev: 0.7, dly: 0.3 });
-      osc('sine', hz, t, t + dur, g, 1); osc('sine', hz * 2.001, t, t + dur, g, 0.3); osc('sine', hz * 3.003, t, t + 1.2, g, 0.1);
-      env(g.gain, t, 0.09 * v, 0.02, dur);
+      const dur = 3.4; const g = voice(t, { ...o, dur, rev: 0.75, dly: 0.28, cut: 4200 });
+      osc('sine', hz, t, t + dur, g, 1); osc('sine', hz * 2.001, t, t + dur, g, 0.2);
+      env(g.gain, t, 0.08 * v, 0.02, dur);
     },
-    // 夜モード：やわらかく膨らむ音
     swell(t, hz, v, o) {
-      const dur = 4.5; const g = voice(t, { ...o, dark: true, dur, rev: 0.8, cut: 1400 });
-      osc('sawtooth', hz, t, t + dur + 0.6, g, 0.4, -7); osc('sawtooth', hz, t, t + dur + 0.6, g, 0.4, 7); osc('sine', hz / 2, t, t + dur + 0.6, g, 0.6);
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06 * v, t + 0.9); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      const dur = 4.5; const g = voice(t, { ...o, dark: true, dur, rev: 0.8, cut: 1200 });
+      osc('sawtooth', hz, t, t + dur + 0.6, g, 0.35, -7); osc('sawtooth', hz, t, t + dur + 0.6, g, 0.35, 7); osc('sine', hz / 2, t, t + dur + 0.6, g, 0.6);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.055 * v, t + 0.9); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     },
-    // 808：低い正弦波が少し下がる。わずかに歪ませて芯を出す
-    kick(t, hz, v) {
-      const ctx = AU.ctx, dur = 1.5; const g = ctx.createGain(); g.gain.value = 0;
-      const sh = ctx.createWaveShaper(); const cv = new Float32Array(256); for (let i = 0; i < 256; i++) { const x = i / 128 - 1; cv[i] = Math.tanh(x * 1.8); } sh.curve = cv;
-      const o = ctx.createOscillator(); o.frequency.setValueAtTime(hz * 2.2, t); o.frequency.exponentialRampToValueAtTime(hz, t + 0.06);
-      o.connect(sh); sh.connect(g); g.connect(AU.dry); o.start(t); o.stop(t + dur + 0.1);
-      env(g.gain, t, v, 0.004, dur);
+    // 星のさざめきの1粒：ふわっと立ち上がって、すっと消える正弦波
+    grain(t, hz, v, pan) {
+      const dur = 0.5 + Math.random() * 0.9; const g = voice(t, { pan, dur, rev: 0.95, dly: 0.25, cut: 5000 });
+      osc('sine', hz, t, t + dur + 0.1, g, 1, (Math.random() - 0.5) * 12); osc('sine', hz * 2, t, t + dur * 0.5, g, 0.08);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.03 * v, t + 0.02 + Math.random() * 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    },
+    // さらさら：ノイズを細い帯で通し、帯をゆっくり動かす（流れ星が通るような音）
+    swish(t, v, pan) {
+      const ctx = AU.ctx, dur = 2.6; const src = ctx.createBufferSource(); src.buffer = noiseBuf('pink');
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 6; bp.frequency.setValueAtTime(1800, t); bp.frequency.exponentialRampToValueAtTime(5200, t + dur * 0.6); bp.frequency.exponentialRampToValueAtTime(2600, t + dur);
+      const g = voice(t, { pan, dur, rev: 0.9, dly: 0, cut: 6000 }); src.connect(bp); bp.connect(g);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05 * v, t + dur * 0.5); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.start(t, Math.random() * 1.2); src.stop(t + dur + 0.1);
+    },
+    // 808：4種類。スマホのスピーカーでも聞こえるよう、まるい・すべる も少しだけ倍音を足す
+    kick(t, hz, v, slideFrom) {
+      const ctx = AU.ctx, kind = K808[AU.k808].id;
+      const dur = kind === 'bounce' ? 0.42 : kind === 'warm' ? 1.0 : kind === 'glide' ? 1.3 : 1.15;
+      const g = ctx.createGain(); g.gain.value = 0;
+      const o = ctx.createOscillator(); o.type = 'sine';
+      if (kind === 'glide' && slideFrom) { o.frequency.setValueAtTime(slideFrom, t); o.frequency.exponentialRampToValueAtTime(hz, t + 0.14); }
+      else if (kind === 'bounce') { o.frequency.setValueAtTime(hz * 1.5, t); o.frequency.exponentialRampToValueAtTime(hz, t + 0.05); }
+      else { o.frequency.setValueAtTime(hz * 1.06, t); o.frequency.exponentialRampToValueAtTime(hz, t + 0.05); }
+      let node = o;
+      if (kind === 'warm') { const sh = ctx.createWaveShaper(); const cv = new Float32Array(512); for (let i = 0; i < 512; i++) { const x = i / 256 - 1; cv[i] = Math.tanh(x * 2.4) / Math.tanh(2.4); } sh.curve = cv; sh.oversample = '2x'; o.connect(sh); node = sh; }
+      node.connect(g);
+      // 2倍・3倍の音を少し（小さいスピーカーで低音の輪郭が分かるように）
+      const h2 = osc('sine', hz * 2, t, t + dur, g, kind === 'warm' ? 0 : 0.16); const h3 = osc('sine', hz * 3, t, t + dur * 0.6, g, kind === 'bounce' ? 0.12 : 0.05);
+      if (kind === 'glide' && slideFrom) { h2.frequency.setValueAtTime(slideFrom * 2, t); h2.frequency.exponentialRampToValueAtTime(hz * 2, t + 0.14); }
+      g.connect(AU.bass);
+      const atk = kind === 'bounce' ? 0.004 : 0.008; const peak = v * (kind === 'warm' ? 0.75 : 1);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + atk);
+      if (kind === 'glide') { g.gain.setValueAtTime(peak, t + 0.25); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); }
+      else g.gain.exponentialRampToValueAtTime(0.0001, t + atk + dur);
+      o.start(t); o.stop(t + dur + 0.1);
       AU.voices++; setTimeout(() => { AU.voices = Math.max(0, AU.voices - 1); }, (t - ctx.currentTime + dur + 0.3) * 1000);
     },
-    // ハイハット：高い所だけ残したノイズの、ごく短い音
-    hat(t, v, pan = 0) {
+    // クラップ：やわらかいノイズを少しずらして重ねる（pluggnbの軽いスネア）
+    clap(t, v) {
+      const ctx = AU.ctx; const g = voice(t, { pan: 0.05, dur: 0.5, rev: 0.5, dly: 0, cut: 4500 });
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 0.9; bp.connect(g);
+      [0, 0.012, 0.025].forEach((d, i) => { const s = ctx.createBufferSource(); s.buffer = noiseBuf('white'); const eg = ctx.createGain(); env(eg.gain, t + d, i === 2 ? 1 : 0.6, 0.002, i === 2 ? 0.22 : 0.03); s.connect(eg); eg.connect(bp); s.start(t + d, Math.random()); s.stop(t + d + 0.3); });
+      g.gain.setValueAtTime(v, t);
+    },
+    // ハイハット：小さく、角を丸めた短いノイズ
+    hat(t, v, pan = 0, open = false) {
       const ctx = AU.ctx; const src = ctx.createBufferSource(); src.buffer = noiseBuf('white');
-      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7500;
-      const g = ctx.createGain(); env(g.gain, t, v, 0.001, 0.045);
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 6500;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 10000;
+      const g = ctx.createGain(); env(g.gain, t, v, 0.003, open ? 0.22 : 0.035);
       let node = g; if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = pan; g.connect(p); node = p; }
-      src.connect(hp); hp.connect(g); node.connect(AU.dry); src.start(t, Math.random() * 1.5); src.stop(t + 0.08);
+      src.connect(hp); hp.connect(lp); lp.connect(g); node.connect(AU.dry); src.start(t, Math.random() * 1.5); src.stop(t + (open ? 0.3 : 0.08));
     },
   };
   const NB = {};
   function noiseBuf(kind) {
     if (NB[kind]) return NB[kind];
     const ctx = AU.ctx, len = ctx.sampleRate * 4; const b = ctx.createBuffer(1, len, ctx.sampleRate); const a = b.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, last = 0;
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
     for (let i = 0; i < len; i++) {
       const w = Math.random() * 2 - 1;
       if (kind === 'pink') { b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852; b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898; a[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926; }
-      else if (kind === 'brown') { last = (last + 0.02 * w) / 1.02; a[i] = last * 3.5; }
       else a[i] = w;
     }
-    // つなぎ目のぷつっという音を消す
     for (let i = 0; i < 2000; i++) { const k = i / 2000; a[i] *= k; a[len - 1 - i] *= k; }
     return (NB[kind] = b);
   }
 
-  /* ── 下で鳴り続ける層：パッド・ノイズ・うなり・ビート（小節ごとに先回りして予約する） ── */
+  /* ── ビートのパターン（🎲で入れかえる）：決まった型を土台に、毎回少しずつ変える ── */
+  function makePattern(seed) {
+    let s = (seed * 9301 + 49297) % 233280 || 7; const R = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+    const KICKS = [[0, 10], [0, 7, 10], [0, 3, 10], [0, 11], [0, 6, 10, 14], [0, 10, 13]];
+    const kickA = KICKS[Math.floor(R() * KICKS.length)]; const kickB = R() < 0.5 ? kickA : KICKS[Math.floor(R() * KICKS.length)];
+    const hatDiv = R() < 0.6 ? 2 : 1; // 8分か16分
+    const rolls = []; for (let i = 0; i < 2; i++) if (R() < 0.75) rolls.push({ bar: Math.floor(R() * 4), step: [6, 12, 14, 4][Math.floor(R() * 4)], n: R() < 0.5 ? 3 : 4 });
+    const clapGhost = R() < 0.4; const openHat = R() < 0.5 ? 14 : null; const slide = R() < 0.7;
+    return { kickA, kickB, hatDiv, rolls, clapGhost, openHat, slide, id: seed };
+  }
+  let PAT = makePattern(AU.pat);
+
+  /* ── 下で鳴り続ける層：パッド・ノイズ・うなり。小節ごとに、ビートとさざめきを先回りして予約する ── */
   const TR = { on: false, timer: 0, nextBar: 0, bar: 0, layers: null, endAt: 0 };
   function bedStart() {
     const ctx = AU.ctx; if (!ctx || TR.on) return; const m = M();
     TR.on = true; AU.t0 = ctx.currentTime + 0.12; TR.nextBar = AU.t0; TR.bar = 0;
     const L = TR.layers = { nodes: [] };
-    // ノイズ（空気の質感・作業ではピンク、睡眠ではブラウン）
-    const ns = ctx.createBufferSource(); ns.buffer = noiseBuf(m.noise); ns.loop = true;
-    const nf = ctx.createBiquadFilter(); nf.type = 'lowpass'; nf.frequency.value = m.noise === 'brown' ? 900 : 5200;
-    const ng = ctx.createGain(); ng.gain.value = 0; ng.gain.setTargetAtTime(m.noiseG, ctx.currentTime, 2);
-    ns.connect(nf); nf.connect(ng); ng.connect(AU.comp); ns.start(); L.nodes.push(ns); L.noiseG = ng;
-    // うなり（バイノーラル）：左は D3、右は D3＋うなりの数。左右を分けて直接出す（残響を通さない）
-    if (m.beat) {
-      const merger = ctx.createChannelMerger(2); const bg = ctx.createGain(); bg.gain.value = 0; bg.gain.setTargetAtTime(m.beat.gain, ctx.currentTime, 3);
+    if (m.noise) {
+      const ns = ctx.createBufferSource(); ns.buffer = noiseBuf(m.noise); ns.loop = true;
+      const nf = ctx.createBiquadFilter(); nf.type = 'lowpass'; nf.frequency.value = 1800; // 高いシャーという成分を抑えた、やわらかいピンクノイズ
+      const ng = ctx.createGain(); ng.gain.value = 0; ng.gain.setTargetAtTime(m.noiseG, ctx.currentTime, 2.5);
+      ns.connect(nf); nf.connect(ng); ng.connect(AU.comp); ns.start(); L.nodes.push(ns); L.noiseG = ng;
+    }
+    // うなり（バイノーラル）：左は D3、右は D3＋うなりの数。左右を分けて直接出す
+    if (m.beatHz) {
+      const merger = ctx.createChannelMerger(2); const bg = ctx.createGain(); bg.gain.value = 0; bg.gain.setTargetAtTime(m.beatHz.gain, ctx.currentTime, 3);
       const l = ctx.createOscillator(); l.frequency.value = D3; const r = ctx.createOscillator();
-      const start = m.beat.hz || m.beat.from; r.frequency.value = D3 + start;
-      if (m.beat.from) { r.frequency.setValueAtTime(D3 + m.beat.from, ctx.currentTime); r.frequency.linearRampToValueAtTime(D3 + m.beat.to, ctx.currentTime + m.beat.minutes * 60); }
+      r.frequency.value = D3 + (m.beatHz.hz || m.beatHz.from);
+      if (m.beatHz.from) { r.frequency.setValueAtTime(D3 + m.beatHz.from, ctx.currentTime); r.frequency.linearRampToValueAtTime(D3 + m.beatHz.to, ctx.currentTime + m.beatHz.minutes * 60); }
       l.connect(merger, 0, 0); r.connect(merger, 0, 1); merger.connect(bg); bg.connect(AU.master); l.start(); r.start();
       L.nodes.push(l, r); L.beatG = bg;
     }
@@ -193,37 +257,53 @@
     [L.noiseG, L.beatG, L.padG].forEach(g => { if (g) g.gain.setTargetAtTime(0.0001, ctx.currentTime, fade); });
     setTimeout(() => L.nodes.forEach(n => { try { n.stop(); } catch (_) {} }), fade * 6000);
   }
-  // 小節を先回りして予約する（パッドの和音・808・ハイハット・グリッター）
+  function bedRestart() { if (!E.play || !AU.on) return; bedStop(0.25); setTimeout(() => { if (E.play && AU.on) bedStart(); }, 350); }
   function sched() {
     const ctx = AU.ctx; if (!TR.on || !ctx) return; const m = M();
     while (TR.nextBar < ctx.currentTime + 0.6) {
       const t = TR.nextBar, bar = TR.bar, ch = PROG[bar % 4], bl = barLen(), st = stepLen();
       padChord(t, ch, bl, m);
-      if (m.kick) { INST.kick(t, hzOf(ch.root - 24), m.kick); if (bar % 2 === 1) INST.kick(t + st * 10, hzOf(ch.root - 24), m.kick * 0.7); }
-      if (m.hat) for (let i = 0; i < 16; i += 2) {
-        INST.hat(t + i * st, m.hat * (i % 4 === 0 ? 1 : 0.6), i % 4 ? 0.25 : -0.15);
-        if (bar % 4 === 3 && i === 12) for (let k = 1; k < 4; k++) INST.hat(t + i * st + k * st * 2 / 3, m.hat * 0.5, 0.35); // 3連のロール
+      const root = hzOf(ch.root - 24);
+      if (m.kick) {
+        const ks = bar % 2 ? PAT.kickB : PAT.kickA;
+        ks.forEach((k, i) => { const second = i > 0 && PAT.slide; const hz = second && i === ks.length - 1 ? hzOf(ch.root - 24 + 7) : root; INST.kick(t + k * st, hz, m.kick * (i ? 0.85 : 1), second ? root : null); });
       }
-      // 遠くで光る小さな音（和音の音の高いところ）
-      for (let i = 0; i < 16; i++) if (Math.random() < m.glitter) {
-        const semi = ch.tones[Math.floor(Math.random() * ch.tones.length)] + 24 + (Math.random() < 0.4 ? 12 : 0);
-        INST.glass(t + i * st, hzOf(semi), 0.35, { pan: Math.random() * 1.6 - 0.8 });
+      if (m.clap) { INST.clap(t + 8 * st, m.clap); if (PAT.clapGhost && bar % 2) INST.clap(t + 15 * st, m.clap * 0.35); }
+      if (m.hat) {
+        for (let i = 0; i < 16; i += PAT.hatDiv) { if (PAT.openHat === i && bar % 2) INST.hat(t + i * st, m.hat * 0.8, 0.3, true); else INST.hat(t + i * st, m.hat * (i % 4 === 0 ? 1 : 0.55), i % 4 ? 0.25 : -0.15); }
+        for (const r of PAT.rolls) if (r.bar === bar % 4) for (let k = 1; k < r.n; k++) INST.hat(t + r.step * st + k * st * 2 / r.n, m.hat * (0.5 + k * 0.1), 0.35);
       }
+      // 星のさざめき：和音の高い音が、ばらばらに小さく光る。星が多い日ほど多く
+      const dens = clamp(E.stars.length / 60, 0.4, 1.4) * m.shimmer;
+      for (let i = 0; i < 16; i++) {
+        if (Math.random() < 0.16 * dens) {
+          const semi = snap(ch.tones[Math.floor(Math.random() * ch.tones.length)] + 24 + (Math.random() < 0.3 ? 12 : 0), ch);
+          const tt = t + i * st + Math.random() * st * 0.6; INST.grain(tt, hzOf(semi), 0.6 + Math.random() * 0.5, Math.random() * 1.8 - 0.9);
+          twinkle(tt);
+        }
+      }
+      // ときどき：きらきらが流れ落ちる（4〜6粒が順に下がる）
+      if (Math.random() < 0.22 * m.shimmer) {
+        const start = 5 + Math.floor(Math.random() * 8); const tones = [...ch.tones].sort((a, b) => b - a);
+        tones.slice(0, 4 + Math.floor(Math.random() * 2)).forEach((x, k) => { const tt = t + (start + k * 0.66) * st; INST.grain(tt, hzOf(snap(x + 24, ch)), 0.75 - k * 0.1, 0.6 - k * 0.3); twinkle(tt); });
+      }
+      if (Math.random() < 0.18 * m.swish) INST.swish(t + Math.floor(Math.random() * 8) * st, 0.8, Math.random() * 1.2 - 0.6);
       TR.nextBar += bl; TR.bar++;
     }
   }
   function padChord(t, ch, bl, m) {
-    const ctx = AU.ctx; const g = ctx.createGain(); const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = m.padCut; f.Q.value = 0.6;
-    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.15; const lg = ctx.createGain(); lg.gain.value = m.padCut * 0.25; lfo.connect(lg); lg.connect(f.frequency);
+    const ctx = AU.ctx; const g = ctx.createGain(); const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = m.padCut; f.Q.value = 0.5;
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.12; const lg = ctx.createGain(); lg.gain.value = m.padCut * 0.22; lfo.connect(lg); lg.connect(f.frequency);
     g.connect(f); f.connect(AU.dry); const rs = ctx.createGain(); rs.gain.value = 0.7; f.connect(rs); rs.connect(AU.rev);
     const end = t + bl + 1.6;
-    ch.tones.slice(0, 4).forEach((semi, i) => { const hz = hzOf(semi - 12 + (i === 0 ? 0 : 0)); osc('sawtooth', hz, t, end, g, 0.25, -9); osc('sawtooth', hz, t, end, g, 0.25, 9); osc('triangle', hz, t, end, g, 0.35); });
+    ch.tones.slice(0, 4).forEach(semi => { const hz = hzOf(semi - 12); osc('sawtooth', hz, t, end, g, 0.22, -9); osc('sawtooth', hz, t, end, g, 0.22, 9); osc('triangle', hz, t, end, g, 0.4); });
     lfo.start(t); lfo.stop(end);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(m.pad, t + 0.9); g.gain.setValueAtTime(m.pad, t + bl); g.gain.exponentialRampToValueAtTime(0.0001, end);
     if (TR.layers) TR.layers.padG = g;
   }
+  // 画面の背景の星を、音に合わせてまたたかせる
+  function twinkle(t) { if (!E.dust.length || !AU.ctx) return; E.twinks.push({ i: Math.floor(Math.random() * E.dust.length), t0: performance.now() + Math.max(0, (t - AU.ctx.currentTime) * 1000) }); if (E.twinks.length > 60) E.twinks.splice(0, E.twinks.length - 60); }
 
-  // 星を鳴らす：和音に寄せた高さで、16分の拍にそろえる。返り値は鳴る時刻（画面の光と合わせる）。鳴らさなかったら null
   function starSound(kind, semiWant, v, pan, dark, prio = 1, mood = null) {
     const ctx = AU.ctx; if (!ctx || !AU.on || ctx.state !== 'running') return null;
     const m = M(); const st = stepLen();
@@ -231,22 +311,21 @@
     for (let spill = 0; spill < 3; spill++, t += st) {
       const ch = chordAt(t); const semi = snap(semiWant, ch);
       const key = t.toFixed(3); const slot = AU.slots.get(key) || [];
-      if (slot.some(s => s.kind === kind && s.semi === semi)) return t; // 同じ音はまとめる
+      if (slot.some(s => s.kind === kind && s.semi === semi)) return t;
       if (slot.length >= 4) continue;
-      if (AU.voices >= 22 && prio < 2) return null; // 鳴っている音が多すぎるときは、今日以外の星を休ませる
+      if (AU.voices >= 24 && prio < 2) return null;
       slot.push({ kind, semi }); AU.slots.set(key, slot);
       const tt = t + Math.random() * 0.01; const vv = v * m.star * (0.9 + Math.random() * 0.2); const o = { pan, dark };
       if (kind === 'diary') {
         INST.bell(tt, hzOf(semi), vv, o);
-        // ピロピロ：気分がいい記録は、和音の音を16分の3連で駆け上がる
-        if (m.arp && (mood == null || mood >= 3)) {
-          const up = ch.tones.map(x => x + 12 * Math.ceil((semi - x) / 12)).filter(x => x >= semi).sort((a, b) => a - b);
-          const seq = [...new Set([...up, ...up.map(x => x + 12)])].slice(1, mood >= 5 ? 6 : 4);
+        if (m.arp && (mood == null || mood >= 3) && Math.random() < m.arp) {
+          const up = ch.tones.map(x => x + 12 * Math.ceil((semi - x) / 12)).filter(x => x >= semi && x <= 36).sort((a, b) => a - b);
+          const seq = [...new Set([...up, ...up.map(x => x + 12)])].filter(x => x <= 36).slice(1, mood >= 5 ? 6 : 4);
           seq.forEach((s2, i) => INST.piro(tt + (i + 1) * st * 2 / 3, hzOf(s2), vv * (0.9 - i * 0.12), { pan: pan + (i % 2 ? 0.3 : -0.3), dark }));
         }
       } else if (kind === 'task') {
         INST.pluck(tt, hzOf(semi), vv, o);
-        if (m.arp) INST.piro(tt + st / 2, hzOf(snap(semi + 3, ch)), vv * 0.6, o); // 小さな装飾音
+        if (m.arp) INST.piro(tt + st / 2, hzOf(snap(semi + 3, ch)), vv * 0.55, o);
       } else if (kind === 'gold') INST.glass(tt, hzOf(semi), vv * 1.2, o);
       else INST.swell(tt, hzOf(semi), vv, o);
       if (AU.slots.size > 96) { const now = ctx.currentTime; for (const k of AU.slots.keys()) if (Number(k) < now - 1) AU.slots.delete(k); }
@@ -267,7 +346,7 @@
     yaw: -0.5, pitch: 0.62, dist: 3.15, lookYaw: 0, lookPitch: 0.35,
     play: false, speed: 1, playT: null, lastTs: 0, raf: 0, lastInteract: 0,
     rings: [], stars: [], dust: [], hits: [], ringHits: [], flashes: [], sel: null, selRing: null,
-    drag: null, pinch: null, gyro: null, gyroOn: false, sprites: {},
+    drag: null, pinch: null, gyro: null, gyroOn: false, sprites: {}, twinks: [],
   };
   const hourOf = ts => { const d = new Date(ts); return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600; };
   const azim = h => (h / 24) * TAU; // 0時が上（奥）、時計回り
@@ -328,7 +407,7 @@
     const cp = Math.cos(E.pitch); const pos = [E.dist * cp * Math.sin(E.yaw), 0.3 + E.dist * Math.sin(E.pitch), E.dist * cp * Math.cos(E.yaw)];
     const target = [0, 0.4, 0];
     const fw = norm(sub(target, pos)); const right = norm(cross(fw, [0, 1, 0])); const up = cross(right, fw);
-    const avail = E.h - 56 - 74; // 上のボタンと下の操作バーをよけた高さ
+    const avail = E.h - 56 - 142; // 上のボタンと、下の音のボタン・操作バーをよけた高さ
     return { pos, fw, right, up, f: Math.min(E.w, avail * 1.1) * 1.12, inside: false, cy: 56 + avail / 2 };
   }
   const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -360,6 +439,10 @@
     bg.addColorStop(0, cam.inside ? '#081430' : '#07112a'); bg.addColorStop(1, '#000');
     ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
     for (const d of E.dust) { ctx.fillStyle = `rgba(200,215,255,${d.a})`; ctx.fillRect(d.x * W, d.y * H, d.s, d.s); }
+    // さざめきの音に合わせて、背景の星がまたたく
+    { const nowT = performance.now(); E.twinks = E.twinks.filter(k => nowT < k.t0 + 900); ctx.globalCompositeOperation = 'lighter';
+      for (const k of E.twinks) { if (nowT < k.t0) continue; const d = E.dust[k.i]; const a = Math.sin(Math.PI * (nowT - k.t0) / 900); const x = d.x * W, y = d.y * H; ctx.globalAlpha = a * 0.9; ctx.drawImage(sprite('#cfe0ff'), x - 7, y - 7, 14, 14); }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
     E.hits = []; E.ringHits = [];
     const playTh = azim(E.playT);
 
@@ -541,7 +624,7 @@
 
   /* ── 操作 ── */
   function resize() {
-    if (!E.cv) return; const w = E.cv.parentElement.clientWidth; const h = Math.round(clamp(w * 1.02, 300, 560));
+    if (!E.cv) return; const w = E.cv.parentElement.clientWidth; const h = Math.round(clamp(w * 1.2, 380, 640));
     E.dpr = Math.min(2, window.devicePixelRatio || 1); E.w = w; E.h = h;
     E.cv.width = Math.round(w * E.dpr); E.cv.height = Math.round(h * E.dpr); E.cv.style.height = h + 'px';
     if (!E.dust.length) { let s = 7; const R = () => ((s = (s * 16807) % 2147483647) / 2147483647); E.dust = Array.from({ length: 90 }, () => ({ x: R(), y: R(), a: 0.05 + R() * 0.25, s: R() < 0.9 ? 1 : 1.5 })); }
@@ -606,11 +689,12 @@
     } else { bedStop(); TR.endAt = 0; wake(false); dim(false); }
     syncControls();
   }
-  // 音のモードを変える（鳴っていたら、下の層を作り直す）
+  // 作業・睡眠：どちらか片方（もう一度押すと外れる）。睡眠を入れるとビートは止まり、外すと元に戻る
   function setSmode(v) {
-    if (!SMODES[v]) return; AU.smode = v; store.set('smode', v);
-    if (v === 'sleep' && E.speed > 1) E.speed = 0.5;
-    if (E.play) { bedStop(0.3); setTimeout(() => { if (E.play && AU.on) bedStart(); }, 400); TR.endAt = v === 'sleep' ? Date.now() + AU.timerMin * 60000 : 0; wake(v === 'sleep'); }
+    const next = AU.smode === v ? 'listen' : v; AU.smode = next; store.set('smode', next);
+    if (next === 'sleep' && E.speed > 1) E.speed = 0.5;
+    if (E.play) { bedRestart(); TR.endAt = next === 'sleep' ? Date.now() + AU.timerMin * 60000 : 0; TR.fading = false; wake(next === 'sleep'); }
+    setMsg(next === 'work' ? '作業：16Hzのうなり（イヤホンで）。目立つ音を減らした' : next === 'sleep' ? '睡眠：ピンクノイズ。ビートを止め、やわらかい音に' : '作業・睡眠を外した');
     syncControls();
   }
   // 睡眠のとき：画面が消えないようにする（音が止まらないように）。暗い幕で画面の明るさを抑える
@@ -657,6 +741,11 @@
     sound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
     mute: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>',
     now: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg>',
+    beat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5 15v4M9.5 10v9M14 6v13M18.5 12v7"/></svg>',
+    dice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="15" cy="9" r="1.2" fill="currentColor"/><circle cx="9" cy="15" r="1.2" fill="currentColor"/></svg>',
+    wave: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M3 12c2.2 0 2.2-6 4.5-6s2.3 12 4.5 12 2.3-9 4.5-9 2.2 3 4.5 3"/></svg>',
+    focus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>',
+    moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/></svg>',
     tilt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="3.5" width="10" height="17" rx="2.5" transform="rotate(-18 12 12)"/><path d="M3.5 8.5a9 9 0 0 1 3-4M20.5 15.5a9 9 0 0 1-3 4"/></svg>',
   };
   function build() {
@@ -670,6 +759,12 @@
         </div>
         <div class="orr-hint" ${store.get('hinted', false) ? 'hidden' : ''}>指でなぞって回す・▶で星が鳴る</div>
         <div class="orr-msg" hidden></div>
+        <div class="orr-mix" role="group" aria-label="音">
+          <div class="mx-beat"><button class="mx" data-o="beat"><span class="mx-i">${IC.beat}</span><span class="mx-l">ビート</span><span class="mx-s"></span></button><button class="mx-dice" data-o="dice" aria-label="ビートのパターンを変える">${IC.dice}</button></div>
+          <button class="mx" data-o="k808"><span class="mx-i">${IC.wave}</span><span class="mx-l">808</span><span class="mx-s"></span></button>
+          <button class="mx" data-o="work"><span class="mx-i">${IC.focus}</span><span class="mx-l">作業</span><span class="mx-s">16Hz</span></button>
+          <button class="mx" data-o="sleep"><span class="mx-i">${IC.moon}</span><span class="mx-l">睡眠</span><span class="mx-s">ピンクノイズ</span></button>
+        </div>
         <div class="orr-bar">
           <button class="orr-play" data-o="play" aria-label="再生"></button>
           <div class="orr-clock" aria-live="off">--:--</div>
@@ -680,7 +775,6 @@
         </div>
       </div>
       <div class="orr-sound">
-        <div class="orr-seg2" role="group" aria-label="音の使い方"><button data-o="smode" data-v="listen">聴く</button><button data-o="smode" data-v="work">作業</button><button data-o="smode" data-v="sleep">睡眠</button></div>
         <div class="orr-snote"></div>
         <div class="orr-sleep" hidden><div class="orr-seg2 sm" role="group" aria-label="睡眠タイマー"><button data-o="timer" data-v="30">30分</button><button data-o="timer" data-v="60">60分</button><button data-o="timer" data-v="90">90分</button></div><span class="orr-left"></span><button class="orr-btn wide" data-o="dim">画面を暗くする</button></div>
       </div>
@@ -694,7 +788,10 @@
       else if (o === 'speed') { E.speed = AU.smode === 'sleep' ? (E.speed === 0.5 ? 1 : 0.5) : E.speed === 1 ? 2 : E.speed === 2 ? 4 : E.speed === 4 ? 0.5 : 1; syncControls(); }
       else if (o === 'now') { E.playT = hourOf(Date.now()); if (E.mode === 'inside') E.lookYaw = azim(E.playT); draw(); }
       else if (o === 'sound') { setSound(!AU.on); if (AU.on) { ensureAudio(); if (E.play) bedStart(); } else bedStop(); syncControls(); }
-      else if (o === 'smode') setSmode(v);
+      else if (o === 'work' || o === 'sleep') setSmode(o);
+      else if (o === 'beat') { AU.beat = !AU.beat; store.set('beat', AU.beat); if (AU.beat && AU.smode === 'sleep') { AU.smode = 'listen'; store.set('smode', 'listen'); bedRestart(); TR.endAt = 0; wake(false); } syncControls(); }
+      else if (o === 'dice') { AU.pat = (AU.pat % 997) + 1 + Math.floor(Math.random() * 50); store.set('pat', AU.pat); PAT = makePattern(AU.pat); if (!AU.beat) { AU.beat = true; store.set('beat', true); } if (AU.smode === 'sleep') { AU.smode = 'listen'; store.set('smode', 'listen'); bedRestart(); TR.endAt = 0; wake(false); } if (!E.play) setPlay(true); setMsg(`ビートのパターンを変えた（No.${AU.pat}）`); syncControls(); }
+      else if (o === 'k808') { AU.k808 = (AU.k808 + 1) % K808.length; store.set('k808', AU.k808); ensureAudio(); if (AU.ctx && AU.ctx.state === 'running') INST.kick(AU.ctx.currentTime + 0.05, hzOf(-24), 0.3); syncControls(); }
       else if (o === 'timer') { AU.timerMin = Number(v); store.set('timer', AU.timerMin); if (E.play && AU.smode === 'sleep') { TR.endAt = Date.now() + AU.timerMin * 60000; TR.fading = false; AU.master && AU.master.gain.setTargetAtTime(AU.on ? AU.vol : 0, AU.ctx.currentTime, 0.2); } syncControls(); updateTimerText(); }
       else if (o === 'dim') { if (!E.play) setPlay(true); dim(true); }
       else if (o === 'gyro') toggleGyro();
@@ -713,9 +810,9 @@
     window.addEventListener('resize', () => { if (E.el && E.el.isConnected) { resize(); draw(); } });
   }
   const SNOTE = {
-    listen: 'キラキラのベル、ピロピロ駆け上がる音、やわらかい808とハイハット。',
-    work: '🎧 イヤホン推奨：左右でわずかに高さの違う音（16Hzのうなり）とピンクノイズ。ビートはひかえめ。ほかの画面に移っても鳴り続ける。',
-    sleep: '🎧 イヤホン推奨：6Hzから2Hzへゆっくり下がるうなりとブラウンノイズ。ビートなし・ゆっくり。タイマーで静かに消える。',
+    listen: '星のさざめき、キラキラのベル、ピロピロ駆け上がる音。',
+    work: '作業：🎧 イヤホンで、左右でわずかに高さの違う音（16Hzのうなり）。急に目立つ音を減らした。ほかの画面に移っても鳴り続ける。',
+    sleep: '睡眠：ピンクノイズ。ビートなし・ゆっくり・やわらかい音。🎧 4Hzから2Hzへ下がるうなり。タイマーで静かに消える。',
   };
   function syncControls() {
     const el = E.el; if (!el) return;
@@ -726,10 +823,15 @@
     const sb = el.querySelector('[data-o="sound"]'); sb.innerHTML = AU.on ? IC.sound : IC.mute; sb.setAttribute('aria-label', AU.on ? '音を消す' : '音を出す'); sb.setAttribute('aria-pressed', String(AU.on));
     const gb = el.querySelector('[data-o="gyro"]'); gb.hidden = E.mode !== 'inside' || !('DeviceOrientationEvent' in window); gb.setAttribute('aria-pressed', String(E.gyroOn));
     el.classList.toggle('inside', E.mode === 'inside');
-    el.querySelectorAll('[data-o="smode"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === AU.smode)));
+    const pr = (sel, on) => { const b = el.querySelector(sel); if (b) b.setAttribute('aria-pressed', String(!!on)); };
+    const beatOn = AU.beat && AU.smode !== 'sleep';
+    pr('[data-o="beat"]', beatOn); pr('[data-o="work"]', AU.smode === 'work'); pr('[data-o="sleep"]', AU.smode === 'sleep');
+    el.querySelector('[data-o="beat"] .mx-s').textContent = beatOn ? `No.${AU.pat}` : 'なし';
+    el.querySelector('[data-o="k808"] .mx-s').textContent = K808[AU.k808].name;
+    el.querySelector('[data-o="k808"]').setAttribute('aria-label', `808の音：${K808[AU.k808].name}（押すと変わる）`);
     el.querySelectorAll('[data-o="timer"]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.v) === AU.timerMin)));
     el.querySelector('.orr-sleep').hidden = AU.smode !== 'sleep';
-    el.querySelector('.orr-snote').textContent = SNOTE[AU.smode];
+    el.querySelector('.orr-snote').textContent = SNOTE[AU.smode] + (AU.smode === 'sleep' ? '' : beatOn ? ` ビート No.${AU.pat}・808「${K808[AU.k808].name}」。` : ' ビートなし。');
     el.classList.toggle('sleepy', AU.smode === 'sleep');
     updateTimerText();
   }
@@ -781,6 +883,6 @@
     _meter() { if (!AU.ctx) return null; if (!AU.an) { AU.an = AU.ctx.createAnalyser(); AU.an.fftSize = 2048; AU.master.connect(AU.an); AU.peak = 0; AU.sum = 0; AU.n = 0; const buf = new Float32Array(2048); setInterval(() => { AU.an.getFloatTimeDomainData(buf); let pk = 0, ss = 0; for (const v of buf) { pk = Math.max(pk, Math.abs(v)); ss += v * v; } AU.peak = Math.max(AU.peak, pk); AU.sum += Math.sqrt(ss / buf.length); AU.n++; }, 40); } return { peak: AU.peak, rms: AU.n ? AU.sum / AU.n : 0 }; },
     // 出ている音を録音する（確認用）
     _stream() { if (!AU.ctx) return null; if (!AU.rec) { AU.rec = AU.ctx.createMediaStreamDestination(); AU.master.connect(AU.rec); } return AU.rec.stream; },
-    _debug: () => ({ rings: E.rings.length, stars: E.stars.length, mode: E.mode, play: E.play, playT: E.playT, audio: AU.ctx ? AU.ctx.state : 'none', voices: AU.voices, smode: AU.smode, bed: TR.on, bars: TR.bar, endAt: TR.endAt }),
+    _debug: () => ({ rings: E.rings.length, stars: E.stars.length, mode: E.mode, play: E.play, playT: E.playT, audio: AU.ctx ? AU.ctx.state : 'none', voices: AU.voices, smode: AU.smode, beat: AU.beat, k808: K808[AU.k808].name, pat: AU.pat, bed: TR.on, bars: TR.bar, endAt: TR.endAt, twinks: E.twinks.length }),
   };
 })();
