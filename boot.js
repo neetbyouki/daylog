@@ -5,7 +5,7 @@ import './store.js?v=2026-11-13f';
 const SUPABASE_URL = 'https://etsuxjcrnyoevrasdhde.supabase.co';
 // 公開してよい鍵（データは行ごとの権限で本人だけが読み書きできる）
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0c3V4amNybnlvZXZyYXNkaGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNDM5OTQsImV4cCI6MjEwOTkxOTk5NH0.ae7iJE6mtN0-wEbiEAaPS5A7j7n3Y_zd-qRVREoBJ9o';
-const VERSION = '2026-11-13g';
+const VERSION = '2026-11-13h';
 const GCAL = 'Google Calendar', HOST = 'host:Daylog_PC';
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
 
@@ -223,7 +223,9 @@ async function start() {
     use: async name => (name === 'db' ? db : name === 'user' ? user : name === 'mcp' ? mcp : null),
   };
   $boot.remove();
-  const s = document.createElement('script');
+  // 天球（orrery.js）を先に読み、続けて本体
+  const o = document.createElement('script'); o.src = 'orrery.js?v=' + VERSION; o.async = false; document.body.appendChild(o);
+  const s = document.createElement('script'); s.async = false;
   s.src = 'daylog.js?v=' + VERSION;
   s.onload = () => { if (gcalLinked === null) fn('google_status').then(r => { if (window.__daylogState) window.__daylogState.gcalLinked = r.linked; }).catch(() => {}); };
   document.body.appendChild(s);
