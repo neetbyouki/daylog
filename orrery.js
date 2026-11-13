@@ -27,7 +27,7 @@
      5. 星のさざめき：和音の高い音が、小さく・ふわっと・ばらばらに光る（画面の背景の星も一緒にまたたく）。
         ときどき、さらさらと流れる音（ノイズのうねり）が通る
      6. 大きな残響（4.5秒）と左右のディレイで、ひとつの空間にまとめる。最後にコンプレッサー
-     ボタン（すべて枠の中）
+     ボタン（すべて枠の中。ふだんはたたんであり、下のバーの ⫶ ボタンで開く）
      ・ビート：あり／なし。🎲 でパターンを入れかえる（808・クラップ・ハイハット。毎回少しずつ違う組み合わせ）
      ・808：まるい／すべる／あたたかい／はずむ の4種類から選ぶ
      ・コード：音色を ガラス／エレピ／ハープ／雲／なし から選ぶ。⟳ で進行を入れかえる（やさしい／王道／ゆらぎ／夜／ひかり。全部 D メジャーの音だけ）
@@ -837,6 +837,7 @@
     moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/></svg>',
     chord: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="17" r="2.6"/><circle cx="12.5" cy="11.5" r="2.6"/><circle cx="17" cy="6" r="2.6"/><path d="M10.6 17h9M15.1 11.5h4.5" opacity=".45"/></svg>',
     cycle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 10a7 7 0 0 1 12.2-3.6L19 8.5"/><path d="M19 4.5v4h-4"/><path d="M19 14a7 7 0 0 1-12.2 3.6L5 15.5"/><path d="M5 19.5v-4h4"/></svg>',
+    mixer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 4.5v15M12 4.5v15M18 4.5v15" opacity=".4"/><circle cx="6" cy="14.5" r="2.1" fill="currentColor" stroke="none"/><circle cx="12" cy="8.5" r="2.1" fill="currentColor" stroke="none"/><circle cx="18" cy="12.5" r="2.1" fill="currentColor" stroke="none"/></svg>',
     tilt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="3.5" width="10" height="17" rx="2.5" transform="rotate(-18 12 12)"/><path d="M3.5 8.5a9 9 0 0 1 3-4M20.5 15.5a9 9 0 0 1-3 4"/></svg>',
   };
   function build() {
@@ -850,7 +851,7 @@
         </div>
         <div class="orr-hint" ${store.get('hinted', false) ? 'hidden' : ''}>指でなぞって回す・▶で星が鳴る</div>
         <div class="orr-msg" hidden></div>
-        <div class="orr-mix" role="group" aria-label="音">
+        <div class="orr-mix" id="orr-mix" role="group" aria-label="音の設定">
           <div class="mx-beat"><button class="mx" data-o="beat"><span class="mx-i">${IC.beat}</span><span class="mx-l">ビート</span><span class="mx-s"></span></button><button class="mx-dice" data-o="dice" aria-label="ビートのパターンを変える">${IC.dice}</button></div>
           <button class="mx" data-o="k808"><span class="mx-i">${IC.wave}</span><span class="mx-l">808</span><span class="mx-s"></span></button>
           <div class="mx-beat"><button class="mx" data-o="pad"><span class="mx-i">${IC.chord}</span><span class="mx-l">コード</span><span class="mx-s"></span></button><button class="mx-dice" data-o="prog" aria-label="コード進行を変える" title="コード進行を変える">${IC.cycle}</button></div>
@@ -863,6 +864,7 @@
           <button class="orr-btn" data-o="speed" aria-label="速さ">1×</button>
           <button class="orr-btn ic" data-o="now" aria-label="今の時刻へ">${IC.now}</button>
           <button class="orr-btn ic" data-o="gyro" aria-label="傾きで見回す" hidden>${IC.tilt}</button>
+          <button class="orr-btn ic" data-o="mix" aria-label="音の設定を開く" aria-expanded="false" aria-controls="orr-mix"></button>
           <button class="orr-btn ic" data-o="sound" aria-label="音"></button>
         </div>
       </div>
@@ -880,6 +882,7 @@
       else if (o === 'speed') { E.speed = AU.smode === 'sleep' ? (E.speed === 0.5 ? 1 : 0.5) : E.speed === 1 ? 2 : E.speed === 2 ? 4 : E.speed === 4 ? 0.5 : 1; syncControls(); }
       else if (o === 'now') { E.playT = hourOf(Date.now()); if (E.mode === 'inside') E.lookYaw = azim(E.playT); draw(); }
       else if (o === 'sound') { setSound(!AU.on); if (AU.on) { ensureAudio(); if (E.play) bedStart(); } else bedStop(); syncControls(); }
+      else if (o === 'mix') { E.mixOpen = !E.mixOpen; syncControls(); }
       else if (o === 'work' || o === 'sleep') setSmode(o);
       else if (o === 'beat') { AU.beat = !AU.beat; store.set('beat', AU.beat); if (AU.beat && AU.smode === 'sleep') { AU.smode = 'listen'; store.set('smode', 'listen'); bedRestart(); TR.endAt = 0; wake(false); } syncControls(); }
       else if (o === 'dice') { AU.pat = (AU.pat % 997) + 1 + Math.floor(Math.random() * 50); store.set('pat', AU.pat); PAT = makePattern(AU.pat); if (!AU.beat) { AU.beat = true; store.set('beat', true); } if (AU.smode === 'sleep') { AU.smode = 'listen'; store.set('smode', 'listen'); bedRestart(); TR.endAt = 0; wake(false); } if (!E.play) setPlay(true); setMsg(`ビートのパターンを変えた（No.${AU.pat}）`); syncControls(); }
@@ -891,6 +894,7 @@
       else if (o === 'gyro') toggleGyro();
       else if (o === 'close') { E.sel = null; E.selRing = null; renderDetail(); draw(); }
     });
+    el.addEventListener('keydown', e => { if (e.key === 'Escape' && E.mixOpen) { E.mixOpen = false; syncControls(); el.querySelector('[data-o="mix"]').focus(); } });
     E.el = el; E.cv = el.querySelector('canvas'); E.ctx = E.cv.getContext('2d');
     bindCanvas(E.cv);
     document.addEventListener('visibilitychange', () => {
@@ -917,6 +921,10 @@
     const sb = el.querySelector('[data-o="sound"]'); sb.innerHTML = AU.on ? IC.sound : IC.mute; sb.setAttribute('aria-label', AU.on ? '音を消す' : '音を出す'); sb.setAttribute('aria-pressed', String(AU.on));
     const gb = el.querySelector('[data-o="gyro"]'); gb.hidden = E.mode !== 'inside' || !('DeviceOrientationEvent' in window); gb.setAttribute('aria-pressed', String(E.gyroOn));
     el.classList.toggle('inside', E.mode === 'inside');
+    // 音の設定は、ボタンで開いたときだけ出す。たたんでいる間は、作業・睡眠中かどうかだけを小さな点で知らせる
+    el.classList.toggle('mix-open', !!E.mixOpen);
+    const mb = el.querySelector('[data-o="mix"]'); mb.innerHTML = IC.mixer; mb.setAttribute('aria-expanded', String(!!E.mixOpen)); mb.setAttribute('aria-label', E.mixOpen ? '音の設定を閉じる' : '音の設定を開く');
+    mb.dataset.mode = AU.smode; el.querySelector('.orr-mix').inert = !E.mixOpen;
     const pr = (sel, on) => { const b = el.querySelector(sel); if (b) b.setAttribute('aria-pressed', String(!!on)); };
     const beatOn = AU.beat && AU.smode !== 'sleep';
     pr('[data-o="beat"]', beatOn); pr('[data-o="work"]', AU.smode === 'work'); pr('[data-o="sleep"]', AU.smode === 'sleep');
@@ -958,7 +966,7 @@
   window.DaylogOrrery = {
     attach(host, api) {
       E.api = api; if (!E.el) build();
-      if (E.el.parentElement !== host) host.appendChild(E.el);
+      if (E.el.parentElement !== host) { host.appendChild(E.el); E.mixOpen = false; } // 開くたびに音の設定はたたんだ状態から
       if (api.need) api.need(E.range);
       const sig = signature(api); if (sig !== E.sig) { E.sig = sig; buildData(); }
       bgRun(false); E.lastInteract = Date.now(); resize(); syncControls(); renderDetail(); draw(); startLoop();

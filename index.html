@@ -226,6 +226,7 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 .orr-clock{font-variant-numeric:tabular-nums;font-size:20px;font-weight:500;letter-spacing:.01em;color:#eaf2ff;margin:0 auto 0 6px}
 .orr-btn{min-width:36px;height:34px;border-radius:999px;border:0;background:rgba(255,255,255,.06);color:rgba(220,230,250,.8);font:inherit;font-size:12.5px;font-variant-numeric:tabular-nums;padding:0 10px;display:grid;place-items:center;cursor:pointer}
 .orr-btn.ic{width:36px;padding:0}
+.orr-btn[hidden]{display:none}
 .orr-btn svg{width:18px;height:18px}
 .orr-btn[aria-pressed="true"]{color:#b9d7ff}
 .orr-btn[data-o="sound"][aria-pressed="false"]{color:rgba(220,230,250,.45)}
@@ -239,6 +240,13 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 .orr-x{margin-left:auto;border:0;background:none;color:var(--fg-3);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px}
 .orr-dt{margin-top:6px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--fg)}
 .orr-mix{position:absolute;left:10px;right:10px;bottom:68px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.orr-mix{opacity:0;visibility:hidden;transform:translateY(10px) scale(.98);transform-origin:bottom right;pointer-events:none;transition:opacity .2s ease,transform .24s cubic-bezier(.2,.8,.2,1),visibility 0s linear .24s}
+.orr.mix-open .orr-mix{opacity:1;visibility:visible;transform:none;pointer-events:auto;transition:opacity .2s ease,transform .24s cubic-bezier(.2,.8,.2,1),visibility 0s}
+.orr-btn[data-o="mix"]{position:relative}
+.orr-btn[data-o="mix"][aria-expanded="true"]{background:rgba(142,197,255,.16);color:#d6e8ff}
+.orr-btn[data-o="mix"][data-mode="work"]::after,.orr-btn[data-o="mix"][data-mode="sleep"]::after{content:"";position:absolute;top:5px;right:6px;width:6px;height:6px;border-radius:50%;background:#6fe0d2;box-shadow:0 0 6px #6fe0d2}
+.orr-btn[data-o="mix"][data-mode="sleep"]::after{background:#a99bff;box-shadow:0 0 6px #a99bff}
+.orr:not(.mix-open) .orr-snote{display:none}
 .mx,.mx-beat{position:relative;min-width:0}
 .mx{width:100%;height:60px;border-radius:18px;border:1px solid rgba(255,255,255,.08);background:rgba(18,20,26,.58);backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);color:rgba(220,230,250,.72);font:inherit;display:grid;grid-template-rows:20px 15px 13px;justify-items:center;align-content:center;gap:1px;padding:0 4px;cursor:pointer;transition:background .25s,border-color .25s,color .25s,box-shadow .25s}
 .mx-i svg{width:18px;height:18px;display:block}
