@@ -169,6 +169,19 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 .tl li.ev.free::after{background:var(--ink)}
 .sub time{font-family:var(--f-mono);font-size:11px;color:var(--fg-3);padding-top:2px;text-align:left}
 .sub-b{min-width:0;overflow-wrap:anywhere;white-space:pre-wrap;font-size:14px}
+/* 1時間ごとの線（記録があればその分ふくらむ） */
+.tl li.hr{padding:0;min-height:20px}
+.tl li.hr time{font-size:10.5px;padding-top:3px;opacity:.75}
+.tl li.hr::after{left:53px;top:10px;width:11px;height:1px;border:0;border-radius:0;background:var(--line-2)}
+.tl li.hr .tl-b{border-top:1px solid color-mix(in oklab,var(--line) 70%,transparent);margin-top:10px}
+.tl li.hr.has{padding-bottom:4px}
+.tl li.hr.has::after{background:var(--fg-3)}
+.tl li.hr.has .kids{margin-top:4px;border-left-color:var(--line-2)}
+.tl li.hr.future{opacity:.45}
+.tl li.hr.future .tl-b{border-top-style:dashed}
+.tl li.wk{padding:3px 0}
+.tl li.wk::after{background:var(--gold, #e9c46a);border-color:var(--gold, #e9c46a)}
+.tl li.wk .tl-b{font-size:12px;color:var(--fg-2)}
 .dots{display:inline-flex;gap:2px;vertical-align:middle}
 .dots i{width:6px;height:6px;border-radius:50%;background:var(--line-2);display:inline-block}
 .dots i.on{background:var(--c)}

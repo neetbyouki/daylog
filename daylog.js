@@ -516,16 +516,21 @@ function timelineHTML(d) {
     }
     if (host) { const k = host.cal + '|' + host.id; if (!kids.has(k)) kids.set(k, []); kids.get(k).push(e); } else loose.push(e);
   }
-  // 1段目＝予定、2段目＝その時間に書いた記録。予定の外で書いた記録は「予定のない時間」というまとまりの下に入れる
+  // 1段目＝予定と1時間ごとの線、2段目＝その時間に書いた記録。予定の外で書いた記録は、その時刻の「時の線」の下に入れる
   // 今進んでいる予定は、すでに始まったほかの予定や記録より後ろ（「いま」の位置）に並べる
-  const raw = [...timed.map(x => ({ kind: 'ev', t: isOn(x) ? now : x.start, s: x.start, x })), ...loose.map(e => ({ kind: 'en', t: e.t, s: e.t, e }))].sort((a, b) => a.t - b.t || a.s - b.s);
-  const items = [];
-  for (const it of raw) {
-    const last = items[items.length - 1];
-    if (it.kind === 'en' && last && last.kind === 'free') { last.list.push(it.e); last.end = it.e.t; }
-    else if (it.kind === 'en') items.push({ kind: 'free', t: it.t, s: it.t, end: it.e.t, list: [it.e] });
-    else items.push(it);
-  }
+  const HOUR = 3600e3; const floorH = t => { const x = new Date(t); x.setMinutes(0, 0, 0); return x.getTime(); };
+  const hours = new Map(); // 時の線: 時刻 -> その1時間に書いた記録（予定の外）
+  const addHour = t => { if (!hours.has(t)) hours.set(t, []); return hours.get(t); };
+  for (const e of loose) addHour(floorH(e.t)).push(e);
+  // 起きた時刻〜就寝の目安までは線を引く。それより外は、過ごした時間（今まで）だけ
+  const rng = dayRange(d, timed, loose);
+  if (rng) for (let t = floorH(rng.from) + (floorH(rng.from) < rng.from ? HOUR : 0); t <= rng.to; t += HOUR) addHour(t);
+  // 予定の最中・予定がちょうど始まる時刻の線は出さない（予定のカードが時間を持っている）
+  const inEv = t => timed.some(x => !x.canceled && x.start <= t && t < x.end);
+  const raw = [...timed.map(x => ({ kind: 'ev', o: 1, t: isOn(x) ? now : x.start, s: x.start, x })),
+    ...[...hours].filter(([t, list]) => list.length || !inEv(t)).map(([t, list]) => ({ kind: 'hr', o: 0, t, s: t, list: list.sort((a, b) => a.t - b.t) }))];
+  if (rng && rng.wake) raw.push({ kind: 'wake', o: -1, t: rng.wake, s: rng.wake });
+  const items = raw.sort((a, b) => a.t - b.t || a.o - b.o || a.s - b.s);
   let h = `<h2 class="sec"><span>今日の流れ</span><span class="r">${st.loading ? '<span class="thinking">予定を読み込み中</span>' : S.mcp ? `<button class="iconbtn plusbtn" data-act="todayPlan" aria-label="今日の予定を足す" title="今日の予定を足す">＋</button><button class="iconbtn" data-act="reloadEvents" aria-label="予定を読み込み直す" title="読み込み直す">${ICON.reload}</button>` : ''}</span></h2>`;
   if (!S.mcp) h += `<div class="err">Googleカレンダーにつながっていないので、予定は表示されない（日記は使える）。</div>`;
   if (st.error) h += `<div class="err">${esc(st.error.msg)}${st.error.code === 'approval_required' ? ' <button class="btn sm" data-act="reloadEvents">許可して読み込む</button>' : ''}</div>`;
@@ -556,9 +561,11 @@ function timelineHTML(d) {
       const list = (kids.get(key) || []).sort((a, b) => a.t - b.t);
       const x = it.x; const endTxt = x.canceled ? '<span class="evstate">キャンセルした</span>' : x.endedAt ? `〜${hm(x.end)}<span class="evstate">（予定は${hm(x.plannedEnd)}まで）</span>` : `〜${hm(x.end)}`;
       lis.push(`<li class="ev ${isNow ? 'is-now' : ''} ${x.canceled ? 'canceled' : ''} ${x.endedAt ? 'ended' : ''}" style="--c:${c.color}"><time>${hm(x.start)}</time><div class="tl-b"><div class="ev-head" ${x.ghost ? '' : `data-act="calOpen" data-arg="${esc(key)}"`}>${d === today() ? `<button class="evmore" data-act="evMenu" data-arg="${esc(key)}" aria-label="この予定を終える・キャンセルする" aria-expanded="${S.evMenu === key}">⋯</button>` : ''}<div class="t">${esc(x.title)}</div><div class="m">${endTxt}${x.canceled ? '' : bellHTML(x)}</div></div>${S.evMenu === key ? evMenuHTML(d, x, key) : ''}${kidsHTML(list, isNow)}</div></li>`);
+    } else if (it.kind === 'wake') {
+      lis.push(`<li class="wk"><time>${hm(it.t)}</time><div class="tl-b"><span>☀ 起きた</span></div></li>`);
     } else {
-      const span = it.list.length > 1 ? `${hm(it.t)}〜${hm(it.end)}` : hm(it.t);
-      lis.push(`<li class="ev free" style="--c:var(--fg-3)"><time>${hm(it.t)}</time><div class="tl-b"><div class="ev-head free-head"><div class="t">予定のない時間</div></div>${kidsHTML(it.list, false)}</div></li>`);
+      const future = d === today() && it.t > now;
+      lis.push(`<li class="hr ${it.list.length ? 'has' : ''} ${future ? 'future' : ''}" style="--c:var(--fg-3)"><time>${hm(it.t)}</time><div class="tl-b">${it.list.length ? kidsHTML(it.list, false) : ''}</div></li>`);
     }
   }
   if (!nowPlaced) lis.push(nowLI(now));
@@ -597,6 +604,20 @@ function bellHTML(x) {
   const at = n.notifyAt ? hm(Date.parse(n.notifyAt)) : '';
   if (n.status === 'sent') return `<span class="bell sent" data-tip="${esc(`${n.sentAt ? hm(Date.parse(n.sentAt)) : at}にスマホへ通知を送った`)}">${ICON.bell}✓</span>`;
   return `<span class="bell" data-tip="${esc(`${at}にスマホへ通知する予定`)}">${ICON.bell}</span>`;
+}
+// 時の線を引く範囲：起きた時刻〜就寝の目安（夜モード後はその時刻）。今日はそれを過ぎても「いま」まで伸ばす
+function dayRange(d, timed, loose) {
+  const day = getDay(d); const now = Date.now(); const isToday = d === today();
+  const wake = wakeAt(d);
+  const firstT = Math.min(...timed.filter(x => !x.canceled).map(x => x.start), ...loose.map(e => e.t), isToday ? now : Infinity);
+  const from = wake || (isFinite(firstT) ? firstT : null);
+  if (!from) return null;
+  const bt = day.bedtime; const closed = closedAt(d);
+  let to = closed || (bt && bt.time ? slotDate(d, bt.time).getTime() : (sleepAt(d) || null));
+  if (!to) to = isToday ? Math.max(now, slotDate(d, '02:00').getTime()) : from;
+  if (isToday && !closed) to = Math.max(to, now);
+  to = Math.min(to, dayStart(addDays(d, 1)).getTime() + 6 * 3600e3);
+  return { from, to, wake };
 }
 const nowRow = now => `<div class="nowtrack"><div class="nowmark" style="top:50%" aria-label="いま ${hm(now)}"><span><small>いま</small>${hm(now)}</span></div></div>`;
 const nowLI = now => `<li class="now"><time>${hm(now)}</time><div class="tl-b"></div></li>`;
