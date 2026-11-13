@@ -1,10 +1,11 @@
 // Daylog の起動：ログイン → Googleカレンダーの許可を保存 → データベースとつなぐ → 本体（daylog.js）を読み込む
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
+import './store.js?v=2026-11-13b';
 
 const SUPABASE_URL = 'https://etsuxjcrnyoevrasdhde.supabase.co';
 // 公開してよい鍵（データは行ごとの権限で本人だけが読み書きできる）
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0c3V4amNybnlvZXZyYXNkaGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNDM5OTQsImV4cCI6MjEwOTkxOTk5NH0.ae7iJE6mtN0-wEbiEAaPS5A7j7n3Y_zd-qRVREoBJ9o';
-const VERSION = '2026-11-13a';
+const VERSION = '2026-11-13b';
 const GCAL = 'Google Calendar', HOST = 'host:Daylog_PC';
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
 
@@ -46,150 +47,111 @@ async function fn(action, body = {}) {
   return data;
 }
 
-// ── データベース（今までの「コレクション／ドキュメント」の形をそのまま再現する）
-function makeDb(uid, token) {
-  const cache = new Map(); // collection -> Map(id -> data)
-  const listeners = new Set(); // {collection, fn}
-  let loaded = false; let failErr = null; const waiters = [];
-  let syncAt = null; let syncing = false; let syncN = 0;
-  const localAt = new Map(); // 'collection/id' -> この端末で書いた時刻（書き込み中の古い内容で上書きし返さないため）
-  const recent = k => Date.now() - (localAt.get(k) || 0) < 20000;
-  const newest = list => list.reduce((m, r) => (r.updated_at && r.updated_at > m ? r.updated_at : m), syncAt || '');
-  const col = c => { if (!cache.has(c)) cache.set(c, new Map()); return cache.get(c); };
-  const emit = c => { for (const l of listeners) if (l.collection === c) l.fn(); };
-  const ready = () => loaded ? Promise.resolve() : new Promise(r => waiters.push(r));
-
-  // 最初の読み込み。失敗したら3回まで試し、それでもだめなら「読めなかった」と知らせる
-  // （以前は失敗しても空のまま始めてしまい、空の内容でサーバーの記録を上書きしていた）
-  const loadAll = async () => {
-    const got = [];
-    for (let from = 0; ; from += 1000) {
-      const { data, error } = await sb.from('docs').select('collection,id,data,updated_at').order('collection').order('id').range(from, from + 999);
-      if (error) throw error;
-      got.push(...data);
-      if (data.length < 1000) break;
-    }
-    return got;
-  };
-  (async () => {
-    let last;
-    for (let i = 0; i < 3; i++) {
-      try {
-        const t0 = new Date(Date.now() - 5 * 60e3).toISOString();
-        const list = await loadAll();
-        for (const r of list) col(r.collection).set(r.id, r.data);
-        syncAt = newest(list) || t0; loaded = true; waiters.splice(0).forEach(r => r());
-        for (const l of listeners) l.fn();
-        return;
-      } catch (e) { last = e; console.warn('load', e); await new Promise(r => setTimeout(r, 1000 * (i + 1))); }
-    }
-    console.error('Daylog load failed', last);
-    failErr = { code: 'load_failed', message: last && last.message };
-    loaded = true; waiters.splice(0).forEach(r => r());
-    for (const l of listeners) l.err && l.err(failErr);
-  })();
-  const writable = () => { if (!loaded || failErr) throw { code: 'not_loaded' }; };
-
-  // ── ほかの端末（スマホ・claude.ai版）での変更を取り込む
-  // ① 15秒ごと・画面に戻ったとき・フォーカスしたときに、前回より新しい記録だけ取り直す（確実な方）
-  // ② リアルタイム通知でもすぐ取り込む（つながっているとき）。切れたら つなぎ直す
-  const sync = async () => {
-    if (document.visibilityState !== 'visible' || !loaded || failErr || !syncAt || syncing) return;
-    syncing = true;
-    try {
-      const { data, error } = await sb.from('docs').select('collection,id,data,updated_at').gte('updated_at', syncAt);
-      if (error) return;
-      const touched = new Set(); let hold = null;
-      for (const r of data || []) {
-        // この端末で書いたばかりの記録は、書き込みが届くまで待ってから見比べる（次回また取る）
-        if (recent(r.collection + '/' + r.id)) { if (!hold || r.updated_at < hold) hold = r.updated_at; continue; }
-        if (JSON.stringify(col(r.collection).get(r.id)) !== JSON.stringify(r.data)) { col(r.collection).set(r.id, r.data); touched.add(r.collection); }
-      }
-      syncAt = hold || newest(data || []);
-      // 1分に1回、ほかで消された記録も反映する（idだけ取る）
-      if (++syncN % 4 === 0) {
-        const { data: ids, error: e2 } = await sb.from('docs').select('collection,id');
-        if (!e2 && ids) {
-          const have = new Set(ids.map(r => r.collection + '/' + r.id));
-          for (const [c, m] of cache) for (const id of [...m.keys()]) if (!have.has(c + '/' + id) && !recent(c + '/' + id)) { m.delete(id); touched.add(c); }
-        }
-      }
-      touched.forEach(emit);
-    } catch (e) { console.warn('sync', e); } finally { syncing = false; }
-  };
-  document.addEventListener('visibilitychange', sync);
-  window.addEventListener('focus', sync);
-  window.addEventListener('online', sync);
-  setInterval(sync, 15000);
-
-  let ch = null; let retry = null;
-  const live = () => {
-    if (ch) { sb.removeChannel(ch); ch = null; }
-    ch = sb.channel('docs-' + uid)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'docs' }, p => {
-        const o = p.old || {}; if (o.user_id && o.user_id !== uid) return;
-        if (o.collection && cache.has(o.collection) && cache.get(o.collection).has(o.id)) { cache.get(o.collection).delete(o.id); emit(o.collection); }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'docs', filter: `user_id=eq.${uid}` }, p => {
-        if (p.eventType === 'DELETE') return;
-        const r = p.new; if (!r || !r.collection || recent(r.collection + '/' + r.id)) return;
-        const cur = col(r.collection).get(r.id);
-        if (JSON.stringify(cur) === JSON.stringify(r.data)) return;
-        col(r.collection).set(r.id, r.data); emit(r.collection);
-      })
-      .subscribe(st => {
-        if (st === 'SUBSCRIBED') { sync(); return; }
-        if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') { clearTimeout(retry); retry = setTimeout(live, 20000); }
-      });
-  };
-  // ログインの鍵をリアルタイム側にも渡してからつなぐ（渡さないと本人の記録の通知が届かない）
-  if (token) sb.realtime.setAuth(token);
-  live();
-  sb.auth.onAuthStateChange((ev, ses) => { if (ses && ses.access_token && (ev === 'TOKEN_REFRESHED' || ev === 'SIGNED_IN')) sb.realtime.setAuth(ses.access_token); });
-
-  const OPS = { '==': (a, b) => a === b, '>=': (a, b) => a >= b, '>': (a, b) => a > b, '<=': (a, b) => a <= b, '<': (a, b) => a < b, '!=': (a, b) => a !== b };
-  const snapOf = (c, filters) => {
-    const docs = [];
-    for (const [id, v] of col(c)) if (filters.every(([f, op, val]) => (OPS[op] || OPS['=='])(v && v[f], val))) docs.push({ id, data: () => v, exists: true });
-    docs.sort((a, b) => (a.id < b.id ? -1 : 1));
-    return { docs, size: docs.length, empty: !docs.length };
-  };
-  const query = (c, filters = []) => ({
-    where: (f, op, val) => query(c, [...filters, [f, op, val]]),
-    get: async () => { await ready(); if (failErr) throw failErr; return snapOf(c, filters); },
-    onSnapshot(cb, err) {
-      const l = { collection: c, fn: () => { if (loaded && !failErr) { try { cb(snapOf(c, filters)); } catch (e) { console.error(e); } } }, err };
-      listeners.add(l); if (loaded) { if (failErr) err && err(failErr); else l.fn(); }
-      return () => listeners.delete(l);
-    },
-  });
-  const split = path => { const i = path.lastIndexOf('/'); return [path.slice(0, i), path.slice(i + 1)]; };
-  const fail = e => { console.error(e); throw { code: e && /quota|limit/i.test(e.message || '') ? 'quota_exceeded' : 'unavailable', message: e && e.message }; };
+// ── データベース：記録置き場（store.js、claude.ai版と共通）に、アプリ版のつなぎ方を渡す
+const isOfflineErr = e => {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  const m = String((e && (e.message || e.details)) || e || '');
+  return e instanceof TypeError || /Failed to fetch|NetworkError|Load failed|network|fetch failed|timeout/i.test(m);
+};
+function webBackend(uid) {
+  const row = r => ({ c: r.collection, id: r.id, data: r.data, u: r.updated_at });
+  const must = ({ data, error }) => { if (error) throw error; return data; };
   return {
-    collection: c => query(c),
-    doc(path) {
-      const [c, id] = split(path);
-      return {
-        async set(data) {
-          writable(); col(c).set(id, data); localAt.set(c + '/' + id, Date.now()); emit(c);
-          const { error } = await sb.from('docs').upsert({ user_id: uid, collection: c, id, data });
-          if (error) fail(error);
-        },
-        async delete() {
-          writable(); col(c).delete(id); localAt.set(c + '/' + id, Date.now()); emit(c);
-          const { error } = await sb.from('docs').delete().eq('collection', c).eq('id', id);
-          if (error) fail(error);
-        },
-        async get() { await ready(); if (failErr) throw failErr; const v = col(c).get(id); return { id, exists: v !== undefined, data: () => v }; },
-        onSnapshot(cb, err) {
-          const l = { collection: c, fn: () => { if (loaded && !failErr) { const v = col(c).get(id); try { cb({ id, exists: v !== undefined, data: () => v }); } catch (e) { console.error(e); } } }, err };
-          listeners.add(l); if (loaded) { if (failErr) err && err(failErr); else l.fn(); }
-          return () => listeners.delete(l);
-        },
+    async loadAll() {
+      const got = [];
+      for (let from = 0; ; from += 1000) {
+        const data = must(await sb.from('docs').select('collection,id,data,updated_at').order('collection').order('id').range(from, from + 999));
+        got.push(...data.map(row));
+        if (data.length < 1000) break;
+      }
+      return got;
+    },
+    async since(cur) {
+      let q = sb.from('docs').select('collection,id,data,updated_at');
+      if (cur) q = q.gte('updated_at', cur);
+      return must(await q).map(row);
+    },
+    async ids() { return must(await sb.from('docs').select('collection,id')).map(r => ({ c: r.collection, id: r.id })); },
+    // 差分を送ると、サーバーで足し合わせた結果が返る
+    async patch(c, id, patch) { return must(await sb.rpc('docs_patch', { p_col: c, p_id: id, p_patch: patch })); },
+    async set(c, id, data) { must(await sb.from('docs').upsert({ user_id: uid, collection: c, id, data })); },
+    async del(c, id) { must(await sb.from('docs').delete().eq('collection', c).eq('id', id)); },
+    isOffline: isOfflineErr,
+    // 送り直せば通りそうな失敗か（電波・ログインの期限切れ・サーバーの一時的な不調）
+    retryable(e) {
+      if (isOfflineErr(e)) return true;
+      const code = String((e && e.code) || ''); const m = String((e && e.message) || '');
+      if (/JWT|expired|not signed in|PGRST301|PGRST303|28000/i.test(code + ' ' + m)) return true;
+      if (/^(22|23|42)|^PGRST[12]/.test(code)) return false;
+      return true;
+    },
+    live(h) {
+      let ch = null; let retry = null;
+      const connect = () => {
+        if (ch) { sb.removeChannel(ch); ch = null; }
+        ch = sb.channel('docs-' + uid)
+          .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'docs' }, p => {
+            const o = p.old || {}; if (o.user_id && o.user_id !== uid) return;
+            if (o.collection) h.del(o.collection, o.id);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'docs', filter: `user_id=eq.${uid}` }, p => {
+            if (p.eventType === 'DELETE') return;
+            const r = p.new; if (r && r.collection) h.rows([row(r)]);
+          })
+          .subscribe(st => {
+            if (st === 'SUBSCRIBED') { h.resync(); return; }
+            if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') { clearTimeout(retry); retry = setTimeout(connect, 20000); }
+          });
       };
+      connect();
     },
   };
 }
+function makeDb(uid, token) {
+  // ログインの鍵をリアルタイム側にも渡してからつなぐ（渡さないと本人の記録の通知が届かない）
+  if (token) sb.realtime.setAuth(token);
+  sb.auth.onAuthStateChange((ev, ses) => { if (ses && ses.access_token && (ev === 'TOKEN_REFRESHED' || ev === 'SIGNED_IN')) sb.realtime.setAuth(ses.access_token); });
+  return window.DaylogStore.makeStore(webBackend(uid), { key: 'daylog', owner: uid });
+}
+
+// ── ホーム画面のDaylogから直接通知（Web Push）
+const VAPID_PUBLIC = 'BMcRoNXICVHJ9Kh4tl1zPCMuxIXCNFVVdCcTLsfQwg-Jl-zBZETYVrAw9XrU0PVZdjIJXeA8loNKGmujScF0si4';
+const b64u = s => { const p = '='.repeat((4 - s.length % 4) % 4); const b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, c => c.charCodeAt(0)); };
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// サービスワーカーの用意を待つ（来ないときは4秒であきらめる）
+const swReady = () => Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(() => r(null), 4000))]);
+const standalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+window.daylogPush = {
+  // 'on' | 'off' | 'denied' | 'need-home'（iPhoneはホーム画面に追加して開く必要がある）| 'unsupported'
+  async state() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return isIOS() && !standalone() ? 'need-home' : 'unsupported';
+    if (Notification.permission === 'denied') return 'denied';
+    try { const reg = await swReady(); if (!reg) return 'off'; const sub = await reg.pushManager.getSubscription(); return sub ? 'on' : 'off'; } catch (_) { return 'off'; }
+  },
+  async enable() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) throw { code: isIOS() && !standalone() ? 'need-home' : 'unsupported' };
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') throw { code: 'denied' };
+    const reg = await swReady(); if (!reg) throw { code: 'unsupported' };
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUBLIC) });
+    const j = sub.toJSON();
+    const { error } = await sb.from('push_subs').upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, ua: navigator.userAgent.slice(0, 200) }, { onConflict: 'endpoint' });
+    if (error) throw { code: 'save_failed', message: error.message };
+    return 'on';
+  },
+  async disable() {
+    const reg = await swReady(); const sub = reg && await reg.pushManager.getSubscription();
+    if (sub) { await sb.from('push_subs').delete().eq('endpoint', sub.endpoint); await sub.unsubscribe(); }
+    return 'off';
+  },
+  async devices() { const { data } = await sb.from('push_subs').select('id'); return (data || []).length; },
+  async test() {
+    const { data, error } = await sb.functions.invoke('daylog-push', { body: { action: 'test' } });
+    if (error) throw { code: 'test_failed', message: error.message };
+    return data;
+  },
+};
 
 // ── つなぎ口（Googleカレンダー／PCの見張り役）
 function makeMcp(db) {
@@ -203,8 +165,7 @@ function makeMcp(db) {
       if (server === HOST) {
         if (tool === 'get_activity') return fn('pc_activity', { from: args.from, to: args.to });
         if (tool === 'set_config') {
-          const cur = await db.doc('pcconfig/main').get();
-          await db.doc('pcconfig/main').set({ ...(cur.exists ? cur.data() : {}), ...args, at: Date.now() });
+          await db.doc('pcconfig/main').update({ ...args, at: Date.now() });
           return { payload: { ok: true } };
         }
         throw { code: 'unknown_tool' };
@@ -238,8 +199,14 @@ async function loadCalendars() {
   return map || {};
 }
 
+// 電波がないとログインの更新ができず、ログインが無いように見えることがある → 端末に残っているログインで開く
+function storedSession() {
+  try { const j = JSON.parse(localStorage.getItem('sb-etsuxjcrnyoevrasdhde-auth-token') || 'null'); return j && j.user && j.user.id ? j : null; } catch (_) { return null; }
+}
 async function start() {
-  const { data: { session } } = await sb.auth.getSession();
+  let session = null;
+  try { ({ data: { session } } = await sb.auth.getSession()); } catch (e) { console.warn(e); }
+  if (!session && navigator.onLine === false) session = storedSession();
   if (!session) { showLogin(); return; }
   if (location.search || location.hash) history.replaceState(null, '', location.pathname);
   // ログインした直後だけ、Googleカレンダーの更新用の鍵がもらえる → サーバーに預ける

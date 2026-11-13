@@ -182,6 +182,16 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 .tl li.wk{padding:3px 0}
 .tl li.wk::after{background:var(--gold, #e9c46a);border-color:var(--gold, #e9c46a)}
 .tl li.wk .tl-b{font-size:12px;color:var(--fg-2)}
+/* 起きた・寝た時刻を直す（さりげない ✎） */
+.fixbtn{background:none;border:0;color:var(--fg-3);opacity:.55;font-size:11px;padding:0 4px;margin-left:2px;cursor:pointer;line-height:1}
+.fixbtn:hover,.fixbtn:focus-visible{opacity:1;color:var(--fg)}
+.wk-prev{margin-left:10px;color:var(--fg-3);font-size:11px}
+.tl li.wk .tl-b{display:flex;flex-wrap:wrap;align-items:center;gap:2px 0}
+.timefix{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;margin:2px 8px 2px 0;font-size:12px}
+.timefix input[type=time]{padding:3px 6px;font-size:13px;width:auto}
+/* 送信待ち・オフラインの小さな印 */
+.dbstate{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--fg-3);border:1px solid var(--line-2);border-radius:999px;padding:0 7px;white-space:nowrap}
+.dbstate.off{color:var(--gold);border-color:color-mix(in oklab,var(--gold) 40%,transparent)}
 .dots{display:inline-flex;gap:2px;vertical-align:middle}
 .dots i{width:6px;height:6px;border-radius:50%;background:var(--line-2);display:inline-block}
 .dots i.on{background:var(--c)}

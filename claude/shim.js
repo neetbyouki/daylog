@@ -3,7 +3,6 @@
 const __rt = (() => {
   const SUPA = 'Supabase', PROJECT = 'etsuxjcrnyoevrasdhde', HOST = 'host:Daylog_PC';
   let mcpP = null; const mcp = () => (mcpP || (mcpP = window.claude.use('mcp')));
-  const q = s => "'" + String(s).replace(/'/g, "''") + "'";
   const dollar = s => { let tag; do { tag = '$d' + Math.random().toString(36).slice(2, 8) + '$'; } while (s.includes(tag)); return tag + s + tag; };
   function parse(r) {
     let p = r && r.payload; let txt = typeof p === 'string' ? p : (p && p.result !== undefined ? p.result : null);
@@ -20,82 +19,29 @@ const __rt = (() => {
     }
     return JSON.parse(txt);
   }
-  async function sql(query) {
+  // Supabase へは、どんなときも `select api_daylog.call('<JSON>'::jsonb) as r` の形だけを送る。
+  // api_daylog.call は権限の小さい役割（daylog_api）で動き、持ち主の記録（docs）の読み書きしかできない
+  const SHAPE = /^select api_daylog\.call\((\$d[a-z0-9]+\$)[\s\S]*\1::jsonb\) as r$/;
+  async function api(req) {
+    const query = `select api_daylog.call(${dollar(JSON.stringify(req))}::jsonb) as r`;
+    if (!SHAPE.test(query)) throw { code: 'bad_query' };
     const m = await mcp(); if (!m) throw { code: 'server_not_connected' };
-    return parse(await m.callTool(SUPA, 'execute_sql', { project_id: PROJECT, query }));
+    const res = parse(await m.callTool(SUPA, 'execute_sql', { project_id: PROJECT, query }));
+    if (!Array.isArray(res) || !res[0] || !('r' in res[0])) throw { code: 'bad_result' };
+    return res[0].r;
   }
-  async function rows(query) { const r = await sql(`select coalesce(json_agg(x), '[]'::json) as rows from (${query}) x`); return (r && r[0] && r[0].rows) || []; }
-
-  function makeDb() {
-    const cache = new Map(); const listeners = new Set(); let loaded = false; let since = 0; const waiters = [];
-    const col = c => { if (!cache.has(c)) cache.set(c, new Map()); return cache.get(c); };
-    const emit = c => { for (const l of listeners) if (l.collection === c) l.fn(); };
-    const ready = () => loaded ? Promise.resolve() : new Promise(r => waiters.push(r));
-    const localAt = new Map(); const recent = k => Date.now() - (localAt.get(k) || 0) < 20000;
-    const absorb = (list, skipRecent) => { const touched = new Set(); let hold = null; for (const r of list) { if (skipRecent && recent(r.collection + '/' + r.id)) { if (hold === null || r.u < hold) hold = r.u; continue; } if (r.u > since) since = r.u; const cur = col(r.collection).get(r.id); if (JSON.stringify(cur) !== JSON.stringify(r.data)) { col(r.collection).set(r.id, r.data); touched.add(r.collection); } } if (hold !== null && since >= hold) since = hold - 1; return touched; };
-    const ALL = `select collection, id, data, (extract(epoch from updated_at) * 1000)::bigint as u from public.docs where user_id = ops.me()`;
-    const load = async () => {
-      // 読み込みは3回まで試す。空の結果を「記録なし」と取り違えないよう、設定の記録があるかも確かめる（取り違えると空の内容で上書きしてしまう）
-      let last;
-      for (let i = 0; i < 3; i++) {
-        try {
-          const list = await rows(ALL);
-          if (!Array.isArray(list)) throw { code: 'bad_result' };
-          if (!list.some(r => r.collection === 'settings')) throw { code: 'empty_result' }; // 記録はすでにあるので、空なら読み取り失敗とみなす
-          absorb(list); loaded = true; waiters.splice(0).forEach(r => r());
-          for (const l of listeners) l.fn();
-          return;
-        } catch (e) { last = e; await new Promise(r => setTimeout(r, 800 * (i + 1))); }
-      }
-      throw last || { code: 'load_failed' };
-    };
-    let failErr = null;
-    load().catch(e => { console.error('Daylog load failed', e); failErr = { code: 'load_failed', cause: e }; loaded = true; waiters.splice(0).forEach(r => r()); for (const l of listeners) l.err && l.err(failErr); });
-    const writable = () => { if (!loaded || failErr) throw { code: 'not_loaded' }; };
-    // ほかの端末での変更を15秒ごと・画面に戻ったとき・フォーカスしたときに取り直す（見ているときだけ）。
-    // 1分に1回は、ほかで消された記録も反映する。Web版と同じ間隔
-    let polling = false, pollN = 0;
-    const poll = async () => {
-      if (!loaded || failErr || polling || document.visibilityState !== 'visible') return;
-      polling = true;
-      try {
-        const list = await rows(`select collection, id, data, (extract(epoch from updated_at) * 1000)::bigint as u from public.docs where user_id = ops.me() and updated_at > to_timestamp(${since} / 1000.0)`);
-        const touched = absorb(list, true);
-        if (++pollN % 4 === 0) {
-          const ids = await rows(`select collection, id from public.docs where user_id = ops.me()`);
-          if (Array.isArray(ids) && ids.length) {
-            const have = new Set(ids.map(r => r.collection + '/' + r.id));
-            for (const [c, m] of cache) for (const id of [...m.keys()]) if (!have.has(c + '/' + id) && !recent(c + '/' + id)) { m.delete(id); touched.add(c); }
-          }
-        }
-        touched.forEach(emit);
-      } catch (_) {} finally { polling = false; }
-    };
-    setInterval(poll, 15000);
-    document.addEventListener('visibilitychange', poll);
-    window.addEventListener('focus', poll);
-
-    const OPS = { '==': (a, b) => a === b, '>=': (a, b) => a >= b, '>': (a, b) => a > b, '<=': (a, b) => a <= b, '<': (a, b) => a < b, '!=': (a, b) => a !== b };
-    const snapOf = (c, f) => { const docs = []; for (const [id, v] of col(c)) if (f.every(([k, op, val]) => (OPS[op] || OPS['=='])(v && v[k], val))) docs.push({ id, data: () => v, exists: true }); docs.sort((a, b) => (a.id < b.id ? -1 : 1)); return { docs, size: docs.length, empty: !docs.length }; };
-    const query = (c, f = []) => ({
-      where: (k, op, v) => query(c, [...f, [k, op, v]]),
-      get: async () => { await ready(); if (failErr) throw failErr; return snapOf(c, f); },
-      onSnapshot(cb, err) { const l = { collection: c, fn: () => { if (loaded && !failErr) { try { cb(snapOf(c, f)); } catch (e) { console.error(e); } } }, err }; listeners.add(l); if (loaded) { if (failErr) err && err(failErr); else l.fn(); } return () => listeners.delete(l); },
-    });
-    const split = p => { const i = p.lastIndexOf('/'); return [p.slice(0, i), p.slice(i + 1)]; };
-    return {
-      collection: c => query(c),
-      doc(path) {
-        const [c, id] = split(path);
-        return {
-          async set(data) { writable(); col(c).set(id, data); localAt.set(c + '/' + id, Date.now()); emit(c); await sql(`select ops.put(${q(c)}, ${q(id)}, ${dollar(JSON.stringify(data))}::jsonb) is not null as ok`); },
-          async delete() { writable(); col(c).delete(id); localAt.set(c + '/' + id, Date.now()); emit(c); await sql(`select ops.del(${q(c)}, ${q(id)}) as ok`); },
-          async get() { await ready(); const v = col(c).get(id); return { id, exists: v !== undefined, data: () => v }; },
-          onSnapshot(cb, err) { const l = { collection: c, fn: () => { if (loaded && !failErr) { const v = col(c).get(id); try { cb({ id, exists: v !== undefined, data: () => v }); } catch (e) { console.error(e); } } }, err }; listeners.add(l); if (loaded) { if (failErr) err && err(failErr); else l.fn(); } return () => listeners.delete(l); },
-        };
-      },
-    };
-  }
+  const backend = {
+    loadAll: () => api({ a: 'load' }),
+    since: cur => api({ a: 'since', since: cur || 0 }),
+    ids: () => api({ a: 'ids' }),
+    patch: (c, id, patch) => api({ a: 'patch', c, id, patch }),
+    set: (c, id, data) => api({ a: 'set', c, id, data }),
+    del: (c, id) => api({ a: 'del', c, id }),
+    isOffline: e => (typeof navigator !== 'undefined' && navigator.onLine === false) || /network|fetch|offline|timeout/i.test(String((e && e.message) || '')),
+    // 形がおかしい・権限がない、はやり直しても通らない。それ以外（つながらない・混んでいる）は送り直す
+    retryable: e => !/daylog_api: bad|bad_query|not_granted|not_in_manifest|blocked_by_policy/.test(String((e && (e.code + ' ' + e.message)) || '')),
+  };
+  const makeDb = () => window.DaylogStore.makeStore(backend, { key: 'daylog-claude', owner: 'claude', mustHave: 'settings' });
 
   let dbP = null;
   return {
@@ -110,8 +56,9 @@ const __rt = (() => {
           callTool: async (server, tool, args, opts) => {
             if (server === HOST) {
               if (tool === 'get_activity') return { payload: { days: [] } };
-              if (tool === 'set_config') { const db = await this.use('db'); const cur = await db.doc('pcconfig/main').get(); await db.doc('pcconfig/main').set({ ...(cur.exists ? cur.data() : {}), ...args, at: Date.now() }); return { payload: { ok: true } }; }
+              if (tool === 'set_config') { const db = await this.use('db'); await db.doc('pcconfig/main').update({ ...args, at: Date.now() }); return { payload: { ok: true } }; }
             }
+            if (server === SUPA) throw { code: 'not_allowed', message: 'Supabase は記録置き場からだけ使う' }; // 入口は api_daylog.call だけ
             return m.callTool(server, tool, args, opts);
           },
         };

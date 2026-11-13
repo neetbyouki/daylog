@@ -11,6 +11,7 @@ root = pathlib.Path(__file__).resolve().parent.parent
 html = (root / 'index.html').read_text(encoding='utf-8')
 js = (root / 'daylog.js').read_text(encoding='utf-8')
 shim = (root / 'claude' / 'shim.js').read_text(encoding='utf-8')
+store = (root / 'store.js').read_text(encoding='utf-8')  # 記録置き場（アプリ版と共通）
 cals = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
 out = pathlib.Path(sys.argv[2])
 
@@ -42,6 +43,6 @@ page = ('<title>Daylog</title>\n<meta name="claude:viewport-fit-sides" content="
         '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">\n'
         + head.strip() + '\n' + body.strip() + '\n<script>\n'
         + 'window.__daylogCals = ' + json.dumps(cals, ensure_ascii=False) + ';\n'
-        + shim + '\n' + js + '</script>\n')
+        + store + '\n' + shim + '\n' + js + '</script>\n')
 out.write_text(page, encoding='utf-8')
 print('built', out, len(page))
