@@ -603,7 +603,7 @@ function timelineHTML(d) {
       lis.push(`<li class="ev ${isNow ? 'is-now' : ''} ${x.canceled ? 'canceled' : ''} ${x.endedAt ? 'ended' : ''}" style="--c:${c.color}"><time>${hm(x.start)}</time><div class="tl-b"><div class="ev-head" ${x.ghost ? '' : `data-act="calOpen" data-arg="${esc(key)}"`}>${d === today() ? `<button class="evmore" data-act="evMenu" data-arg="${esc(key)}" aria-label="この予定を終える・キャンセルする" aria-expanded="${S.evMenu === key}">⋯</button>` : ''}<div class="t">${esc(x.title)}</div><div class="m">${endTxt}${x.canceled ? '' : bellHTML(x)}</div></div>${S.evMenu === key ? evMenuHTML(d, x, key) : ''}${kidsHTML(list, isNow)}</div></li>`);
     } else if (it.kind === 'wake') {
       const y = addDays(d, -1); const sl = sleepAt(y);
-      lis.push(`<li class="wk"><time>${hm(it.t)}</time><div class="tl-b">${S.timeFix && S.timeFix.key === 'wake:' + d ? timeFixHTML() : `<span>☀ 起きた</span>${fixBtn('wake:' + d, '起きた時刻を直す')}`}
+      lis.push(`<li class="wakeline"><time>${hm(it.t)}</time><div class="tl-b">${S.timeFix && S.timeFix.key === 'wake:' + d ? timeFixHTML() : `<span>☀ 起きた</span>${fixBtn('wake:' + d, '起きた時刻を直す')}`}
         ${S.timeFix && S.timeFix.key === 'sleep:' + y ? timeFixHTML() : `<span class="wk-prev">前の晩 ${sl ? hm(sl) + ' 就寝' : 'の就寝 —'}${fixBtn('sleep:' + y, '前の晩に寝た時刻を直す')}</span>`}</div></li>`);
     } else {
       const future = d === today() && it.t > now;
