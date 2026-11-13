@@ -30,15 +30,36 @@
      ボタン（すべて枠の中）
      ・ビート：あり／なし。🎲 でパターンを入れかえる（808・クラップ・ハイハット。毎回少しずつ違う組み合わせ）
      ・808：まるい／すべる／あたたかい／はずむ の4種類から選ぶ
+     ・コード：音色を ガラス／エレピ／ハープ／雲／なし から選ぶ。⟳ で進行を入れかえる（やさしい／王道／ゆらぎ／夜／ひかり。全部 D メジャーの音だけ）
      ・作業：集中向け。16Hz のうなり（左右の耳でわずかに違う高さ＝バイノーラル。イヤホンで効く）。
             急に目立つ音を減らし、同じ質感がずっと続くようにする
      ・睡眠：ピンクノイズ。ビートを止め、ゆっくり・暗く・やわらかく。うなりは 4Hz から 2Hz へゆっくり下がる。タイマーで静かに消える */
   const D3 = 146.83;
-  const PROG = [ // D からの半音（和音の音）
-    { name: 'Gmaj7', root: 5, tones: [5, 9, 12, 16, 19] },
-    { name: 'F#m7', root: 4, tones: [4, 7, 11, 14, 16] },
-    { name: 'Em9', root: 2, tones: [2, 5, 9, 12, 18] },
-    { name: 'Dmaj9', root: 0, tones: [0, 4, 7, 11, 16] },
+  // コード進行（D からの半音。全部 D メジャーの中の音だけ）。▸ で入れかえる
+  const PROGS = [
+    { id: 'soft', name: 'やさしい', chords: [
+      { name: 'Gmaj9', root: 5, tones: [5, 9, 12, 16, 19] }, { name: 'F#m7', root: 4, tones: [4, 7, 11, 14, 16] },
+      { name: 'Em9', root: 2, tones: [2, 5, 9, 12, 16] }, { name: 'Dmaj9', root: 0, tones: [0, 4, 7, 11, 14] }] },
+    { id: 'royal', name: '王道', chords: [
+      { name: 'Gmaj9', root: 5, tones: [5, 9, 12, 16, 19] }, { name: 'A6/9', root: 7, tones: [7, 11, 14, 16, 21] },
+      { name: 'F#m7', root: 4, tones: [4, 7, 11, 14, 16] }, { name: 'Bm9', root: 9, tones: [9, 12, 16, 19, 23] }] },
+    { id: 'drift', name: 'ゆらぎ', chords: [
+      { name: 'Dmaj9', root: 0, tones: [0, 4, 7, 11, 14] }, { name: 'Bm9', root: 9, tones: [9, 12, 16, 19, 23] },
+      { name: 'Gmaj9', root: 5, tones: [5, 9, 12, 16, 19] }, { name: 'A9sus4', root: 7, tones: [7, 12, 14, 17, 21] }] },
+    { id: 'night', name: '夜', chords: [
+      { name: 'Em9', root: 2, tones: [2, 5, 9, 12, 16] }, { name: 'A9', root: 7, tones: [7, 11, 14, 17, 21] },
+      { name: 'Dmaj9', root: 0, tones: [0, 4, 7, 11, 14] }, { name: 'Bm7', root: 9, tones: [9, 12, 16, 19, 21] }] },
+    { id: 'light', name: 'ひかり', chords: [
+      { name: 'Bm9', root: 9, tones: [9, 12, 16, 19, 23] }, { name: 'Gmaj7', root: 5, tones: [5, 9, 12, 16, 19] },
+      { name: 'Dmaj9', root: 0, tones: [0, 4, 7, 11, 14] }, { name: 'Aadd9', root: 7, tones: [7, 11, 14, 19, 21] }] },
+  ];
+  // コードの音色（のこぎり波はやめた。どれも角のない音）
+  const PADS = [
+    { id: 'glass', name: 'ガラス' },   // 正弦波を少しずらして重ねた、すきとおった和音
+    { id: 'keys', name: 'エレピ' },    // やわらかいエレピを、小節の頭と裏で軽く弾く
+    { id: 'harp', name: 'ハープ' },    // 和音を1音ずつ、ゆっくり上り下り
+    { id: 'cloud', name: '雲' },       // 息のようなノイズを和音の高さで鳴らす。いちばん空気っぽい
+    { id: 'off', name: 'なし' },
   ];
   const K808 = [
     { id: 'round', name: 'まるい' },
@@ -50,7 +71,8 @@
   const AU = {
     ctx: null, on: store.get('sound', true), vol: 0.8, voices: 0, slots: new Map(),
     smode: ['listen', 'work', 'sleep'].includes(store.get('smode', 'listen')) ? store.get('smode', 'listen') : 'listen',
-    beat: store.get('beat', true), k808: clamp(store.get('k808', 0), 0, K808.length - 1), pat: store.get('pat', 1), timerMin: store.get('timer', 60),
+    beat: store.get('beat', true), k808: clamp(store.get('k808', 0), 0, K808.length - 1),
+    pad: clamp(store.get('pad', 0), 0, PADS.length - 1), prog: clamp(store.get('prog', 0), 0, PROGS.length - 1), pat: store.get('pat', 1), timerMin: store.get('timer', 60),
   };
   // 今の設定から、各層の大きさを決める
   function M() {
@@ -96,7 +118,8 @@
   }
   const stepLen = () => 60 / M().bpm / 4; // 16分音符
   const barLen = () => 60 / M().bpm * 4;
-  const chordAt = t => PROG[((Math.floor(((t || 0) - (AU.t0 || 0)) / barLen()) % 4) + 4) % 4];
+  const curProg = () => PROGS[AU.prog].chords;
+  const chordAt = t => curProg()[((Math.floor(((t || 0) - (AU.t0 || 0)) / barLen()) % 4) + 4) % 4];
   function snap(semi, chord) {
     semi = Math.min(semi, 36); // D6 より上は使わない
     let best = semi, bd = 99;
@@ -145,7 +168,7 @@
     },
     swell(t, hz, v, o) {
       const dur = 4.5; const g = voice(t, { ...o, dark: true, dur, rev: 0.8, cut: 1200 });
-      osc('sawtooth', hz, t, t + dur + 0.6, g, 0.35, -7); osc('sawtooth', hz, t, t + dur + 0.6, g, 0.35, 7); osc('sine', hz / 2, t, t + dur + 0.6, g, 0.6);
+      osc('triangle', hz, t, t + dur + 0.6, g, 0.5, -6); osc('triangle', hz, t, t + dur + 0.6, g, 0.5, 6); osc('sine', hz / 2, t, t + dur + 0.6, g, 0.6);
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.055 * v, t + 0.9); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     },
     // 星のさざめきの1粒：ふわっと立ち上がって、すっと消える正弦波
@@ -254,14 +277,14 @@
   function bedStop(fade = 0.6) {
     if (!TR.on) return; TR.on = false; clearInterval(TR.timer);
     const ctx = AU.ctx, L = TR.layers; TR.layers = null; if (!L) return;
-    [L.noiseG, L.beatG, L.padG].forEach(g => { if (g) g.gain.setTargetAtTime(0.0001, ctx.currentTime, fade); });
+    [L.noiseG, L.beatG, ...(L.pads || []).map(p => p.g)].forEach(g => { if (!g) return; const gp = g.gain, now = ctx.currentTime; if (gp.cancelAndHoldAtTime) gp.cancelAndHoldAtTime(now); else { gp.cancelScheduledValues(now); gp.setValueAtTime(gp.value, now); } gp.setTargetAtTime(0.0001, now, fade); });
     setTimeout(() => L.nodes.forEach(n => { try { n.stop(); } catch (_) {} }), fade * 6000);
   }
   function bedRestart() { if (!E.play || !AU.on) return; bedStop(0.25); setTimeout(() => { if (E.play && AU.on) bedStart(); }, 350); }
   function sched() {
     const ctx = AU.ctx; if (!TR.on || !ctx) return; const m = M();
     while (TR.nextBar < ctx.currentTime + 0.6) {
-      const t = TR.nextBar, bar = TR.bar, ch = PROG[bar % 4], bl = barLen(), st = stepLen();
+      const t = TR.nextBar, bar = TR.bar, ch = curProg()[bar % 4], bl = barLen(), st = stepLen();
       padChord(t, ch, bl, m);
       const root = hzOf(ch.root - 24);
       if (m.kick) {
@@ -291,15 +314,81 @@
       TR.nextBar += bl; TR.bar++;
     }
   }
-  function padChord(t, ch, bl, m) {
-    const ctx = AU.ctx; const g = ctx.createGain(); const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = m.padCut; f.Q.value = 0.5;
-    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.12; const lg = ctx.createGain(); lg.gain.value = m.padCut * 0.22; lfo.connect(lg); lg.connect(f.frequency);
-    g.connect(f); f.connect(AU.dry); const rs = ctx.createGain(); rs.gain.value = 0.7; f.connect(rs); rs.connect(AU.rev);
-    const end = t + bl + 1.6;
-    ch.tones.slice(0, 4).forEach(semi => { const hz = hzOf(semi - 12); osc('sawtooth', hz, t, end, g, 0.22, -9); osc('sawtooth', hz, t, end, g, 0.22, 9); osc('triangle', hz, t, end, g, 0.4); });
-    lfo.start(t); lfo.stop(end);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(m.pad, t + 0.9); g.gain.setValueAtTime(m.pad, t + bl); g.gain.exponentialRampToValueAtTime(0.0001, end);
-    if (TR.layers) TR.layers.padG = g;
+  /* コードの層。t＝小節の頭、from＝実際に鳴らし始める時刻（音色を途中で変えたとき、小節の途中から入る） */
+  function padChord(t, ch, bl, m, from = t) {
+    const kind = PADS[AU.pad].id; if (kind === 'off') return;
+    const ctx = AU.ctx, start = Math.max(t, from), end = t + bl + 1.8;
+    const g = ctx.createGain(); g.gain.value = 0;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 0.4;
+    g.connect(f); f.connect(AU.dry);
+    const rs = ctx.createGain(); f.connect(rs); rs.connect(AU.rev);
+    const ds = ctx.createGain(); ds.gain.value = 0; f.connect(ds); ds.connect(AU.dly);
+    const four = ch.tones.slice(0, 4), sleep = AU.smode === 'sleep';
+    const pad = { g, t, end }; if (TR.layers) { TR.layers.pads = (TR.layers.pads || []).filter(p => p.end > ctx.currentTime); TR.layers.pads.push(pad); TR.layers.padG = g; }
+    // 持続する和音の大きさ：ゆっくりふくらんで、次の小節と重なりながら消える
+    const swellEnv = (peak, atk) => { g.gain.setValueAtTime(0.0001, start); g.gain.exponentialRampToValueAtTime(peak, start + atk); g.gain.setValueAtTime(peak, t + bl); g.gain.exponentialRampToValueAtTime(0.0001, end); };
+    if (kind === 'glass') {
+      f.frequency.value = m.padCut * 1.8; rs.gain.value = 0.8;
+      four.forEach((semi, i) => { const hz = hzOf(semi - 12); osc('sine', hz, start, end, g, 0.5, -4); osc('sine', hz, start, end, g, 0.5, 4); if (i) osc('sine', hz * 2, start, end, g, 0.07, 2); });
+      // ほんの少しだけ、ゆっくり明るさがゆれる
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.1; const lg = ctx.createGain(); lg.gain.value = m.padCut * 0.3; lfo.connect(lg); lg.connect(f.frequency); lfo.start(start); lfo.stop(end);
+      swellEnv(m.pad * 1.35, 1.2);
+    } else if (kind === 'cloud') {
+      // 息のような音：ピンクノイズを和音の高さの細い帯に通す＋ごく小さな正弦波で音程を支える
+      f.frequency.value = m.padCut * 2.4; rs.gain.value = 1.1;
+      const src = ctx.createBufferSource(); src.buffer = noiseBuf('pink'); src.loop = true;
+      four.forEach((semi, i) => {
+        const hz = hzOf(semi + (i ? 0 : -12)); const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = hz; bp.Q.value = 38;
+        const bg = ctx.createGain(); bg.gain.value = 7; src.connect(bp); bp.connect(bg); bg.connect(g);
+        osc('sine', hz, start, end, g, 0.09, (i - 1.5) * 3);
+      });
+      src.start(start, Math.random() * 2); src.stop(end + 0.05);
+      swellEnv(m.pad * 1.6, 1.8);
+    } else if (kind === 'keys') {
+      // エレピ：FMでやわらかいアタック。小節の頭・裏・終わり際で弾く（睡眠は頭だけ）
+      f.frequency.value = m.padCut * 2.2; rs.gain.value = 0.55; ds.gain.value = sleep ? 0 : 0.14;
+      g.gain.setValueAtTime(1, t);
+      const st = bl / 16; const hits = sleep ? [[0, 1]] : [[0, 1], [6, 0.55], [10, 0.7]];
+      hits.forEach(([step, vel]) => {
+        const ht = t + step * st; if (ht < from - 0.01) return;
+        four.forEach((semi, i) => {
+          const nt = ht + i * 0.014, hz = hzOf(semi - 12), dur = step === 0 ? 2.6 : 1.6;
+          const ng = ctx.createGain(); ng.connect(g); env(ng.gain, nt, m.pad * 0.9 * vel, 0.006, dur);
+          const c = ctx.createOscillator(); c.frequency.value = hz; const mo = ctx.createOscillator(); mo.frequency.value = hz;
+          const mi = ctx.createGain(); mi.gain.setValueAtTime(hz * 1.1, nt); mi.gain.exponentialRampToValueAtTime(hz * 0.05, nt + 0.7);
+          mo.connect(mi); mi.connect(c.frequency); c.connect(ng); c.start(nt); mo.start(nt); c.stop(nt + dur + 0.1); mo.stop(nt + dur + 0.1);
+          osc('sine', hz * 2, nt, nt + 0.5, ng, 0.06);
+        });
+      });
+    } else if (kind === 'harp') {
+      // ハープ：和音の音を8分で上って下りる。下にごく小さな和音を敷いて、すき間を埋める
+      f.frequency.value = m.padCut * 2.4; rs.gain.value = 0.75; ds.gain.value = sleep ? 0.1 : 0.2;
+      const st = bl / 16; const up = [...ch.tones.map(x => x - 12), ch.tones[0], ch.tones[1]];
+      const seq = sleep ? [0, 2, 4, 6] : [0, 1, 2, 3, 4, 5, 6, 4];
+      const step = sleep ? 4 : 2;
+      seq.forEach((k, i) => {
+        const nt = t + i * step * st; if (nt < from - 0.01) return; const hz = hzOf(up[k % up.length]);
+        const ng = ctx.createGain(); ng.connect(g); env(ng.gain, nt, m.pad * (i ? 0.75 : 1), 0.005, sleep ? 2.4 : 1.6);
+        osc('triangle', hz, nt, nt + 2.6, ng, 0.8); osc('sine', hz * 2, nt, nt + 0.4, ng, 0.12);
+      });
+      const bed = ctx.createGain(); bed.connect(g); four.forEach(semi => osc('sine', hzOf(semi - 12), start, end, bed, 0.25));
+      bed.gain.setValueAtTime(0.0001, start); bed.gain.exponentialRampToValueAtTime(m.pad * 0.5, start + 1.4); bed.gain.setValueAtTime(m.pad * 0.5, t + bl); bed.gain.exponentialRampToValueAtTime(0.0001, end);
+      g.gain.setValueAtTime(1, t);
+    }
+  }
+  // 音色・進行を変えたとき：今鳴っている和音をすっと消し、新しい音で小節の途中から入りなおす
+  function repad() {
+    const ctx = AU.ctx; if (!ctx) return;
+    if (!TR.on) return previewPad();
+    const now = ctx.currentTime + 0.03, m = M(), bl = barLen();
+    for (const p of (TR.layers && TR.layers.pads) || []) { if (p.end <= now) continue; const gp = p.g.gain; if (gp.cancelAndHoldAtTime) gp.cancelAndHoldAtTime(now); else { gp.cancelScheduledValues(now); gp.setValueAtTime(gp.value, now); } gp.setTargetAtTime(0.0001, now, 0.15); }
+    for (let s = TR.nextBar - bl; s > now - bl; s -= bl) padChord(s, chordAt(s + 0.01), bl, m, now + 0.05);
+  }
+  // 止まっているときは、押した音色で今の進行の1つめの和音を少しだけ鳴らす
+  function previewPad() {
+    const ctx = ensureAudio(); if (!ctx || !AU.on) return;
+    const go = () => { const t = ctx.currentTime + 0.05; if (AU.master) { TR.fading = false; AU.master.gain.cancelScheduledValues(t); AU.master.gain.setTargetAtTime(AU.vol, t, 0.05); } padChord(t, curProg()[0], 2.2, M()); };
+    if (ctx.state === 'running') go(); else ctx.resume().then(go).catch(() => {});
   }
   // 画面の背景の星を、音に合わせてまたたかせる
   function twinkle(t) { if (!E.dust.length || !AU.ctx) return; E.twinks.push({ i: Math.floor(Math.random() * E.dust.length), t0: performance.now() + Math.max(0, (t - AU.ctx.currentTime) * 1000) }); if (E.twinks.length > 60) E.twinks.splice(0, E.twinks.length - 60); }
@@ -746,6 +835,8 @@
     wave: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M3 12c2.2 0 2.2-6 4.5-6s2.3 12 4.5 12 2.3-9 4.5-9 2.2 3 4.5 3"/></svg>',
     focus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>',
     moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/></svg>',
+    chord: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="17" r="2.6"/><circle cx="12.5" cy="11.5" r="2.6"/><circle cx="17" cy="6" r="2.6"/><path d="M10.6 17h9M15.1 11.5h4.5" opacity=".45"/></svg>',
+    cycle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 10a7 7 0 0 1 12.2-3.6L19 8.5"/><path d="M19 4.5v4h-4"/><path d="M19 14a7 7 0 0 1-12.2 3.6L5 15.5"/><path d="M5 19.5v-4h4"/></svg>',
     tilt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="3.5" width="10" height="17" rx="2.5" transform="rotate(-18 12 12)"/><path d="M3.5 8.5a9 9 0 0 1 3-4M20.5 15.5a9 9 0 0 1-3 4"/></svg>',
   };
   function build() {
@@ -762,8 +853,9 @@
         <div class="orr-mix" role="group" aria-label="音">
           <div class="mx-beat"><button class="mx" data-o="beat"><span class="mx-i">${IC.beat}</span><span class="mx-l">ビート</span><span class="mx-s"></span></button><button class="mx-dice" data-o="dice" aria-label="ビートのパターンを変える">${IC.dice}</button></div>
           <button class="mx" data-o="k808"><span class="mx-i">${IC.wave}</span><span class="mx-l">808</span><span class="mx-s"></span></button>
+          <div class="mx-beat"><button class="mx" data-o="pad"><span class="mx-i">${IC.chord}</span><span class="mx-l">コード</span><span class="mx-s"></span></button><button class="mx-dice" data-o="prog" aria-label="コード進行を変える" title="コード進行を変える">${IC.cycle}</button></div>
           <button class="mx" data-o="work"><span class="mx-i">${IC.focus}</span><span class="mx-l">作業</span><span class="mx-s">16Hz</span></button>
-          <button class="mx" data-o="sleep"><span class="mx-i">${IC.moon}</span><span class="mx-l">睡眠</span><span class="mx-s">ピンクノイズ</span></button>
+          <button class="mx" data-o="sleep"><span class="mx-i">${IC.moon}</span><span class="mx-l">睡眠</span><span class="mx-s">ノイズ</span></button>
         </div>
         <div class="orr-bar">
           <button class="orr-play" data-o="play" aria-label="再生"></button>
@@ -792,6 +884,8 @@
       else if (o === 'beat') { AU.beat = !AU.beat; store.set('beat', AU.beat); if (AU.beat && AU.smode === 'sleep') { AU.smode = 'listen'; store.set('smode', 'listen'); bedRestart(); TR.endAt = 0; wake(false); } syncControls(); }
       else if (o === 'dice') { AU.pat = (AU.pat % 997) + 1 + Math.floor(Math.random() * 50); store.set('pat', AU.pat); PAT = makePattern(AU.pat); if (!AU.beat) { AU.beat = true; store.set('beat', true); } if (AU.smode === 'sleep') { AU.smode = 'listen'; store.set('smode', 'listen'); bedRestart(); TR.endAt = 0; wake(false); } if (!E.play) setPlay(true); setMsg(`ビートのパターンを変えた（No.${AU.pat}）`); syncControls(); }
       else if (o === 'k808') { AU.k808 = (AU.k808 + 1) % K808.length; store.set('k808', AU.k808); ensureAudio(); if (AU.ctx && AU.ctx.state === 'running') INST.kick(AU.ctx.currentTime + 0.05, hzOf(-24), 0.3); syncControls(); }
+      else if (o === 'pad') { AU.pad = (AU.pad + 1) % PADS.length; store.set('pad', AU.pad); repad(); setMsg(`コードの音色：${PADS[AU.pad].name}`); syncControls(); }
+      else if (o === 'prog') { AU.prog = (AU.prog + 1) % PROGS.length; store.set('prog', AU.prog); if (PADS[AU.pad].id === 'off') { AU.pad = 0; store.set('pad', 0); } repad(); setMsg(`コード進行：${PROGS[AU.prog].name}（${curProg().map(c => c.name).join(' → ')}）`); syncControls(); }
       else if (o === 'timer') { AU.timerMin = Number(v); store.set('timer', AU.timerMin); if (E.play && AU.smode === 'sleep') { TR.endAt = Date.now() + AU.timerMin * 60000; TR.fading = false; AU.master && AU.master.gain.setTargetAtTime(AU.on ? AU.vol : 0, AU.ctx.currentTime, 0.2); } syncControls(); updateTimerText(); }
       else if (o === 'dim') { if (!E.play) setPlay(true); dim(true); }
       else if (o === 'gyro') toggleGyro();
@@ -829,9 +923,11 @@
     el.querySelector('[data-o="beat"] .mx-s').textContent = beatOn ? `No.${AU.pat}` : 'なし';
     el.querySelector('[data-o="k808"] .mx-s').textContent = K808[AU.k808].name;
     el.querySelector('[data-o="k808"]').setAttribute('aria-label', `808の音：${K808[AU.k808].name}（押すと変わる）`);
+    el.querySelector('[data-o="pad"] .mx-s').textContent = PADS[AU.pad].name;
+    el.querySelector('[data-o="pad"]').setAttribute('aria-label', `コードの音色：${PADS[AU.pad].name}（押すと変わる）`);
     el.querySelectorAll('[data-o="timer"]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.v) === AU.timerMin)));
     el.querySelector('.orr-sleep').hidden = AU.smode !== 'sleep';
-    el.querySelector('.orr-snote').textContent = SNOTE[AU.smode] + (AU.smode === 'sleep' ? '' : beatOn ? ` ビート No.${AU.pat}・808「${K808[AU.k808].name}」。` : ' ビートなし。');
+    el.querySelector('.orr-snote').textContent = SNOTE[AU.smode] + (AU.smode === 'sleep' ? '' : (beatOn ? ` ビート No.${AU.pat}・808「${K808[AU.k808].name}」。` : ' ビートなし。')) + (PADS[AU.pad].id === 'off' ? ' コードなし。' : ` コード「${PROGS[AU.prog].name}」を${PADS[AU.pad].name}の音で。`);
     el.classList.toggle('sleepy', AU.smode === 'sleep');
     updateTimerText();
   }
@@ -883,6 +979,6 @@
     _meter() { if (!AU.ctx) return null; if (!AU.an) { AU.an = AU.ctx.createAnalyser(); AU.an.fftSize = 2048; AU.master.connect(AU.an); AU.peak = 0; AU.sum = 0; AU.n = 0; const buf = new Float32Array(2048); setInterval(() => { AU.an.getFloatTimeDomainData(buf); let pk = 0, ss = 0; for (const v of buf) { pk = Math.max(pk, Math.abs(v)); ss += v * v; } AU.peak = Math.max(AU.peak, pk); AU.sum += Math.sqrt(ss / buf.length); AU.n++; }, 40); } return { peak: AU.peak, rms: AU.n ? AU.sum / AU.n : 0 }; },
     // 出ている音を録音する（確認用）
     _stream() { if (!AU.ctx) return null; if (!AU.rec) { AU.rec = AU.ctx.createMediaStreamDestination(); AU.master.connect(AU.rec); } return AU.rec.stream; },
-    _debug: () => ({ rings: E.rings.length, stars: E.stars.length, mode: E.mode, play: E.play, playT: E.playT, audio: AU.ctx ? AU.ctx.state : 'none', voices: AU.voices, smode: AU.smode, beat: AU.beat, k808: K808[AU.k808].name, pat: AU.pat, bed: TR.on, bars: TR.bar, endAt: TR.endAt, twinks: E.twinks.length }),
+    _debug: () => ({ rings: E.rings.length, stars: E.stars.length, mode: E.mode, play: E.play, playT: E.playT, audio: AU.ctx ? AU.ctx.state : 'none', voices: AU.voices, smode: AU.smode, beat: AU.beat, k808: K808[AU.k808].name, pad: PADS[AU.pad].name, prog: PROGS[AU.prog].name, pads: (TR.layers && TR.layers.pads || []).length, pat: AU.pat, bed: TR.on, bars: TR.bar, endAt: TR.endAt, twinks: E.twinks.length }),
   };
 })();
