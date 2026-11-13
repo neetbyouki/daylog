@@ -528,6 +528,8 @@ function entryEditor(e) {
   return `<div class="ee" style="white-space:normal"><textarea class="field" id="ee-text" data-draft rows="2" style="width:100%;min-height:56px" aria-label="記録を直す">${esc(draft('ee-text', e.text || ''))}</textarea>
     <div class="row" style="margin-top:6px">${sel('mood', '気分')}${sel('body', '体調')}<label class="faint" style="font-size:12px"><input type="checkbox" id="ee-nap" ${draft('ee-nap', e.nap ? 'on' : '') ? 'checked' : ''} data-onchg="eeNap"> 💤昼寝</label><span class="spacer"></span><button class="btn ghost sm" data-act="entryEditCancel">やめる</button><button class="btn primary sm" data-act="entrySave" data-arg="${e.id}">保存</button></div></div>`;
 }
+// 就寝・就寝の目安の予定（今日の流れでは控えめな1行にする。時間の幅は持たせない）
+const isBedEv = x => /^🌙\s*就寝/.test(x.title || '');
 function timelineHTML(d) {
   const st = S.events[d] || {};
   const evs = effEvents(d);
@@ -542,7 +544,7 @@ function timelineHTML(d) {
   for (const e of (getDay(d).entries || [])) {
     let host = null;
     for (const x of timed) {
-      if (x.canceled || !(x.start <= e.t && e.t < x.end)) continue;
+      if (x.canceled || isBedEv(x) || !(x.start <= e.t && e.t < x.end)) continue;
       if (!host || (isOn(x) && !isOn(host)) || (isOn(x) === isOn(host) && x.start > host.start)) host = x;
     }
     if (host) { const k = host.cal + '|' + host.id; if (!kids.has(k)) kids.set(k, []); kids.get(k).push(e); } else loose.push(e);
@@ -557,7 +559,7 @@ function timelineHTML(d) {
   const rng = dayRange(d, timed, loose);
   if (rng) for (let t = floorH(rng.from) + (floorH(rng.from) < rng.from ? HOUR : 0); t <= rng.to; t += HOUR) addHour(t);
   // 予定の最中・予定がちょうど始まる時刻の線は出さない（予定のカードが時間を持っている）
-  const inEv = t => timed.some(x => !x.canceled && x.start <= t && t < x.end);
+  const inEv = t => timed.some(x => !x.canceled && !isBedEv(x) && x.start <= t && t < x.end);
   const raw = [...timed.map(x => ({ kind: 'ev', o: 1, t: isOn(x) ? now : x.start, s: x.start, x })),
     ...[...hours].filter(([t, list]) => list.length || !inEv(t)).map(([t, list]) => ({ kind: 'hr', o: 0, t, s: t, list: list.sort((a, b) => a.t - b.t) }))];
   if (rng && rng.wake) raw.push({ kind: 'wake', o: -1, t: rng.wake, s: rng.wake });
@@ -590,7 +592,14 @@ function timelineHTML(d) {
     if (it.kind === 'ev') {
       const c = calOf(it.x.cal); const key = it.x.cal + '|' + it.x.id; const isNow = key === nowKey;
       const list = (kids.get(key) || []).sort((a, b) => a.t - b.t);
-      const x = it.x; const endTxt = x.canceled ? '<span class="evstate">キャンセルした</span>' : x.endedAt ? `〜${hm(x.end)}<span class="evstate">（予定は${hm(x.plannedEnd)}まで）</span>` : `〜${hm(x.end)}`;
+      const x = it.x;
+      // 就寝・就寝の目安は、ほかの予定と分けて控えめな1行にする
+      if (!x.canceled && isBedEv(x)) {
+        const done = !/目安/.test(x.title);
+        lis.push(`<li class="ev bedline ${done ? 'done' : ''}" style="--c:${c.color}"><time>${hm(x.start)}</time><div class="tl-b"><span class="bl-t" ${x.ghost ? '' : `data-act="calOpen" data-arg="${esc(key)}"`}>${done ? '🌙 就寝' : '🌙 就寝の目安'}</span>${kidsHTML(list, isNow)}</div></li>`);
+        continue;
+      }
+      const endTxt = x.canceled ? '<span class="evstate">キャンセルした</span>' : x.endedAt ? `〜${hm(x.end)}<span class="evstate">（予定は${hm(x.plannedEnd)}まで）</span>` : `〜${hm(x.end)}`;
       lis.push(`<li class="ev ${isNow ? 'is-now' : ''} ${x.canceled ? 'canceled' : ''} ${x.endedAt ? 'ended' : ''}" style="--c:${c.color}"><time>${hm(x.start)}</time><div class="tl-b"><div class="ev-head" ${x.ghost ? '' : `data-act="calOpen" data-arg="${esc(key)}"`}>${d === today() ? `<button class="evmore" data-act="evMenu" data-arg="${esc(key)}" aria-label="この予定を終える・キャンセルする" aria-expanded="${S.evMenu === key}">⋯</button>` : ''}<div class="t">${esc(x.title)}</div><div class="m">${endTxt}${x.canceled ? '' : bellHTML(x)}</div></div>${S.evMenu === key ? evMenuHTML(d, x, key) : ''}${kidsHTML(list, isNow)}</div></li>`);
     } else if (it.kind === 'wake') {
       const y = addDays(d, -1); const sl = sleepAt(y);
