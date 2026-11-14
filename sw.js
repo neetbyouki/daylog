@@ -1,8 +1,8 @@
 // Daylog のサービスワーカー
 // ・画面のファイルを覚えておき、電波がなくても開けるようにする（記録は store.js が端末に覚えている）
 // ・Daylogからの通知（Web Push）を受け取って出す
-const CACHE = 'daylog-shell-v17';
-const SHELL = ['./', './index.html', './boot.js', './store.js', './orrery.js', './daylog.js', './manifest.webmanifest', './icons/icon-192.png'];
+const CACHE = 'daylog-shell-v18';
+const SHELL = ['./', './index.html', './boot.js', './store.js', './galaxy.js', './daylog.js', './manifest.webmanifest', './icons/icon-192.png'];
 const LIB = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(async c => { await c.addAll(SHELL); try { await c.add(LIB); } catch (_) {} }).then(() => self.skipWaiting()));
