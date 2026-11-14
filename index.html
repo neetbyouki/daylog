@@ -214,6 +214,45 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 /* 送信待ち・オフラインの小さな印 */
 .dbstate{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--fg-3);border:1px solid var(--line-2);border-radius:999px;padding:0 7px;white-space:nowrap}
 .dbstate.off{color:var(--gold);border-color:color-mix(in oklab,var(--gold) 40%,transparent)}
+/* ── タイマー（全画面） ── */
+.tm-btn.on{border-color:color-mix(in oklab,#8ec5ff 55%,transparent);color:#d6e8ff;padding:0 12px;gap:6px}
+.tm-btn.on.pause{opacity:.7}
+.tm-btn.mini{height:26px!important;padding:0 10px 0 8px!important;font-size:12px;gap:5px}.tm-btn.mini svg{width:13px;height:13px}
+.tm-btn.on.done{border-color:var(--gold);color:var(--gold)}
+.overlay.tm{background:radial-gradient(120% 80% at 50% 38%,#0c1530 0%,#02040c 72%);backdrop-filter:none;-webkit-backdrop-filter:none;display:flex;flex-direction:column}
+.tm-top{display:flex;justify-content:space-between;align-items:center;padding:12px max(14px,env(safe-area-inset-left,0px)) 0}
+.tm-back,.tm-snd{display:inline-flex;align-items:center;gap:4px;height:40px;padding:0 14px 0 10px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#dbe6fb;font-size:14px}
+.tm-snd{padding:0 14px;font-size:12.5px;color:rgba(219,230,251,.75)}
+.tm-snd[aria-pressed="false"]{color:rgba(219,230,251,.45)}
+.tm-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(14px,3.2vh,30px);padding:12px 20px 28px;min-height:0}
+.tm-head{width:min(100%,420px);text-align:center}
+.tm-lb{display:block;font-size:12px;color:rgba(200,214,242,.65);margin-bottom:8px}
+.tm-purpose{width:100%;text-align:center;font-size:17px;padding:12px 14px;border-radius:14px}
+.tm-what{font-size:19px;font-weight:600;line-height:1.4;overflow-wrap:anywhere;color:#eef4ff}
+.tm-ring{position:relative;width:min(74vw,44vh,340px);aspect-ratio:1;flex:none}
+.tm-ring svg{width:100%;height:100%;display:block;overflow:visible}
+.tm-track{fill:rgba(142,197,255,.035);stroke:rgba(255,255,255,.09);stroke-width:14}
+.tm-arc{fill:none;stroke:#7fb6ff;stroke-width:14;stroke-linecap:round;filter:drop-shadow(0 0 10px rgba(110,170,255,.55));transition:stroke-dashoffset .3s linear}
+.tm-ring.idle .tm-arc{stroke:rgba(142,197,255,.5);filter:none}
+.tm-ring.pause .tm-arc{stroke:#9aa6c4;filter:none}
+.tm-ring.done .tm-track{stroke:var(--gold);fill:color-mix(in oklab,var(--gold) 9%,transparent)}
+.tm-center{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:4px;text-align:center}
+.tm-digits{font-size:clamp(44px,15vw,74px);font-weight:300;letter-spacing:.01em;line-height:1;color:#f2f6ff;font-variant-numeric:tabular-nums}
+.tm-state{font-size:13px;color:rgba(200,214,242,.7)}
+.tm-foot{width:min(100%,420px);display:grid;gap:12px;justify-items:center}
+.tm-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%}
+.tm-presets button{height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#dbe6fb;font-size:15px}
+.tm-presets button[aria-pressed="true"]{background:rgba(110,165,255,.24);border-color:rgba(142,197,255,.6);color:#fff;font-weight:600}
+.tm-adj{display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(200,214,242,.6)}
+.tm-adj button{min-width:44px;height:32px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:none;color:rgba(219,230,251,.8);font-size:13px}
+.tm-adj button:disabled{opacity:.3}
+.tm-foot .btn{min-height:46px;padding:0 22px;font-size:15px}
+.tm-go{width:100%;min-height:52px!important;font-size:16px!important}
+.tm-go:disabled{opacity:.35}
+.tm-row{display:flex;gap:10px;width:100%}.tm-row .btn{flex:1}.tm-row .tm-go{flex:2}
+.tm-need{font-size:12px;color:rgba(200,214,242,.6)}
+.tm-need[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){.tm-arc{transition:none}}
 /* ── 銀河（星空タブ。galaxy.js が中身を作る） ── */
 .dots{display:inline-flex;gap:2px;vertical-align:middle}
 .dots i{width:6px;height:6px;border-radius:50%;background:var(--line-2);display:inline-block}
