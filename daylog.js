@@ -219,8 +219,11 @@ function normEvents(payload, cal, d) {
     const allDay = !!(e.start && e.start.date && !e.start.dateTime);
     const start = allDay ? parseYmd(e.start.date).getTime() : Date.parse(e.start && e.start.dateTime);
     const end = allDay ? parseYmd((e.end && e.end.date) || e.start.date).getTime() : Date.parse((e.end && e.end.dateTime) || e.start.dateTime);
-    return { id: e.id, cal: cal.key, title: e.summary || '（タイトルなし）', start, end, allDay, date: allDay ? e.start.date : null };
-  }).filter(e => !isNaN(e.start) && (!e.allDay || e.date === d));
+    const x = { id: e.id, cal: cal.key, title: e.summary || '（タイトルなし）', start, end, allDay, date: allDay ? e.start.date : null };
+    // 終日の予定：何日続くか・今日が何日目か（Googleの終わりの日は「次の日」なので含めない）
+    if (allDay) { x.ed = (e.end && e.end.date) || addDays(x.date, 1); x.span = Math.max(1, diffDays(x.date, x.ed)); x.nth = diffDays(x.date, d) + 1; }
+    return x;
+  }).filter(e => !isNaN(e.start) && (!e.allDay || (e.date <= d && d < e.ed)));
 }
 async function loadEvents(d, force) {
   if (!S.mcp) return;
@@ -480,11 +483,22 @@ function todayView() {
   const sub = `<button class="gamechip ichip" data-tip="今月 ${monthWroteCount(mk)} 日書いた" aria-label="今月 ${monthWroteCount(mk)} 日書いた">${ICON.pen}<b class="mono">${monthWroteCount(mk)}</b></button>${gameSub}${blank ? `<button class="gamechip ichip" data-tip="空白時間 ${fmtMin(blank)}：触らずに動画や音楽が流れていた時間。睡眠には数えない。" aria-label="空白時間 ${fmtMin(blank)}">${ICON.wave}<b class="mono">${fmtMin(blank)}</b></button>` : ''}<button class="gamechip ichip" data-tip="${esc(moonName(age))}" aria-label="${esc(moonName(age))}">${moonSVG(age, 14)}</button>`;
   const actions = `<button class="night-btn" data-act="openNight"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>夜モード</button>`;
   let h = headerHTML(dayLabel(d), sub, actions);
+  h += alldayHTML(d);
   h += `<div class="modes" role="group" aria-label="今日の体調">${Object.entries(MODES).map(([k, m]) => `<button class="mode" style="--c:${m.c}" data-act="setMode" data-arg="${k}" aria-pressed="${mode === k}" title="${m.hint}">${m.label}</button>`).join('')}</div>`;
   h += `<div class="stack">${morningCard(d)}${todayCards(d)}</div>`;
   h += timelineHTML(d);
   h += `<div class="stack" style="margin-top:18px">${claudeCard(d)}</div>`;
   return h;
+}
+// 終日の予定（Googleカレンダー）：日付のすぐ下に1行。色の線＋名前で、時刻の流れとは分けて置く
+const calOfKey = k => CFG.CALS.find(c => c.key === k) || { name: '', color: 'var(--fg-3)' };
+function alldayHTML(d) {
+  const list = effEvents(d).filter(x => x.allDay && !x.canceled);
+  if (!list.length) return '';
+  return `<div class="allday-band" aria-label="今日の終日の予定"><span class="ad-lb">終日</span><div class="ad-list">${list.map(x => {
+    const c = calOfKey(x.cal), more = x.span > 1 ? `${x.nth}/${x.span}日目` : '';
+    return `<button class="ad" style="--c:${c.color}" data-act="calOpen" data-arg="${x.cal}|${esc(x.id)}" aria-label="終日の予定：${esc(x.title)}${more ? '（' + more + '）' : ''}・${esc(c.name)}"><i class="ad-bar" aria-hidden="true"></i><span class="ad-t">${esc(x.title)}</span>${more ? `<span class="ad-n mono">${more}</span>` : ''}<span class="ad-c" aria-hidden="true">${esc(c.name)}</span></button>`;
+  }).join('')}</div></div>`;
 }
 function todayCards(d) {
   const day = getDay(d); const out = [];
@@ -556,7 +570,6 @@ function timelineHTML(d) {
   const st = S.events[d] || {};
   const evs = effEvents(d);
   const timed = evs.filter(x => !x.allDay);
-  const allDay = evs.filter(x => x.allDay);
   const calOf = k => CFG.CALS.find(c => c.key === k) || CFG.CALS[0];
   const now = Date.now();
   const isOn = x => d === today() && !x.canceled && x.start <= now && now < x.end;
@@ -589,7 +602,6 @@ function timelineHTML(d) {
   let h = `<h2 class="sec"><span>今日の流れ</span><span class="r">${st.loading ? '<span class="thinking">予定を読み込み中</span>' : S.mcp ? `<button class="iconbtn plusbtn" data-act="todayPlan" aria-label="今日の予定を足す" title="今日の予定を足す">＋</button><button class="iconbtn" data-act="reloadEvents" aria-label="予定を読み込み直す" title="読み込み直す">${ICON.reload}</button>` : ''}</span></h2>`;
   if (!S.mcp) h += `<div class="err">Googleカレンダーにつながっていないので、予定は表示されない（日記は使える）。</div>`;
   if (st.error) h += `<div class="err">${esc(st.error.msg)}${st.error.code === 'approval_required' ? ' <button class="btn sm" data-act="reloadEvents">許可して読み込む</button>' : ''}</div>`;
-  if (allDay.length) h += `<div class="allday">${allDay.map(x => `<span style="--c:${calOf(x.cal).color}">${esc(calOf(x.cal).name)} ${esc(x.title)}</span>`).join('')}</div>`;
   if (!items.length) {
     h += `<div class="empty">まだ何もない一日。下の欄から、今の気分を1行で残せる。スコアだけでもいい。</div>`;
     return h;
