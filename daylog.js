@@ -431,6 +431,8 @@ function restoreFocus(fx) {
   try { if (fx.s != null) el.setSelectionRange(fx.s, fx.e); } catch (_) {}
   el.scrollTop = fx.scroll || 0;
 }
+// 書いた分だけ欄の高さを伸ばす（上限あり）
+const autosize = el => { el.style.height = 'auto'; el.style.height = Math.min(320, el.scrollHeight + 2) + 'px'; };
 const draft = (id, fb = '') => S.drafts[id] != null ? S.drafts[id] : fb;
 
 function mainHTML() {
@@ -789,15 +791,15 @@ function tasksView() {
 function memosView() {
   const list = Object.values(S.memos).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   let h = headerHTML('メモ', `<span>${list.length} 件</span>`);
-  h += `<div class="card" style="margin-top:12px"><div class="form"><div class="line"><input class="field grow" id="memo-text" data-draft placeholder="思いついたことを1行で" value="${esc(draft('memo-text'))}" data-enter="memoAdd" aria-label="メモ"><button class="btn primary" data-act="memoAdd" aria-label="メモを置く">＋</button></div></div></div>`;
+  h += `<div class="card" style="margin-top:12px"><div class="form"><div class="line memo-add"><textarea class="field grow autosize" id="memo-text" data-draft rows="1" placeholder="思いついたことを書く（改行できる）" aria-label="メモ。改行できる。Ctrl＋Enterで置く">${esc(draft('memo-text'))}</textarea><button class="btn primary" data-act="memoAdd" aria-label="メモを置く">＋</button></div></div></div>`;
   const when = m => m.createdAt ? `${shortLabel(logicalDate(m.createdAt))} ${hm(m.createdAt)}${m.editedAt ? '（直した）' : ''}` : '';
   const item = m => {
-    if (S.editMemo === m.id) return `<li class="memo editing"><div class="txt"><textarea class="field" id="memo-edit" data-draft rows="2" aria-label="メモを直す">${esc(draft('memo-edit', m.text))}</textarea><div class="row" style="margin-top:6px"><span class="spacer"></span><button class="btn ghost sm" data-act="memoEditCancel">やめる</button><button class="btn primary sm" data-act="memoSave" data-arg="${m.id}">保存</button></div></div></li>`;
+    if (S.editMemo === m.id) return `<li class="memo editing"><div class="txt"><textarea class="field autosize" id="memo-edit" data-draft rows="2" aria-label="メモを直す。Ctrl＋Enterで保存">${esc(draft('memo-edit', m.text))}</textarea><div class="row" style="margin-top:6px"><span class="spacer"></span><button class="btn ghost sm" data-act="memoEditCancel">やめる</button><button class="btn primary sm" data-act="memoSave" data-arg="${m.id}">保存</button></div></div></li>`;
     const open = S.memoMenu === m.id;
     return `<li class="memo"><div class="txt">${esc(m.text)}<div class="when">${when(m)}</div>${open ? `<div class="mmenu"><button class="link" data-act="memoEdit" data-arg="${m.id}">直す</button><button class="link danger" data-act="memoDelete" data-arg="${m.id}">消す</button></div>` : ''}</div><button class="gmore" data-act="memoMenu" data-arg="${m.id}" aria-expanded="${open}" aria-label="このメモの操作">⋯</button></li>`;
   };
   h += list.length ? `<ul class="memos">${list.map(item).join('')}</ul>`
-    : `<div class="empty">まだメモはない。建築のアイデア、動画のネタ、買うもの、なんでも1行で置いておける。</div>`;
+    : `<div class="empty">まだメモはない。建築のアイデア、動画のネタ、買うもの、なんでも置いておける。Enterで改行、＋（PCはCtrl＋Enter）で置く。</div>`;
   return h;
 }
 
@@ -1300,6 +1302,7 @@ function skyPick(h) {
   render();
 }
 function afterMain() {
+  document.querySelectorAll('.autosize').forEach(autosize);
   if (S.view !== 'sky') { if (window.DaylogGalaxy) window.DaylogGalaxy.detach(); return; }
   loadGalaxy();
   const host = $('#gx-host');
@@ -1450,11 +1453,11 @@ const A = {};
 A.skyToday = () => skyPick({ day: today() });
 /* ── タイマー（タスクの画面の右上から開く。全画面。端末ごとに覚え、閉じても・開き直しても進み続ける） ── */
 const TM_KEY = 'daylog-timer';
-const TM = Object.assign({ state: 'idle', dur: 900, purpose: '', endAt: 0, left: 0, sound: true, logged: false }, (() => { try { return JSON.parse(localStorage.getItem(TM_KEY)) || {}; } catch (_) { return {}; } })());
+const TM = Object.assign({ state: 'idle', dur: 900, purpose: '', endAt: 0, left: 0, spent: 0, early: false, sound: true, logged: false }, (() => { try { return JSON.parse(localStorage.getItem(TM_KEY)) || {}; } catch (_) { return {}; } })());
 const tmSave = () => { try { localStorage.setItem(TM_KEY, JSON.stringify(TM)); } catch (_) {} };
 const tmLeft = () => (TM.state === 'run' ? Math.max(0, (TM.endAt - Date.now()) / 1000) : TM.state === 'pause' ? TM.left : TM.state === 'done' ? 0 : TM.dur);
 const tmFmt = sec => { const t = Math.ceil(sec - 0.001), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), ss = t % 60; return h ? `${h}:${pad(m)}:${pad(ss)}` : `${pad(m)}:${pad(ss)}`; };
-const tmMin = sec => (sec >= 3600 && sec % 3600 === 0 ? `${sec / 3600}時間` : sec >= 3600 ? `${Math.floor(sec / 3600)}時間${Math.round(sec % 3600 / 60)}分` : `${Math.round(sec / 60)}分`);
+const tmMin = sec => (sec < 60 ? `${Math.max(1, Math.round(sec))}秒` : sec >= 3600 && sec % 3600 === 0 ? `${sec / 3600}時間` : sec >= 3600 ? `${Math.floor(sec / 3600)}時間${Math.round(sec % 3600 / 60)}分` : `${Math.round(sec / 60)}分`);
 const TM_R = 132, TM_C = 2 * Math.PI * TM_R;
 const TM_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.6 1.6M9.5 3h5M12 3v3"/></svg>';
 // 右上のボタン：タスクの画面ではいつも出す。ほかの画面では、タイマーが動いている間だけ残り時間を小さく出す
@@ -1464,24 +1467,43 @@ function timerChipHTML() {
   const label = TM.state === 'done' ? '終了' : active ? `<span class="mono" id="tm-chip-t">${tmFmt(tmLeft())}</span>` : (S.view === 'tasks' ? 'タイマー' : '');
   return `<button class="night-btn tm-btn ${active ? 'on ' + TM.state : ''}${S.view !== 'tasks' ? ' mini' : ''}" data-act="timerOpen" aria-label="タイマーを開く${active ? '（' + (TM.state === 'done' ? '終了' : '残り ' + tmFmt(tmLeft())) + '）' : ''}">${TM_ICON}${label}</button>`;
 }
+// タイマーの画面のアイコン（文字の代わり。押せるものには必ず aria-label と title を付ける）
+const TI = (d, sw = 2) => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const TMI = {
+  back: TI('<path d="M14.5 5.5l-6.5 6.5 6.5 6.5"/>'),
+  snd: TI('<path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/><path d="M15.8 9a4 4 0 0 1 0 6M18.3 6.5a7.5 7.5 0 0 1 0 11"/>', 1.8),
+  mute: TI('<path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>', 1.8),
+  play: '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.6-6.8a.8.8 0 0 0 0-1.4L9.2 4.5A.8.8 0 0 0 8 5.2z" fill="currentColor"/></svg>',
+  pause: '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></svg>',
+  stop: '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.2" fill="currentColor"/></svg>',
+  again: TI('<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v4h4"/>'),
+  close: TI('<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>'),
+  log: TI('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 2.2),
+  aim: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".8" fill="currentColor"/></svg>',
+};
+const tmBtn = (act, icon, label, cls = '', arg = '', extra = '') => `<button class="tm-ic ${cls}" data-act="${act}"${arg !== '' ? ` data-arg="${arg}"` : ''} aria-label="${label}" title="${label}" ${extra}>${icon}</button>`;
 function timerHTML() {
-  const st = TM.state, left = tmLeft(), frac = st === 'idle' ? 1 : TM.dur ? left / TM.dur : 0;
+  const st = TM.state, left = tmLeft();
+  // 円：動いている間は残りの割合。終わったら、やった分（途中でやめたらその分だけ）を金色で
+  const frac = st === 'idle' ? 1 : st === 'done' ? (TM.dur ? clamp(TM.spent / TM.dur, 0, 1) : 1) : TM.dur ? left / TM.dur : 0;
   const purpose = st === 'idle' ? draft('tm-purpose', '') : TM.purpose;
   const ok = !!String(purpose).trim();
-  const ring = `<div class="tm-ring ${st}"><svg viewBox="0 0 300 300" aria-hidden="true"><circle class="tm-track" cx="150" cy="150" r="${TM_R}"/><circle class="tm-arc" id="tm-arc" cx="150" cy="150" r="${TM_R}" stroke-dasharray="${TM_C.toFixed(2)}" stroke-dashoffset="${(TM_C * (1 - frac)).toFixed(2)}" transform="rotate(-90 150 150)"/></svg>
-    <div class="tm-center"><div class="tm-digits mono" id="tm-digits" role="timer" aria-live="off">${st === 'done' ? '00:00' : tmFmt(left)}</div><div class="tm-state" id="tm-state">${st === 'idle' ? tmMin(TM.dur) : st === 'run' ? `${hm(TM.endAt)} まで` : st === 'pause' ? '一時停止中' : 'おつかれさま'}</div></div></div>`;
+  const digits = st === 'done' ? tmFmt(TM.spent) : tmFmt(left);
+  const stateTx = st === 'idle' ? tmMin(TM.dur) : st === 'run' ? `${hm(TM.endAt)} まで` : st === 'pause' ? '一時停止中' : TM.early ? `${tmMin(TM.dur)}のうち` : 'おつかれさま';
+  const ring = `<div class="tm-ring ${st}${st === 'done' && TM.early ? ' early' : ''}"><svg viewBox="0 0 300 300" aria-hidden="true"><circle class="tm-track" cx="150" cy="150" r="${TM_R}"/><circle class="tm-arc" id="tm-arc" cx="150" cy="150" r="${TM_R}" stroke-dasharray="${TM_C.toFixed(2)}" stroke-dashoffset="${(TM_C * (1 - frac)).toFixed(2)}" transform="rotate(-90 150 150)"/></svg>
+    <div class="tm-center">${st === 'done' && TM.early ? `<div class="tm-state">${stateTx}</div>` : ''}<div class="tm-digits mono" id="tm-digits" role="timer" aria-live="off">${digits}</div>${st === 'done' && TM.early ? '<div class="tm-state">やった</div>' : `<div class="tm-state" id="tm-state">${stateTx}</div>`}</div></div>`;
   let top, bottom;
   if (st === 'idle') {
-    top = `<label class="tm-lb" for="tm-purpose">この時間の目的</label><input class="field tm-purpose" id="tm-purpose" data-draft maxlength="60" placeholder="例：動画の構成を書く" value="${esc(purpose)}" data-enter="timerStart" autocomplete="off">`;
+    top = `<input class="field tm-purpose" id="tm-purpose" data-draft maxlength="60" placeholder="この時間の目的" value="${esc(purpose)}" data-enter="timerStart" autocomplete="off" aria-label="この時間の目的（書くと始められる）">`;
     bottom = `<div class="tm-presets" role="group" aria-label="時間をえらぶ">${[[300, '5分'], [900, '15分'], [1800, '30分'], [3600, '1時間']].map(([v, l]) => `<button data-act="timerSet" data-arg="${v}" aria-pressed="${TM.dur === v}">${l}</button>`).join('')}</div>
-      <div class="tm-adj"><button data-act="timerAdj" data-arg="-300" aria-label="5分へらす" ${TM.dur <= 300 ? 'disabled' : ''}>−5</button><button data-act="timerAdj" data-arg="-60" aria-label="1分へらす" ${TM.dur <= 60 ? 'disabled' : ''}>−1</button><span>分</span><button data-act="timerAdj" data-arg="60" aria-label="1分ふやす">＋1</button><button data-act="timerAdj" data-arg="300" aria-label="5分ふやす">＋5</button></div>
-      <button class="btn primary tm-go" id="tm-start" data-act="timerStart" ${ok ? '' : 'disabled'}>始める</button><div class="tm-need" id="tm-need" ${ok ? 'hidden' : ''}>目的を書くと始められる</div>`;
+      <div class="tm-adj">${tmBtn('timerAdj', '−5', '5分へらす', 'sm', -300, TM.dur <= 300 ? 'disabled' : '')}${tmBtn('timerAdj', '−1', '1分へらす', 'sm', -60, TM.dur <= 60 ? 'disabled' : '')}${tmBtn('timerAdj', '＋1', '1分ふやす', 'sm', 60)}${tmBtn('timerAdj', '＋5', '5分ふやす', 'sm', 300)}</div>
+      <div class="tm-row">${tmBtn('timerStart', TMI.play, '始める', 'big primary', '', `id="tm-start" ${ok ? '' : 'disabled'}`)}</div><div class="tm-need" id="tm-need" ${ok ? 'hidden' : ''}>目的を書くと始められる</div>`;
   } else {
-    top = `<div class="tm-lb">${st === 'done' ? 'やりきった時間' : '今の目的'}</div><div class="tm-what">${esc(TM.purpose)}</div>`;
-    if (st === 'done') bottom = `<div class="tm-row"><button class="btn primary" data-act="timerLog" ${TM.logged ? 'disabled' : ''}>${TM.logged ? '記録に残した' : `記録に残す（${tmMin(TM.dur)}）`}</button><button class="btn" data-act="timerAgain">もう一度</button></div><button class="btn ghost" data-act="timerReset">別のタイマーにする</button>`;
-    else bottom = `<div class="tm-row"><button class="btn primary tm-go" data-act="timerPause">${st === 'run' ? '一時停止' : '再開'}</button><button class="btn" data-act="timerAdd" data-arg="60">＋1分</button></div><button class="btn ghost" data-act="timerReset">やめる</button>`;
+    top = `<div class="tm-what"><span class="tm-aim">${TMI.aim}</span>${esc(TM.purpose)}</div>`;
+    if (st === 'done') bottom = `<div class="tm-row">${tmBtn('timerReset', TMI.close, TM.logged ? '閉じて、別のタイマーにする' : '記録せずに閉じて、別のタイマーにする')}${tmBtn('timerLog', TM.logged ? TMI.log : TMI.log, TM.logged ? '記録に残した' : `${tmMin(TM.spent)}を記録に残す`, 'big primary log', '', TM.logged || TM.spent < 1 ? 'disabled' : '')}${TM.early && !TM.logged ? tmBtn('timerResume', TMI.play, '続ける（残り ' + tmFmt(TM.left) + '）') : tmBtn('timerAgain', TMI.again, 'もう一度同じ時間で')}</div><div class="tm-need">${TM.logged ? '今日の流れに残した' : `✓ で「${tmMin(TM.spent)}」を記録に残す`}</div>`;
+    else bottom = `<div class="tm-row">${tmBtn('timerStop', TMI.stop, 'ここでやめる（やった分を記録できる）')}${st === 'run' ? tmBtn('timerPause', TMI.pause, '一時停止', 'big primary') : tmBtn('timerPause', TMI.play, '再開', 'big primary')}${tmBtn('timerAdd', '＋1', '1分のばす', '', 60)}</div>`;
   }
-  return `<div class="overlay tm" role="dialog" aria-modal="true" aria-label="タイマー"><div class="tm-top"><button class="tm-back" data-act="timerClose" aria-label="戻る"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5l-6.5 6.5 6.5 6.5"/></svg>戻る</button><button class="tm-snd" data-act="timerSound" aria-pressed="${TM.sound}" aria-label="終わりの音：${TM.sound ? 'あり' : 'なし'}">${TM.sound ? '音あり' : '音なし'}</button></div>
+  return `<div class="overlay tm" role="dialog" aria-modal="true" aria-label="タイマー"><div class="tm-top">${tmBtn('timerClose', TMI.back, '戻る', 'flat')}${tmBtn('timerSound', TM.sound ? TMI.snd : TMI.mute, `終わりの音：${TM.sound ? 'あり' : 'なし'}（押すと切りかえ）`, 'flat' + (TM.sound ? '' : ' off'), '', `aria-pressed="${TM.sound}"`)}</div>
     <div class="tm-body"><div class="tm-head">${top}</div>${ring}<div class="tm-foot">${bottom}</div></div></div>`;
 }
 let tmTimer = 0, tmAudio = null, tmLock = null;
@@ -1509,7 +1531,7 @@ function tmChime() { // 終わりの合図：やわらかい音を3つ
   } catch (_) {}
 }
 function tmFinish(live) {
-  clearInterval(tmTimer); tmTimer = 0; TM.state = 'done'; TM.left = 0; TM.logged = false; tmSave();
+  clearInterval(tmTimer); tmTimer = 0; TM.state = 'done'; TM.left = 0; TM.spent = TM.dur; TM.early = false; TM.logged = false; tmSave();
   if (live) { tmChime(); try { if (navigator.vibrate) navigator.vibrate([200, 120, 200]); } catch (_) {} S.timerOpen = true; }
   tmWake(); render();
 }
@@ -1530,17 +1552,24 @@ A.timerPause = () => {
   tmSave(); tmWake(); render();
 };
 A.timerAdd = v => { const n = Number(v); if (TM.state === 'run') TM.endAt += n * 1000; else if (TM.state === 'pause') TM.left += n; else return; TM.dur += n; tmSave(); render(); };
-A.timerReset = () => { clearInterval(tmTimer); tmTimer = 0; S.drafts['tm-purpose'] = TM.state === 'done' ? '' : TM.purpose; Object.assign(TM, { state: 'idle', endAt: 0, left: 0, logged: false }); tmSave(); tmWake(); render(); };
-A.timerAgain = () => { Object.assign(TM, { state: 'run', endAt: Date.now() + TM.dur * 1000, logged: false }); tmSave(); tmRun(); render(); };
+A.timerReset = () => { clearInterval(tmTimer); tmTimer = 0; S.drafts['tm-purpose'] = TM.state === 'done' ? '' : TM.purpose; Object.assign(TM, { state: 'idle', endAt: 0, left: 0, spent: 0, early: false, logged: false }); tmSave(); tmWake(); render(); };
+// 途中でやめる：やった分（決めた時間−残り）を出して、記録に残すか選べる。止めただけなので「続ける」もできる
+A.timerStop = () => {
+  if (TM.state !== 'run' && TM.state !== 'pause') return;
+  const left = tmLeft(); clearInterval(tmTimer); tmTimer = 0;
+  Object.assign(TM, { state: 'done', left, spent: Math.max(0, Math.round(TM.dur - left)), early: left > 0.5, logged: false }); tmSave(); tmWake(); render();
+};
+A.timerResume = () => { if (TM.state !== 'done' || !TM.early || TM.logged || TM.left <= 0) return; Object.assign(TM, { state: 'run', endAt: Date.now() + TM.left * 1000, early: false, logged: false }); tmSave(); tmRun(); render(); };
+A.timerAgain = () => { Object.assign(TM, { state: 'run', endAt: Date.now() + TM.dur * 1000, spent: 0, early: false, logged: false }); tmSave(); tmRun(); render(); };
 A.timerSound = () => { TM.sound = !TM.sound; tmSave(); render(); };
 A.timerLog = () => {
   if (TM.state !== 'done' || TM.logged) return;
   const d = today(), day = getDay(d);
-  patchDay(d, { entries: [...(day.entries || []), { id: uid(), t: Date.now(), text: `⏱ ${TM.purpose}（${tmMin(TM.dur)}）` }] });
+  patchDay(d, { entries: [...(day.entries || []), { id: uid(), t: Date.now(), text: `⏱ ${TM.purpose}（${tmMin(TM.spent || TM.dur)}${TM.early ? ` / 予定${tmMin(TM.dur)}` : ''}）` }] });
   TM.logged = true; tmSave(); render();
 };
 // 開き直したとき：動いていたタイマーを続ける（もう時間が過ぎていたら「終了」にする）
-if (TM.state === 'run') { if (Date.now() >= TM.endAt) { TM.state = 'done'; TM.left = 0; tmSave(); } else tmRun(); }
+if (TM.state === 'run') { if (Date.now() >= TM.endAt) { TM.state = 'done'; TM.left = 0; TM.spent = TM.dur; TM.early = false; tmSave(); } else tmRun(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { tmTick(); tmWake(); } });
 A.setLook = v => { patchSettings({ look: v === 'classic' ? 'classic' : 'nova' }); applyLook(); };
 /* ── Daylogから直接通知（ホーム画面のDaylog・アプリ版） ── */
@@ -1777,8 +1806,8 @@ A.stepDel = arg => { const [tid, sid] = arg.split(':'); const t = S.tasks[tid]; 
 A.memoMenu = id => { S.memoMenu = S.memoMenu === id ? null : id; render(); };
 A.memoEdit = id => { const m = S.memos[id]; if (!m) return; S.editMemo = id; S.memoMenu = null; S.drafts['memo-edit'] = m.text; render(); setTimeout(() => { const t = $('#memo-edit'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }, 30); };
 A.memoEditCancel = () => { S.editMemo = null; render(); };
-A.memoSave = id => { const m = S.memos[id]; if (!m) return; const text = String(S.drafts['memo-edit'] || '').trim(); if (!text) return; const nm = { ...m, text, editedAt: Date.now() }; S.memos[id] = nm; S.editMemo = null; render(); putDoc('memos/' + id, nm); toast('メモを直した。'); };
-A.memoAdd = () => { const text = (S.drafts['memo-text'] || '').trim(); if (!text) return; const id = uid(); const m = { id, text, createdAt: Date.now() }; S.drafts['memo-text'] = ''; S.memos[id] = m; render(); putDoc('memos/' + id, m); };
+A.memoSave = id => { const m = S.memos[id]; if (!m) return; const text = String(S.drafts['memo-edit'] || '').replace(/\n{3,}/g, '\n\n').trim(); if (!text) return; const nm = { ...m, text, editedAt: Date.now() }; S.memos[id] = nm; S.editMemo = null; render(); putDoc('memos/' + id, nm); toast('メモを直した。'); };
+A.memoAdd = () => { const text = (S.drafts['memo-text'] || '').replace(/\n{3,}/g, '\n\n').trim(); if (!text) return; const id = uid(); const m = { id, text, createdAt: Date.now() }; S.drafts['memo-text'] = ''; S.memos[id] = m; render(); putDoc('memos/' + id, m); };
 A.memoDelete = id => { const m = S.memos[id]; if (!m) return; delete S.memos[id]; render(); delDoc('memos/' + id); S.undo = () => { S.memos[id] = m; render(); putDoc('memos/' + id, m); }; toast('メモを消した。', true); };
 A.memoToTask = id => { const m = S.memos[id]; if (!m) return; const tid = uid(); const t = { id: tid, title: m.text.split('\n')[0].slice(0, 120), status: 'open', steps: [], createdAt: Date.now(), fromMemo: id }; S.tasks[tid] = t; delete S.memos[id]; render(); putDoc('tasks/' + tid, t); delDoc('memos/' + id); toast('タスクにした。タスクの画面にある。'); };
 // 目標
@@ -2106,6 +2135,7 @@ document.addEventListener('input', e => {
   if (el.id === 'tm-purpose') { const b = $('#tm-start'); if (b) b.disabled = !el.value.trim(); const hn = $('#tm-need'); if (hn) hn.hidden = !!el.value.trim(); }
   if (el.id === 'task-title') { const box = el.closest('.taskadd'); if (box) box.classList.toggle('open', !!el.value.trim()); }
   if (el.id === 'composer-text') { el.style.height = 'auto'; el.style.height = Math.min(120, el.scrollHeight) + 'px'; }
+  if (el.classList && el.classList.contains('autosize')) autosize(el);
 });
 document.addEventListener('change', e => {
   const el = e.target; if (el.id && el.hasAttribute('data-draft')) S.drafts[el.id] = el.value;
@@ -2115,6 +2145,8 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
   const el = e.target;
   if (el.id === 'composer-text' && !e.shiftKey) { e.preventDefault(); A.sendEntry(); return; }
+  // メモは Enter で改行。Ctrl（Macは⌘）＋Enter で置く・保存
+  if (el.id === 'memo-text' || el.id === 'memo-edit') { if (e.ctrlKey || e.metaKey) { e.preventDefault(); if (el.id === 'memo-text') A.memoAdd(); else if (S.editMemo) A.memoSave(S.editMemo); } return; }
   const k = el.dataset && el.dataset.enter; if (k && A[k]) { e.preventDefault(); A[k](el.dataset.arg, el, e); }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (S.timerOpen) A.timerClose(); else if (S.calSheet) { S.calSheet = null; render(); } else if (S.sheet) { S.sheet = null; render(); } else if (S.view === 'settings' && !S.night) A.goBack(); } });
