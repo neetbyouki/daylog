@@ -832,9 +832,11 @@ function memosView() {
   const tab = S.memoTab || 'quick';
   let h = headerHTML('メモ', `<span>ひとこと ${memos.length}</span><span>ノート ${notes.length}</span>`);
   const q = String(draft('memo-q')).trim();
-  h += `<div class="msearch">${MI.search}<input id="memo-q" data-draft type="search" enterkeyhint="search" placeholder="ひとこと・ノートをさがす" value="${esc(draft('memo-q'))}" aria-label="メモをさがす" autocomplete="off">${q ? '<button class="msearch-x" data-act="memoSearchClear" aria-label="さがすのをやめる">×</button>' : ''}</div>`;
+  // お気に入りは、検索欄の右にある小さな★から（押すと★だけの一覧。もう一度押すと戻る）
+  h += `<div class="mbar"><div class="msearch">${MI.search}<input id="memo-q" data-draft type="search" enterkeyhint="search" placeholder="ひとこと・ノートをさがす" value="${esc(draft('memo-q'))}" aria-label="メモをさがす" autocomplete="off">${q ? '<button class="msearch-x" data-act="memoSearchClear" aria-label="さがすのをやめる">×</button>' : ''}</div><button class="mfav-btn${tab === 'fav' ? ' on' : ''}" data-act="memoTab" data-arg="${tab === 'fav' ? (S.memoTabPrev || 'quick') : 'fav'}" aria-pressed="${tab === 'fav'}" aria-label="お気に入り（${favN}件）${tab === 'fav' ? 'を閉じる' : 'を見る'}" title="お気に入り">${tab === 'fav' ? MI.star : MI.starO}${favN ? `<span>${favN}</span>` : ''}</button></div>`;
   if (q) return h + memoSearchHTML(q.toLowerCase());
-  h += `<div class="mtabs" role="tablist" aria-label="メモの種類">${[['quick', 'ひとこと', memos.length], ['notes', 'ノート', notes.length], ['fav', '★', favN]].map(([k, l, n]) => `<button role="tab" data-act="memoTab" data-arg="${k}" aria-selected="${tab === k}"${k === 'fav' ? ' aria-label="お気に入り"' : ''}>${l}<span class="mt-n">${n}</span></button>`).join('')}</div>`;
+  if (tab === 'fav') h += `<div class="mfav-head"><span class="mfav-t">${MI.star}お気に入り</span><button class="link" data-act="memoTab" data-arg="${S.memoTabPrev || 'quick'}">閉じる</button></div>`;
+  else h += `<div class="mtabs" role="tablist" aria-label="メモの種類">${[['quick', 'ひとこと', memos.length], ['notes', 'ノート', notes.length]].map(([k, l, n]) => `<button role="tab" data-act="memoTab" data-arg="${k}" aria-selected="${tab === k}">${l}<span class="mt-n">${n}</span></button>`).join('')}</div>`;
   if (tab === 'quick') {
     h += `<div class="card" style="margin-top:12px"><div class="form"><div class="line memo-add"><textarea class="field grow autosize" id="memo-text" data-draft rows="1" placeholder="思いついたことを書く（改行できる）" aria-label="メモ。改行できる。Ctrl＋Enterで置く">${esc(draft('memo-text'))}</textarea><button class="btn primary" data-act="memoAdd" aria-label="メモを置く">＋</button></div></div></div>`;
     const list = memos.sort(byFavNew);
@@ -2159,7 +2161,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) NE.fl
 window.addEventListener('pagehide', () => NE.flush());
 
 // ── メモの画面の操作
-A.memoTab = t => { S.memoTab = t; S.memoMenu = null; S.editMemo = null; window.scrollTo(0, 0); render(); };
+A.memoTab = t => { if (t === 'fav' && S.memoTab !== 'fav') S.memoTabPrev = S.memoTab || 'quick'; S.memoTab = t; S.memoMenu = null; S.editMemo = null; window.scrollTo(0, 0); render(); };
 A.memoSearchClear = () => { S.drafts['memo-q'] = ''; render(); };
 A.memoFav = id => { const m = S.memos[id]; if (!m) return; const nm = { ...m, fav: !m.fav }; S.memos[id] = nm; render(); putDoc('memos/' + id, nm); };
 A.noteFav = id => { const n = S.notes[id]; if (!n) return; const nn = { ...n, fav: !n.fav }; S.notes[id] = nn; render(); putDoc('notes/' + id, nn); };

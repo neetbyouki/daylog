@@ -215,18 +215,26 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 .dbstate{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--fg-3);border:1px solid var(--line-2);border-radius:999px;padding:0 7px;white-space:nowrap}
 .dbstate.off{color:var(--gold);border-color:color-mix(in oklab,var(--gold) 40%,transparent)}
 /* ── メモ：ひとこと／ノート／★ ── */
-.msearch{position:relative;display:flex;align-items:center;margin-top:12px}
+.mbar{display:flex;gap:8px;align-items:center;margin-top:12px}
+.msearch{position:relative;display:flex;align-items:center;flex:1;min-width:0}
+.mfav-btn{flex:none;display:inline-flex;align-items:center;gap:3px;height:40px;min-width:40px;padding:0 9px;justify-content:center;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg-3);font-size:12px;font-variant-numeric:tabular-nums}
+.mfav-btn svg{width:16px;height:16px}
+.mfav-btn:hover{color:var(--gold)}
+.mfav-btn.on{color:var(--gold);border-color:color-mix(in oklab,var(--gold) 45%,var(--line))}
+.mfav-head{display:flex;align-items:center;justify-content:space-between;margin-top:14px}
+.mfav-t{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--gold)}
+.mfav-head .link{font-size:13px;color:var(--fg-2);text-decoration:none}
 .msearch > svg{position:absolute;left:12px;color:var(--fg-3);pointer-events:none}
 .msearch input{width:100%;height:40px;padding:0 36px 0 36px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);outline:none;-webkit-appearance:none;appearance:none}
 .msearch input:focus{border-color:var(--line-2)}
 .msearch input::-webkit-search-cancel-button{display:none}
 .msearch-x{position:absolute;right:6px;width:30px;height:30px;border:0;background:none;color:var(--fg-3);font-size:18px;border-radius:50%}
-.mtabs{display:grid;grid-template-columns:1fr 1fr 64px;gap:4px;margin-top:10px;padding:4px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
+.mtabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:10px;padding:4px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
 .mtabs button{height:36px;border:0;border-radius:10px;background:none;color:var(--fg-2);font-size:14px;display:flex;align-items:center;justify-content:center;gap:6px}
 .mtabs button[aria-selected="true"]{background:var(--panel-2);color:var(--fg);font-weight:600;box-shadow:0 1px 0 rgba(255,255,255,.04) inset}
-.mtabs button:last-child{color:var(--gold)}
 .mt-n{font-size:11px;font-weight:500;color:var(--fg-3);font-variant-numeric:tabular-nums}
-.memo-side{display:flex;flex-direction:column;align-items:center;gap:2px;margin:-4px -6px 0 0}
+.memo-side{display:flex;flex-direction:row;align-items:center;gap:0;margin:-6px -6px -6px 0;flex:none}
+.memo-side .mstar{width:30px;height:30px}
 .mstar{display:inline-grid;place-items:center;width:34px;height:34px;border:0;border-radius:50%;background:none;color:var(--fg-3);opacity:.6;flex:none}
 .mstar:hover{opacity:1}
 .mstar.on{color:var(--gold);opacity:1}
@@ -726,6 +734,7 @@ textarea.field{width:100%;resize:vertical;min-height:84px;line-height:1.6}
 .goal.done .gmark{color:var(--gold)}
 .gmore,.gplus{background:none;border:0;color:var(--fg-3);font-size:15px;line-height:1;padding:2px 6px;border-radius:6px;cursor:pointer;opacity:.55}
 .gmore:hover,.gplus:hover,.gmore[aria-expanded="true"],.gplus[aria-expanded="true"]{opacity:1;color:var(--fg-2)}
+.memo .memo-side .gmore{align-self:center;display:inline-grid;place-items:center;width:30px;height:30px;padding:0 0 6px;font-size:16px}
 .gmenu{display:flex;gap:16px;flex-wrap:wrap;padding:0 0 8px 22px;font-size:12px}
 .gmenu .link{color:var(--fg-2);text-decoration:none}
 .gmenu .link.danger{color:var(--rose)}
