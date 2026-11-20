@@ -170,3 +170,4 @@ h2.sec{font-size:13px;font-weight:500;letter-spacing:0;color:var(--fg-2);margin:
 .gedit{border-radius:999px}
 .skybox{background:radial-gradient(120% 90% at 50% 40%,#0b1430 0%,#000 78%);border-color:var(--line)}
 .rise{background:radial-gradient(120% 100% at 50% 100%,#0d1a3d 0%,#000 75%)}
+.ne-body:focus-visible{outline:none}

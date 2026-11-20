@@ -34,6 +34,7 @@ const __rt = (() => {
     loadAll: () => api({ a: 'load' }),
     since: cur => api({ a: 'since', since: cur || 0 }),
     ids: () => api({ a: 'ids' }),
+    get: (c, ids) => api({ a: 'get', c, ids }),
     patch: (c, id, patch) => api({ a: 'patch', c, id, patch }),
     set: (c, id, data) => api({ a: 'set', c, id, data }),
     del: (c, id) => api({ a: 'del', c, id }),

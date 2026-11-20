@@ -39,6 +39,16 @@
     return res;
   }
 
+  // 画像の控え（端末の IndexedDB）。使えない端末では何もしない
+  const idb = (() => {
+    let dbp = null;
+    const open = () => dbp || (dbp = new Promise(res => {
+      try { const r = indexedDB.open('daylog-blobs', 1); r.onupgradeneeded = () => r.result.createObjectStore('b'); r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null); } catch (_) { res(null); }
+    }));
+    const run = (mode, f) => open().then(db => new Promise(res => { if (!db) return res(null); try { const t = db.transaction('b', mode); const q = f(t.objectStore('b')); t.oncomplete = () => res(q && q.result); t.onerror = t.onabort = () => res(null); } catch (_) { res(null); } }));
+    return { get: id => run('readonly', s => s.get(id)), put: (id, v) => run('readwrite', s => s.put(v, id)), del: id => run('readwrite', s => s.delete(id)) };
+  })();
+
   function makeStore(be, opt = {}) {
     const KEY = opt.key || 'daylog';
     const ls = {
@@ -46,6 +56,9 @@
       set(k, v) { try { localStorage.setItem(KEY + '-' + k, v); } catch (_) {} },
     };
     const cache = new Map(); const listeners = new Set(); const waiters = [];
+    // 画像（collection = 'blobs'）は大きいので、ふだんの置き場・端末の控え（snap）には入れない。
+    // 必要なときに取りに行き、端末の IndexedDB に覚えておく（次からは通信しない）
+    const BLOB = 'blobs', blobs = new Map(), blobWait = new Map();
     let loaded = false, failErr = null, offline = false, cursor = null, syncing = false, syncN = 0, lastErr = null;
     const col = c => { if (!cache.has(c)) cache.set(c, new Map()); return cache.get(c); };
     const emit = c => { for (const l of listeners) if (l.collection === c) l.fn(); };
@@ -55,7 +68,8 @@
     // ── 送る箱（端末に残る）
     let outbox = [];
     try { outbox = JSON.parse(ls.get('outbox') || '[]'); if (!Array.isArray(outbox)) outbox = []; } catch (_) { outbox = []; }
-    const saveOutbox = () => ls.set('outbox', JSON.stringify(outbox));
+    // 画像の中身は大きいので、端末に残す送る箱には入れない（中身は IndexedDB にある。送るときにそこから出す）
+    const saveOutbox = () => ls.set('outbox', JSON.stringify(outbox.map(o => (o.c === BLOB && o.op === 'set' ? { ...o, data: null, idb: 1 } : o))));
     const localAt = new Map(); // この端末で書いた時刻（届く前の古い内容で上書きし返さないため）
     const busy = k => Date.now() - (localAt.get(k) || 0) < 20000 || outbox.some(o => o.c + '/' + o.id === k);
     const status = () => {
@@ -69,13 +83,14 @@
     const saveSnap = () => {
       clearTimeout(snapT);
       snapT = setTimeout(() => {
-        const docs = []; for (const [c, m] of cache) for (const [id, data] of m) docs.push([c, id, data]);
+        const docs = []; for (const [c, m] of cache) if (c !== BLOB) for (const [id, data] of m) docs.push([c, id, data]);
         ls.set('snap', JSON.stringify({ at: Date.now(), owner: opt.owner || '', cursor, docs }));
       }, 1000);
     };
     const readSnap = () => { try { const s = JSON.parse(ls.get('snap') || 'null'); return s && s.owner === (opt.owner || '') && Array.isArray(s.docs) ? s : null; } catch (_) { return null; } };
 
     const applyLocal = op => {
+      if (op.c === BLOB) { if (op.op === 'del') { blobs.delete(op.id); idb.del(op.id); } else if (op.data) { blobs.set(op.id, op.data); idb.put(op.id, op.data); } return; }
       const m = col(op.c);
       if (op.op === 'patch') m.set(op.id, mergeDoc(m.get(op.id), op.data));
       else if (op.op === 'set') m.set(op.id, op.data);
@@ -87,6 +102,7 @@
       const touched = new Set(); let hold = null; let max = cursor;
       for (const r of rows || []) {
         const k = r.c + '/' + r.id;
+        if (r.c === BLOB) { if (r.data) { blobs.set(r.id, r.data); idb.put(r.id, r.data); } continue; }
         if (skipBusy && busy(k)) { if (hold === null || r.u < hold) hold = r.u; continue; }
         if (max === null || r.u > max) max = r.u;
         const cur = col(r.c).get(r.id);
@@ -144,7 +160,11 @@
           try {
             let res;
             if (op.op === 'patch') res = await be.patch(op.c, op.id, op.data);
-            else if (op.op === 'set') await be.set(op.c, op.id, op.data);
+            else if (op.op === 'set') {
+              if (op.c === BLOB && !op.data) op.data = (blobs.get(op.id)) || await idb.get(op.id);
+              if (op.c === BLOB && !op.data) { outbox.shift(); saveOutbox(); continue; } // 中身がもう端末にない画像は送れない
+              await be.set(op.c, op.id, op.data);
+            }
             else await be.del(op.c, op.id);
             outbox.shift(); saveOutbox(); lastErr = null; if (offline) { offline = false; reload(); }
             // サーバーで足し合わせた結果を反映（まだ送っていない分は、その上に重ねる）
@@ -200,7 +220,7 @@
     setInterval(() => { sync(); flush(); }, 15000);
     if (be.live) be.live({
       rows: rows => { if (!loaded || failErr) return; const t = applyRows(rows, true); if (t.size) { t.forEach(emit); saveSnap(); } },
-      del: (c, id) => { if (!loaded || failErr || busy(c + '/' + id)) return; if (col(c).has(id)) { col(c).delete(id); emit(c); saveSnap(); } },
+      del: (c, id) => { if (c === BLOB) { blobs.delete(id); idb.del(id); return; } if (!loaded || failErr || busy(c + '/' + id)) return; if (col(c).has(id)) { col(c).delete(id); emit(c); saveSnap(); } },
       resync: sync,
     });
 
@@ -221,6 +241,33 @@
         return () => listeners.delete(l);
       },
     });
+    // 画像を取る：手元 → 端末（IndexedDB）→ サーバー の順。同時に頼まれた分はまとめて取りに行く
+    let blobQ = new Set(), blobT = null;
+    const blobFetch = async () => {
+      const want = [...blobQ]; blobQ = new Set(); blobT = null;
+      for (let i = 0; i < want.length; i += 10) {
+        const part = want.slice(i, i + 10);
+        let rows = [];
+        try { rows = be.get ? await be.get(BLOB, part) : []; } catch (e) { console.warn('Daylog blob', e); }
+        const got = new Map((rows || []).map(r => [r.id, r.data]));
+        for (const id of part) {
+          const d = got.get(id) || null; if (d) { blobs.set(id, d); idb.put(id, d); }
+          const w = blobWait.get(id); blobWait.delete(id); if (w) w.forEach(f => f(d));
+        }
+      }
+    };
+    const getBlob = id => {
+      if (blobs.has(id)) return Promise.resolve(blobs.get(id));
+      if (blobWait.has(id)) return new Promise(r => blobWait.get(id).push(r));
+      blobWait.set(id, []);
+      return new Promise(resolve => {
+        blobWait.get(id).push(resolve);
+        idb.get(id).then(v => {
+          if (v) { blobs.set(id, v); const w = blobWait.get(id); blobWait.delete(id); if (w) w.forEach(f => f(v)); return; }
+          blobQ.add(id); if (!blobT) blobT = setTimeout(blobFetch, 30);
+        });
+      });
+    };
     const split = p => { const i = p.lastIndexOf('/'); return [p.slice(0, i), p.slice(i + 1)]; };
     return {
       collection: c => query(c),
@@ -239,6 +286,7 @@
         };
       },
       status, flush, sync,
+      blob: { get: getBlob, put: (id, data) => queue({ op: 'set', c: BLOB, id, data }), del: id => queue({ op: 'del', c: BLOB, id }), peek: id => blobs.get(id) },
     };
   }
 

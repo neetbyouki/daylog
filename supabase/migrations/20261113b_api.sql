@@ -12,7 +12,7 @@ grant daylog_api to postgres;
 
 -- 持ち主（Daylogを使う本人）の id。daylog_api からも読めるよう、この関数だけは作った人の権限で動かす
 create or replace function ops.me() returns uuid language sql stable security definer set search_path = '' as $$
-  select id from auth.users where email = '(owner-email-removed)' limit 1
+  select id from auth.users where email = '<持ち主のメールアドレス>' limit 1
 $$;
 
 create schema if not exists api_daylog authorization daylog_api;

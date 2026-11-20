@@ -1,11 +1,11 @@
 // Daylog の起動：ログイン → Googleカレンダーの許可を保存 → データベースとつなぐ → 本体（daylog.js）を読み込む
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import './store.js?v=2026-11-13f';
+import './store.js?v=2026-11-21a';
 
 const SUPABASE_URL = 'https://etsuxjcrnyoevrasdhde.supabase.co';
 // 公開してよい鍵（データは行ごとの権限で本人だけが読み書きできる）
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0c3V4amNybnlvZXZyYXNkaGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNDM5OTQsImV4cCI6MjEwOTkxOTk5NH0.ae7iJE6mtN0-wEbiEAaPS5A7j7n3Y_zd-qRVREoBJ9o';
-const VERSION = '2026-11-17a';
+const VERSION = '2026-11-21a';
 const GCAL = 'Google Calendar', HOST = 'host:Daylog_PC';
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
 
@@ -60,18 +60,20 @@ function webBackend(uid) {
     async loadAll() {
       const got = [];
       for (let from = 0; ; from += 1000) {
-        const data = must(await sb.from('docs').select('collection,id,data,updated_at').order('collection').order('id').range(from, from + 999));
+        const data = must(await sb.from('docs').select('collection,id,data,updated_at').neq('collection', 'blobs').order('collection').order('id').range(from, from + 999));
         got.push(...data.map(row));
         if (data.length < 1000) break;
       }
       return got;
     },
     async since(cur) {
-      let q = sb.from('docs').select('collection,id,data,updated_at');
+      let q = sb.from('docs').select('collection,id,data,updated_at').neq('collection', 'blobs');
       if (cur) q = q.gte('updated_at', cur);
       return must(await q).map(row);
     },
-    async ids() { return must(await sb.from('docs').select('collection,id')).map(r => ({ c: r.collection, id: r.id })); },
+    async ids() { return must(await sb.from('docs').select('collection,id').neq('collection', 'blobs')).map(r => ({ c: r.collection, id: r.id })); },
+    // 画像など、決まった記録だけを取る
+    async get(c, ids) { return must(await sb.from('docs').select('collection,id,data,updated_at').eq('collection', c).in('id', ids)).map(row); },
     // 差分を送ると、サーバーで足し合わせた結果が返る
     async patch(c, id, patch) { return must(await sb.rpc('docs_patch', { p_col: c, p_id: id, p_patch: patch })); },
     async set(c, id, data) { must(await sb.from('docs').upsert({ user_id: uid, collection: c, id, data })); },
