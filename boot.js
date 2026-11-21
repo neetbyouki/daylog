@@ -1,11 +1,11 @@
 // Daylog の起動：ログイン → Googleカレンダーの許可を保存 → データベースとつなぐ → 本体（daylog.js）を読み込む
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import './store.js?v=2026-11-21a';
+import './store.js?v=2026-11-21b';
 
 const SUPABASE_URL = 'https://etsuxjcrnyoevrasdhde.supabase.co';
 // 公開してよい鍵（データは行ごとの権限で本人だけが読み書きできる）
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0c3V4amNybnlvZXZyYXNkaGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNDM5OTQsImV4cCI6MjEwOTkxOTk5NH0.ae7iJE6mtN0-wEbiEAaPS5A7j7n3Y_zd-qRVREoBJ9o';
-const VERSION = '2026-11-21f';
+const VERSION = '2026-11-21g';
 const GCAL = 'Google Calendar', HOST = 'host:Daylog_PC';
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
 
@@ -21,7 +21,8 @@ async function signIn() {
     provider: 'google',
     options: {
       redirectTo: location.origin + location.pathname,
-      scopes: 'https://www.googleapis.com/auth/calendar',
+      // カレンダーの読み書き＋Googleドライブ（Daylogが作ったファイルだけ。毎週のバックアップに使う）
+      scopes: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.file',
       queryParams: { access_type: 'offline', prompt: 'consent' },
     },
   });
@@ -113,6 +114,15 @@ function makeDb(uid, token) {
   // ログインの鍵をリアルタイム側にも渡してからつなぐ（渡さないと本人の記録の通知が届かない）
   if (token) sb.realtime.setAuth(token);
   sb.auth.onAuthStateChange((ev, ses) => { if (ses && ses.access_token && (ev === 'TOKEN_REFRESHED' || ev === 'SIGNED_IN')) sb.realtime.setAuth(ses.access_token); });
+  // エラーの自動報告：client_errors に書く（自分の行だけ書ける・読める）
+  window.DaylogStore.errors.use(async rows => {
+    const { error } = await sb.from('client_errors').insert(rows.map(r => ({ user_id: uid, seen_at: new Date(r.t).toISOString(), ver: r.ver, src: 'web', view: r.view, kind: r.kind, msg: r.msg, stack: r.stack || null, ua: r.ua, n: r.n })));
+    if (error) throw error;
+  }, { ver: VERSION, src: 'web' });
+  window.DaylogStore.errors.reader({
+    list: async () => { const { data, error } = await sb.from('client_errors').select('id,at,seen_at,ver,src,view,kind,msg,stack,n').order('at', { ascending: false }).limit(50); if (error) throw error; return (data || []).map(r => ({ ...r, at: Date.parse(r.at), seen: Date.parse(r.seen_at), stack: (r.stack || '').slice(0, 1200) })); },
+    clear: async () => { const { error } = await sb.from('client_errors').delete().eq('user_id', uid); if (error) throw error; },
+  });
   return window.DaylogStore.makeStore(webBackend(uid), { key: 'daylog', owner: uid });
 }
 

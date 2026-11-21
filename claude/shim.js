@@ -42,7 +42,12 @@ const __rt = (() => {
     // 形がおかしい・権限がない、はやり直しても通らない。それ以外（つながらない・混んでいる）は送り直す
     retryable: e => !/daylog_api: bad|bad_query|not_granted|not_in_manifest|blocked_by_policy/.test(String((e && (e.code + ' ' + e.message)) || '')),
   };
-  const makeDb = () => window.DaylogStore.makeStore(backend, { key: 'daylog-claude', owner: 'claude', mustHave: 'settings' });
+  const makeDb = () => {
+    // エラーの自動報告：api_daylog.call の 'err' で client_errors に書く
+    window.DaylogStore.errors.use(rows => api({ a: 'err', rows }), { ver: window.__daylogVersion || '', src: 'claude' });
+    window.DaylogStore.errors.reader({ list: () => api({ a: 'errs' }), clear: () => api({ a: 'errclear' }) });
+    return window.DaylogStore.makeStore(backend, { key: 'daylog-claude', owner: 'claude', mustHave: 'settings' });
+  };
 
   let dbP = null;
   return {

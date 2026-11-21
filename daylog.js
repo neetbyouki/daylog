@@ -1200,9 +1200,105 @@ function settingsView() {
     <div class="item"><div class="l">PCの見張り役<small>${pcTxt}</small></div>${S.pcStatus === 'ok' || S.pcStatus === 'error' ? `<div class="row"><button class="btn sm" data-act="syncPC">今すぐ同期</button></div>` : ''}</div>
     <div class="item"><div class="l">ログイン中<small>${esc((S.user && S.user.email) || '')}</small></div><button class="btn sm ghost" data-act="logout">ログアウト</button></div>
   </div>`;
+  h += backupCardHTML();
   h += `<p class="faint" style="font-size:12px;margin-top:16px">記録は自分のアカウントだけが読み書きできる。アドレスを誰かに送っても、ログインしないと日記は見えない。</p>`;
   return h;
 }
+
+/* ── 記録の守り：Googleドライブへの毎週の保存・書き出し・エラーの記録 ── */
+const BK_ERR = {
+  scope: 'ドライブへの保存がまだ許可されていない。アプリ版で「ログインし直す」を押して、Googleドライブも許可して。',
+  needs_reauth: 'Googleの許可が切れた。アプリ版で「ログインし直す」を押して。',
+  no_google: 'Googleの許可がまだない。アプリ版で一度ログインし直して。',
+  api_off: 'Google Cloud で「Google Drive API」が有効になっていない。有効にすると、次から保存できる。',
+};
+const mdhm = ts => { const d = new Date(ts); return `${d.getMonth() + 1}/${d.getDate()} ${hm(ts)}`; };
+const kb = n => (n >= 1048576 ? (n / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1024)) + 'KB');
+function backupState() {
+  const m = S.meta || {}; const b = m.backup || {}; const req = m.backupreq || {};
+  const waiting = req.at && req.at > (b.reqAt || 0) && Date.now() - req.at < 10 * 60000;
+  return { b, waiting };
+}
+function backupCardHTML() {
+  const { b, waiting } = backupState();
+  const web = !!window.daylogRelogin;
+  let txt;
+  if (waiting) txt = '保存中…（1分ほどかかる）';
+  else if (b.ok === false && b.err) txt = `<span class="bk-err">${esc(BK_ERR[b.err] || `保存に失敗した（${b.err}）。少しして「今すぐ保存」を押してみて。`)}</span>${b.at ? `<br>最後に保存できたのは ${mdhm(b.at)}` : ''}`;
+  else if (b.ok && b.at) txt = `最後に保存：${mdhm(b.at)}（${b.reason === 'weekly' ? '毎週の自動' : '手動'}・${kb((b.file && b.file.size) || 0)}）`;
+  else txt = 'まだ一度も保存していない。';
+  const relog = web && b.ok === false && /^(scope|needs_reauth|no_google)$/.test(b.err || '') && !waiting;
+  const E = S.errView || {};
+  let h = `<h2 class="sec"><span>記録の守り</span></h2><div class="card settings">
+    <div class="item"><div class="l">Googleドライブに保存<small>${txt}<br>毎週月曜の朝4:30に、ドライブの「Daylog バックアップ」フォルダへ自動で保存する（新しい12回分を残す）。</small></div><div class="row">${relog ? '<button class="btn sm" data-act="relogin">ログインし直す</button>' : ''}<button class="btn sm${relog ? ' ghost' : ''}" data-act="backupNow" ${waiting ? 'aria-disabled="true"' : ''}>${waiting ? '保存中…' : '今すぐ保存'}</button></div></div>
+    <div class="item"><div class="l">ファイルに書き出す<small>記録をまるごと1つのファイル（JSON）にして、この端末に保存する。ノートの画像も入る。</small></div><button class="btn sm" data-act="exportJson" ${S.exporting ? 'aria-disabled="true"' : ''}>${S.exporting ? '書き出し中…' : '書き出す'}</button></div>
+    <div class="item"><div class="l">画面で起きたエラー<small>こわれた動きがあると、自動でここに記録される（90日で消える）。</small></div><button class="btn sm ghost" data-act="showErrors">${E.open ? '閉じる' : '見る'}</button></div>`;
+  if (E.open) {
+    let body;
+    if (E.loading) body = '<p class="faint">読み込み中…</p>';
+    else if (E.error) body = `<p class="faint">${esc(E.error)}</p>`;
+    else if (!E.list || !E.list.length) body = '<p class="faint">記録されたエラーはない。</p>';
+    else body = `<ol class="errlist">${E.list.map(r => `<li><div class="er-h"><b>${esc(r.msg || '?')}</b>${r.n > 1 ? `<span class="er-n">×${r.n}</span>` : ''}</div><div class="er-m">${mdhm(r.at || r.seen)} · ${esc(r.src || '')} ${esc(r.ver || '')}${r.view ? ' · ' + esc(r.view) : ''} · ${esc(r.kind || '')}</div>${r.stack ? `<details><summary>くわしく</summary><pre>${esc(r.stack)}</pre></details>` : ''}</li>`).join('')}</ol><div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn sm ghost" data-act="clearErrors">すべて消す</button></div>`;
+    h += `<div class="item errbox">${body}</div>`;
+  }
+  return h + '</div>';
+}
+const actBackupNow = () => {
+  if (backupState().waiting) return;
+  putDoc('meta/backupreq', { at: Date.now() });
+  S.meta = { ...(S.meta || {}), backupreq: { at: Date.now() } };
+  toast('Googleドライブへの保存を頼んだ。1分ほどで終わる。'); render();
+};
+async function loadErrors() {
+  S.errView = { ...(S.errView || {}), open: true, loading: true, error: null }; render();
+  try {
+    const list = await window.DaylogStore.errors.list();
+    S.errView = { open: true, loading: false, list: Array.isArray(list) ? list : [] };
+  } catch (e) {
+    const m = String((e && (e.message || e.code)) || e);
+    S.errView = { open: true, loading: false, error: /unknown action/.test(m) ? 'エラーを読む仕組みがまだサーバーに入っていない（準備中）。記録自体はされている。' : 'エラーの記録を読めなかった。少しして開き直してみて。' };
+  }
+  render();
+}
+const actShowErrors = () => { if (S.errView && S.errView.open) { S.errView = { open: false }; render(); return; } loadErrors(); };
+const actClearErrors = async () => {
+  try { await window.DaylogStore.errors.clear(); S.errView = { open: true, list: [] }; toast('エラーの記録を消した。'); }
+  catch (_) { toast('消せなかった。少しして、もう一度押してみて。'); }
+  render();
+};
+// 書き出し：画面が持っている記録＋ノートの画像を1つのJSONにする
+const withTimeout = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))]);
+async function buildExport() {
+  const cols = S.db && S.db.dump ? S.db.dump() : null;
+  if (!cols) throw new Error('no_dump');
+  delete (cols.meta || {}).backupreq;
+  const ids = new Set(); Object.values(cols.notes || {}).forEach(n => (n && n.imgs || []).forEach(id => ids.add(id)));
+  const blobs = {}; let missing = 0;
+  if (S.db.blob) for (const id of ids) { const v = await withTimeout(S.db.blob.get(id), 8000); if (v) blobs[id] = v; else missing++; }
+  if (Object.keys(blobs).length) cols.blobs = blobs;
+  const counts = {}; for (const [c, m] of Object.entries(cols)) counts[c] = Object.keys(m).length;
+  return { file: { app: 'Daylog', kind: 'export', format: 1, exportedAt: new Date().toISOString(), counts, collections: cols }, missing };
+}
+async function saveFile(filename, text) {
+  const dl = await (window.claude && window.claude.use ? window.claude.use('downloads').catch(() => null) : null);
+  if (dl && dl.save) { await dl.save({ filename, data: text }); return 'saved'; }
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000); return 'saved';
+}
+const actExportJson = async () => {
+  if (S.exporting) return;
+  S.exporting = true; render();
+  try {
+    const { file, missing } = await buildExport();
+    const d = new Date(); const name = `Daylog-${today()}_${pad(d.getHours())}${pad(d.getMinutes())}-export.json`;
+    await saveFile(name, JSON.stringify(file));
+    toast(missing ? `書き出した（画像${missing}枚は読めなかったので入っていない）。` : '書き出した。');
+  } catch (e) {
+    const code = e && e.code;
+    toast(code === 'declined' || code === 'dismissed' || code === 'cancelled' ? '書き出しをやめた。' : code === 'not_granted' ? 'ファイルの保存が許可されていない。' : '書き出せなかった。少しして、もう一度押してみて。');
+  } finally { S.exporting = false; render(); }
+};
 
 /* ── カレンダー ── */
 const H_PX = 44; // 1時間の高さ
@@ -2357,6 +2453,7 @@ A.revInsight = async () => {
 };
 // 設定
 A.relogin = () => { if (window.daylogRelogin) window.daylogRelogin(); };
+A.backupNow = actBackupNow; A.showErrors = actShowErrors; A.clearErrors = actClearErrors; A.exportJson = actExportJson;
 A.logout = () => { if (window.daylogLogout) window.daylogLogout(); };
 A.toggleClaude = () => { patchSettings({ useClaude: S.settings.useClaude === false }); };
 A.toggleSetting = k => { patchSettings({ [k]: !S.settings[k] }); schedulePCPush(); };
@@ -2888,6 +2985,7 @@ async function boot() {
   subscribe('reviews', 'reviews');
   subscribe('notify', 'notify', null, { where: ['day', '>=', addDays(logicalDate(), -3)] });
   subscribe('meta', 'meta');
+  if (window.DaylogStore && window.DaylogStore.errors) window.DaylogStore.errors.context({ view: () => S.view + (S.view === 'memos' && S.nOpen ? '/note' : '') });
   // 起動が落ち着いてから、銀河の部品を裏で読んでおく（星空タブを開いたときに待たせない）
   setTimeout(() => (window.requestIdleCallback || (f => setTimeout(f, 1)))(() => loadGalaxy()), 5000);
 }

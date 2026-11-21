@@ -49,6 +49,44 @@
     return { get: id => run('readonly', s => s.get(id)), put: (id, v) => run('readwrite', s => s.put(v, id)), del: id => run('readwrite', s => s.delete(id)) };
   })();
 
+  /* ── 画面で起きたエラーを覚えて、サーバーへ送る（エラーの自動報告）
+     ・window の error と、捕まえられなかった Promise の失敗、送っても断られた書き込みを拾う
+     ・同じエラーは1つにまとめて回数（n）だけ増やす。1回の起動で50種類まで。電波がない間は端末にためる（20件まで）
+     ・電波がないこと自体（Failed to fetch など）は報告しない */
+  const ERR = { q: [], seen: new Map(), send: null, ctx: {}, t: 0 };
+  const errLs = { get() { try { return JSON.parse(localStorage.getItem('daylog-errq') || '[]'); } catch (_) { return []; } }, set(q) { try { localStorage.setItem('daylog-errq', JSON.stringify(q.slice(-20))); } catch (_) {} } };
+  ERR.q = errLs.get();
+  const NOISE = /ResizeObserver loop|^Script error\.?$|Failed to fetch|NetworkError|Load failed|network error|The network connection was lost|AbortError|cancelled/i;
+  function errPush(kind, msg, stack) {
+    msg = String(msg == null ? '' : msg).slice(0, 600); if (!msg || NOISE.test(msg)) return;
+    const key = kind + '|' + msg; const cur = ERR.seen.get(key);
+    if (cur) { cur.n++; return; }
+    if (ERR.seen.size >= 50) return;
+    let view = ''; try { view = ERR.ctx.view ? String(ERR.ctx.view()).slice(0, 40) : ''; } catch (_) {}
+    const row = { t: Date.now(), kind, msg, stack: String(stack || '').slice(0, 4000), ver: ERR.ctx.ver || '', src: ERR.ctx.src || '', view, ua: (navigator.userAgent || '').slice(0, 300), n: 1 };
+    ERR.seen.set(key, row); ERR.q.push(row); ERR.q = ERR.q.slice(-20); errLs.set(ERR.q);
+    clearTimeout(ERR.t); ERR.t = setTimeout(errFlush, 3000);
+  }
+  async function errFlush() {
+    if (!ERR.send || !ERR.q.length || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+    const rows = ERR.q.splice(0, 20); errLs.set(ERR.q);
+    try { await ERR.send(rows); } catch (_) { ERR.q = rows.concat(ERR.q).slice(-20); errLs.set(ERR.q); }
+  }
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('error', e => { if (e && e.target && e.target !== window && !e.message) return; const er = e.error; errPush('error', (er && er.message) || e.message, (er && er.stack) || `${e.filename || ''}:${e.lineno || ''}:${e.colno || ''}`); });
+    window.addEventListener('unhandledrejection', e => { const r = e.reason; errPush('promise', r && (r.message || r.code) ? `${r.code ? r.code + ': ' : ''}${r.message || ''}` : String(r), r && r.stack); });
+    window.addEventListener('online', () => errFlush());
+  }
+  const errors = {
+    use(send, ctx) { ERR.send = send; Object.assign(ERR.ctx, ctx || {}); setTimeout(errFlush, 2000); setInterval(errFlush, 60000); },
+    context(ctx) { Object.assign(ERR.ctx, ctx || {}); },
+    report: errPush, flush: errFlush, pending: () => ERR.q.length,
+    // 記録されたエラーを読む・片付ける（つなぎ側が reader({ list, clear }) で渡す）
+    reader(r) { ERR.reader = r; },
+    list: () => (ERR.reader ? ERR.reader.list() : Promise.reject({ code: 'no_reader' })),
+    clear: () => (ERR.reader ? ERR.reader.clear() : Promise.reject({ code: 'no_reader' })),
+  };
+
   function makeStore(be, opt = {}) {
     const KEY = opt.key || 'daylog';
     const ls = {
@@ -184,6 +222,7 @@
             console.error('Daylog drop write', op, e);
             outbox.shift(); saveOutbox();
             lastErr = { code: (e && e.code) || 'write_failed', message: e && e.message, at: Date.now() };
+            errPush('write', `${op.op} ${op.c}: ${(e && (e.code || '')) || ''} ${(e && e.message) || e}`.trim());
           }
         }
       } finally { flushing = false; status(); }
@@ -286,9 +325,11 @@
         };
       },
       status, flush, sync,
+      // 書き出し用：今この端末にある記録を全部（画像は含まない）
+      dump() { const out = {}; for (const [c, m] of cache) { if (!m.size) continue; out[c] = {}; for (const [id, v] of m) out[c][id] = v; } return out; },
       blob: { get: getBlob, put: (id, data) => queue({ op: 'set', c: BLOB, id, data }), del: id => queue({ op: 'del', c: BLOB, id }), peek: id => blobs.get(id) },
     };
   }
 
-  window.DaylogStore = { makeStore, mergeDoc };
+  window.DaylogStore = { makeStore, mergeDoc, errors };
 })();
