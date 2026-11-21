@@ -133,78 +133,90 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 .ad-c{flex:none;font-size:11px;color:var(--fg-3)}
 .allday{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
 .allday span{font-size:12px;border-radius:6px;padding:2px 8px;background:color-mix(in oklab,var(--c) 16%,var(--panel));border:1px solid color-mix(in oklab,var(--c) 40%,var(--line))}
-.tl{list-style:none;margin:8px 0 0;padding:0;position:relative}
-.tl::before{content:"";position:absolute;left:58px;top:6px;bottom:6px;width:1px;background:var(--line)}
-.tl li{display:grid;grid-template-columns:50px 1fr;gap:16px;padding:7px 0;position:relative}
-.tl time{font-family:var(--f-mono);font-size:12px;color:var(--fg-3);text-align:right;padding-top:2px}
-.tl li::after{content:"";position:absolute;box-sizing:border-box;left:53px;top:11px;width:11px;height:11px;border-radius:50%;background:var(--ink);border:1.5px solid var(--fg-3)}
-.tl li.ev::after{border-color:var(--c);background:var(--c)}
-.tl li.en::after{border-color:var(--star);background:var(--ink)}
-.tl li.now{padding:2px 0}
-.tl li.now::after{left:52px;top:5px;width:13px;height:13px;background:var(--lav);border-color:var(--lav);box-shadow:0 0 10px var(--lav)}
-.tl li.now time{color:var(--lav)}
-.tl li.now .tl-b{border-top:1px dashed #4b4387;margin-top:9px}
-.ev .tl-b{position:relative}
-/* 進行中の予定：文字の下に「いま」の線を引く帯を設け、文字と重ならないようにする */
-.nowtrack{position:relative;height:28px;margin:2px 0 0 -10px}
-.nowmark{position:absolute;left:-3px;right:0;height:0;border-top:1.5px dashed var(--lav);pointer-events:none;z-index:2}
-.nowmark::before{content:"";position:absolute;left:-14px;top:-6.25px;width:11px;height:11px;border-radius:50%;background:var(--lav);box-shadow:0 0 10px var(--lav)}
-.nowmark span{position:absolute;right:calc(100% + 16px);top:-13px;width:50px;text-align:right;font-family:var(--f-mono);font-size:12px;line-height:13px;color:var(--lav)}
-.nowmark span small{display:block;font-family:var(--f-body);font-size:10px;letter-spacing:.06em}
-.tl-b{min-width:0}
-.ev .tl-b{border-left:3px solid var(--c);padding:2px 0 2px 10px;background:color-mix(in oklab,var(--c) 7%,transparent);border-radius:0 8px 8px 0}
+/* 今日の流れ：時刻は左の列（--tc）。予定・記録がある時刻だけ行になり、間は「空き」の帯。線（--rx）の色で埋まっている時間と空きが分かる */
+.flow{--tc:44px;--g:22px;--rx:calc(var(--tc) + var(--g) / 2);list-style:none;margin:8px 0 0;padding:0;position:relative}
+.flow > li{position:relative}
+.flow > li::before{content:"";position:absolute;left:var(--rx);top:0;bottom:0;width:1px;background:var(--line);z-index:0}
+.flow > li:first-child::before{top:11px}
+.flow > li:last-child::before{bottom:auto;height:11px}
+.flow .fl,.flow .fr{display:grid;grid-template-columns:var(--tc) minmax(0,1fr);column-gap:var(--g);align-items:start;position:relative;z-index:1}
+.flow .fl{padding:5px 0}
+.flow time{position:relative;font-family:var(--f-mono);font-size:12px;line-height:20px;color:var(--fg-3);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.flow .c2{min-width:0;line-height:20px}
+/* 線の上の点 */
+.flow .fl > time::after,.flow .fr-h > time::after,.flow .fr-now > time::after{content:"";position:absolute;right:calc(var(--g) / -2 - 4.5px);top:5.5px;width:9px;height:9px;border-radius:50%;box-sizing:border-box;background:var(--ink);border:1.5px solid var(--fg-3)}
+/* 記録 */
+.fl-en .c2,.fr-k .c2{overflow-wrap:anywhere;white-space:pre-wrap;font-size:14px}
+.fl-en > time::after{border-color:var(--star)!important}
+.flow .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--fg-3);margin-top:2px;white-space:normal;line-height:1.4}
+.flow button.more{float:right;background:none;border:0;color:var(--fg-3);padding:0 2px;font-size:13px;line-height:20px}
+/* 起きた・就寝：控えめな1行 */
+.fl-wake,.fl-bed,.fl-slept{--c:var(--gold)}
+.fl-slept time{font-size:11.5px;opacity:.8}
+.fl-slept .c2{display:flex;flex-wrap:wrap;align-items:center;gap:0 2px;font-size:12px;color:var(--fg-3)}
+.fl-slept > time::after{width:7px!important;height:7px!important;top:6.5px!important;right:calc(var(--g) / -2 - 3.5px)!important;border:1px solid color-mix(in oklab,var(--lav) 70%,transparent)!important}
+.flow > li.gap.sleep::before{background:none;width:0;left:calc(var(--rx) - .5px);border-left:2px dotted color-mix(in oklab,var(--lav) 55%,transparent)}
+.flow > li.gap.sleep .g-t{color:var(--lav);opacity:.7}
+.fl-wake time,.fl-bed time{font-size:11.5px}
+.fl-wake .c2{display:flex;flex-wrap:wrap;align-items:center;gap:0 2px;font-size:12px;color:var(--fg-2)}
+.fl-wake > time::after{width:7px!important;height:7px!important;top:6.5px!important;right:calc(var(--g) / -2 - 3.5px)!important;background:color-mix(in oklab,var(--gold) 80%,transparent)!important;border-color:transparent!important}
+.fl-bed .bl-t{font-size:12px;color:var(--fg-3);cursor:pointer;letter-spacing:.02em}
+.fl-bed.done .bl-t{color:var(--fg-2)}
+.fl-bed > time::after{width:7px!important;height:7px!important;top:6.5px!important;right:calc(var(--g) / -2 - 3.5px)!important;border:1px solid color-mix(in oklab,var(--c) 70%,transparent)!important}
+.fl-bed.done > time::after{background:color-mix(in oklab,var(--c) 70%,transparent)!important}
+/* いま */
+.fl-now time,.fr-now time{color:var(--lav);font-weight:600}
+.fl-now > time::after,.fr-now > time::after{width:11px!important;height:11px!important;top:4.5px!important;right:calc(var(--g) / -2 - 5.5px)!important;background:var(--lav)!important;border-color:var(--lav)!important;box-shadow:0 0 10px var(--lav)}
+.fl-now .c2,.fr-now .c2{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--lav);letter-spacing:.06em}
+.fl-now .c2::after,.fr-now .c2::after{content:"";flex:1;border-top:1.5px solid color-mix(in oklab,var(--lav) 80%,transparent)}
+.flow > li.fl-now{padding:2px 0}
+/* 予定：カード（::after）。始まりは上、終わりは下の時刻。線は予定の色で太く（埋まっている時間） */
+.flow > li.ev{margin:4px 0}
+.flow > li.ev::before{width:2px;left:calc(var(--rx) - .5px);top:10px;bottom:10px;background:color-mix(in oklab,var(--c) 75%,transparent)}
+.flow > li.ev::after{content:"";position:absolute;left:calc(var(--tc) + var(--g));right:0;top:0;bottom:0;border-radius:12px;background:color-mix(in oklab,var(--c) 9%,var(--panel));box-shadow:inset 3px 0 0 var(--c);z-index:0}
+.ev .c2{padding:0 12px 0 14px}
+.ev .fr-h{padding:7px 0}
+.ev .fr-h:not(:last-of-type){padding-bottom:0}
+.ev .fr-h time .te{display:block;font-size:11px;line-height:15px;font-weight:400;color:var(--fg-3);opacity:.85}
+.ev .fr-h .m{line-height:15px}
+.ev .m .dur{margin-right:8px}
+.ev .fr-h time{color:var(--fg-2);font-size:12.5px;font-weight:500}
+.ev .fr-h > time::after{background:var(--c);border-color:var(--c)}
+.ev .fr-k{padding-top:3px}
+.ev .fr-k time{font-size:11.5px}
+.ev .fr-k .c2{border-top:1px dashed color-mix(in oklab,var(--c) 22%,transparent);padding-top:3px}
+.ev .fr-k > time{padding-top:4px}
+.ev .fr-now{padding:4px 0 2px}
+.ev .fr-e{padding:1px 0 7px}
+.ev .fr-e time{font-size:11px;line-height:16px;opacity:.85}
+.ev .fr-e .c2{line-height:16px}
 .ev .t{font-weight:500;overflow-wrap:anywhere}
-.ev .m{font-size:12px;color:var(--fg-3);font-family:var(--f-mono)}
-.en .tl-b{overflow-wrap:anywhere;white-space:pre-wrap}
-.en .meta,.sub .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--fg-3);margin-top:2px;white-space:normal}
-.en button.more,.sub button.more{float:right;background:none;border:0;color:var(--fg-3);padding:0 2px;font-size:13px}
+.ev .m{font-size:11.5px;color:var(--fg-3)}
 .ev-head{cursor:pointer;position:relative}
-.evmore{float:right;background:none;border:0;color:var(--fg-3);font-size:14px;line-height:1;padding:4px 8px;margin:-2px 0 0 4px;border-radius:6px;opacity:.6}
+.evmore{float:right;background:none;border:0;color:var(--fg-3);font-size:14px;line-height:1;padding:4px 8px;margin:-2px -6px 0 4px;border-radius:6px;opacity:.6}
 .evmore:hover,.evmore[aria-expanded="true"]{opacity:1;color:var(--fg-2)}
-.evmenu{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:12px;margin:6px 8px 2px 0}
+.evmenu{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:12px;margin:4px 0 2px}
 .evmenu .link{color:var(--fg-2);text-decoration:none;font-size:12px}
 .evmenu .link.danger{color:var(--rose)}
 .evmenu .faint{font-size:11px}
-.evstate{color:var(--fg-3)}
-.ev.canceled .tl-b{opacity:.55;background:transparent;border-left-style:dashed}
+.evstate{color:var(--fg-3);margin-right:8px}
+.flow > li.ev.is-now::after{box-shadow:inset 3px 0 0 var(--c),inset 0 0 0 1px color-mix(in oklab,var(--c) 45%,transparent)}
+.flow > li.ev.ended::after{background:color-mix(in oklab,var(--c) 5%,var(--panel))}
+.flow > li.ev.canceled{opacity:.6}
+.flow > li.ev.canceled::after{background:transparent;box-shadow:inset 0 0 0 1px var(--line-2)}
+.flow > li.ev.canceled::before{background:var(--line);width:1px;left:var(--rx)}
 .ev.canceled .ev-head .t{text-decoration:line-through;text-decoration-color:var(--fg-3)}
-.ev.ended .tl-b{background:color-mix(in oklab,var(--c) 4%,transparent)}
-.ev .tl-b:has(.sub),.ev.is-now .tl-b{padding-bottom:6px}
-.kids{margin:6px 8px 0 4px;padding-left:14px;border-left:1px solid color-mix(in oklab,var(--c) 45%,transparent)}
-.sub{display:grid;grid-template-columns:38px minmax(0,1fr);gap:8px;padding:5px 0;position:relative}
-.sub::before{content:"";position:absolute;left:-14px;top:13px;width:10px;height:1px;background:color-mix(in oklab,var(--c) 45%,transparent)}
-.sub + .sub{border-top:1px dashed color-mix(in oklab,var(--c) 18%,transparent)}
-.ev.free .tl-b{border-left:2px dashed var(--line-2);background:transparent;padding-left:11px}
-.kids .nowtrack{margin-left:-28px}
-.ev.free .free-head{cursor:default}
-.ev.free .free-head .t{font-weight:400;color:var(--fg-2);font-size:13px}
-.tl li.ev.free::after{background:var(--ink)}
-.sub time{font-family:var(--f-mono);font-size:11px;color:var(--fg-3);padding-top:2px;text-align:left}
-.sub-b{min-width:0;overflow-wrap:anywhere;white-space:pre-wrap;font-size:14px}
-/* 1時間ごとの線（記録があればその分ふくらむ） */
-.tl li.hr{padding:0;min-height:20px}
-.tl li.hr time{font-size:10.5px;padding-top:3px;opacity:.75}
-.tl li.hr::after{left:53px;top:10px;width:11px;height:1px;border:0;border-radius:0;background:var(--line-2)}
-.tl li.hr .tl-b{border-top:1px solid color-mix(in oklab,var(--line) 70%,transparent);margin-top:10px}
-.tl li.hr.has{padding-bottom:4px}
-.tl li.hr.has::after{background:var(--fg-3)}
-.tl li.hr.has .kids{margin-top:4px;border-left-color:var(--line-2)}
-.tl li.hr.future{opacity:.45}
-.tl li.hr.future .tl-b{border-top-style:dashed}
-/* 起きた：就寝と同じ、控えめな1行（実線） */
-.tl li.wakeline{padding:3px 0;--c:var(--gold)}
-.tl li.wakeline::after{left:55px;top:8px;width:7px;height:7px;background:color-mix(in oklab,var(--c) 75%,transparent);border:1px solid color-mix(in oklab,var(--c) 75%,transparent)}
-.tl li.wakeline time{font-size:11px;padding-top:0}
-.tl li.wakeline .tl-b{display:flex;flex-wrap:wrap;align-items:center;gap:2px 0;border-top:1px solid color-mix(in oklab,var(--c) 35%,transparent);margin-top:7px;padding:2px 0 0 2px;font-size:11.5px;color:var(--fg-2);letter-spacing:.02em}
-/* 就寝・就寝の目安：予定のカードにせず、控えめな1行 */
-.tl li.ev.bedline{padding:3px 0}
-.tl li.ev.bedline::after{left:55px;top:8px;width:7px;height:7px;background:var(--ink);border:1px solid color-mix(in oklab,var(--c) 70%,transparent)}
-.tl li.ev.bedline time{font-size:11px;padding-top:0}
-.ev.bedline .tl-b{border:0;background:transparent;padding:0 0 0 2px;border-top:1px dashed color-mix(in oklab,var(--c) 35%,transparent);margin-top:7px;border-radius:0}
-.ev.bedline .bl-t{display:inline-block;margin-top:2px;font-size:11.5px;color:var(--fg-3);letter-spacing:.02em;cursor:pointer}
-.ev.bedline.done .tl-b{border-top-style:solid}
-.ev.bedline.done .bl-t{color:var(--fg-2)}
-.ev.bedline.done::after{background:color-mix(in oklab,var(--c) 70%,transparent)}
+/* 空き：これからの空きは緑の点線と札（押すとその時刻から予定を入れる）。過ぎた空きは薄く長さだけ */
+.flow > li.gap{height:var(--h);display:grid;grid-template-columns:var(--tc) minmax(0,1fr);column-gap:var(--g);align-items:center}
+.flow > li.gap > *{grid-column:2;position:relative;z-index:1}
+.flow > li.gap.past::before{background:none;border-left:1px dotted var(--fg-3);opacity:.55}
+.flow > li.gap.fut::before{background:none;width:0;left:calc(var(--rx) - .5px);border-left:2px dashed color-mix(in oklab,var(--mint) 65%,transparent)}
+.g-t{font-size:10.5px;line-height:1;color:var(--fg-3);opacity:.75;font-variant-numeric:tabular-nums}
+.g-pill{justify-self:start;display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12px;line-height:1;color:var(--mint);background:color-mix(in oklab,var(--mint) 9%,transparent);border:1px dashed color-mix(in oklab,var(--mint) 50%,transparent);border-radius:999px;padding:5px 10px}
+.g-pill b{font-weight:600;letter-spacing:.04em}
+.g-pill i{font-style:normal;opacity:.75;margin-left:2px}
+button.g-pill{cursor:pointer}
+@media (hover:hover){button.g-pill:hover{background:color-mix(in oklab,var(--mint) 16%,transparent);border-style:solid}}
 /* 起きた・寝た時刻を直す（さりげない ✎） */
 .fixbtn{background:none;border:0;color:var(--fg-3);opacity:.55;font-size:11px;padding:0 4px;margin-left:2px;cursor:pointer;line-height:1}
 .fixbtn:hover,.fixbtn:focus-visible{opacity:1;color:var(--fg)}
@@ -424,15 +436,15 @@ li.task.dropped{animation:t-drop-in 360ms var(--t-spring)}
 .wk-ev.short .rz-t{display:none}
 @media (pointer:coarse){.wk-ev .rz{height:12px}}
 .wk-ev.lifted{overflow:visible;z-index:8;box-shadow:0 10px 26px rgba(0,0,0,.5),0 0 0 1.5px var(--c);opacity:.96}
-.wk-ev.moved,.tl > li.ev.moved .ev-head{animation:t-drop-in 380ms var(--t-spring)}
-.tl > li.ev.can-drag{position:relative}
-.tl > li.ev .rz{height:12px}
-.tl > li.ev .rz-t{top:-4px}.tl > li.ev .rz-b{bottom:-4px}
-.tl > li.ev .rz::after{content:"";position:absolute;left:50%;top:50%;width:28px;height:4px;margin:-2px 0 0 -14px;border-radius:2px;background:var(--c);opacity:0;transition:opacity 150ms var(--t-ease)}
-@media (hover:hover){.tl > li.ev.can-drag:hover .rz::after{opacity:.55}}
-.tl > li.ev.lifted{z-index:6;transition:none}
-.tl > li.ev.lifted .tl-b{box-shadow:0 12px 30px rgba(0,0,0,.45);border-radius:12px}
-.tl > li.ev.lifted .rz::after{opacity:.9}
+.wk-ev.moved,.flow > li.ev.moved .ev-head{animation:t-drop-in 380ms var(--t-spring)}
+.flow > li.ev.can-drag{position:relative}
+.flow > li.ev .rz{height:12px;left:calc(var(--tc) + var(--g))}
+.flow > li.ev .rz-t{top:-4px}.flow > li.ev .rz-b{bottom:-4px}
+.flow > li.ev .rz::after{content:"";position:absolute;left:50%;top:50%;width:28px;height:4px;margin:-2px 0 0 -14px;border-radius:2px;background:var(--c);opacity:0;transition:opacity 150ms var(--t-ease)}
+@media (hover:hover){.flow > li.ev.can-drag:hover .rz::after{opacity:.55}}
+.flow > li.ev.lifted{z-index:6;transition:none}
+.flow > li.ev.lifted::after{box-shadow:inset 3px 0 0 var(--c),0 12px 30px rgba(0,0,0,.45)}
+.flow > li.ev.lifted .rz::after{opacity:.9}
 .drag-time{position:absolute;right:6px;top:-12px;z-index:9;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;background:color-mix(in oklab,var(--c,#4d8dff) 75%,#000);box-shadow:0 4px 14px rgba(0,0,0,.4);pointer-events:none;white-space:nowrap}
 .wk-ev .drag-time{right:auto;left:50%;top:-22px;transform:translateX(-50%);font-size:11px}
 /* 動きを止める（端末の設定・アプリの「控えめ」） */
@@ -775,7 +787,6 @@ textarea.field{width:100%;resize:vertical;min-height:84px;line-height:1.6}
 .cs-grid input[type="date"]{width:150px}
 .cs-grid input[type="time"]{width:112px}
 .cs-grid input[type="checkbox"]{width:20px;height:20px;accent-color:var(--lav)}
-.tl-b[data-act]{cursor:pointer}
 /* Claudeからの欄：ほかのカードと違う、ラベンダーの光る枠 */
 .card.clcard{position:relative;border:1px solid #4b4387;background:linear-gradient(165deg,#221d4a 0%,#191838 55%,#151a31 100%);box-shadow:0 0 0 1px rgba(184,167,255,.06) inset,0 10px 28px -16px rgba(184,167,255,.45);padding:12px 16px 14px}
 .cl-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -975,22 +986,16 @@ html:not(.classic) .big-time{font-family:var(--f-disp);font-size:28px;font-weigh
 html:not(.classic) .field{background:var(--sky);border:1px solid var(--line-2);border-radius:14px}
 html:not(.classic) .field:focus{border-color:#4d8dff}
 html:not(.classic) .empty{border-radius:var(--r);border-color:var(--line-2)}
-html:not(.classic) .tl::before{background:linear-gradient(180deg,transparent,#23262d 24px,#23262d calc(100% - 24px),transparent)}
-html:not(.classic) .tl time{font-family:var(--f-body);font-variant-numeric:tabular-nums}
-html:not(.classic) .ev:not(.bedline):not(.free) .tl-b{border-left:0;border-radius:16px;padding:8px 12px 8px 14px;background:color-mix(in oklab,var(--c) 7%,var(--panel));box-shadow:inset 3px 0 0 var(--c),inset 0 0 0 1px color-mix(in oklab,var(--c) 14%,transparent)}
+html:not(.classic) .flow time{font-family:var(--f-body)}
+html:not(.classic) .flow > li::before{background:#23262d}
+html:not(.classic) .flow > li.ev::after{border-radius:16px;background:color-mix(in oklab,var(--c) 7%,var(--panel));box-shadow:inset 3px 0 0 var(--c),inset 0 0 0 1px rgba(255,255,255,.04)}
+html:not(.classic) .flow > li.ev.is-now::after{box-shadow:inset 3px 0 0 var(--c),inset 0 0 0 1px color-mix(in oklab,var(--c) 45%,transparent),0 0 22px color-mix(in oklab,var(--c) 14%,transparent)}
+html:not(.classic) .flow > li.ev.canceled::after{background:transparent;box-shadow:inset 0 0 0 1px var(--line-2)}
 html:not(.classic) .ev .t{font-weight:500}
-html:not(.classic) .ev .m{font-family:var(--f-body);font-variant-numeric:tabular-nums}
-html:not(.classic) .ev.canceled .tl-b{background:transparent;box-shadow:inset 0 0 0 1px var(--line-2)}
-html:not(.classic) .kids{border-left-color:color-mix(in oklab,var(--c) 35%,transparent)}
-html:not(.classic) .sub time{font-family:var(--f-body);font-variant-numeric:tabular-nums}
-html:not(.classic) .tl li.now::after{background:radial-gradient(circle at 35% 35%,#fff 0,#b9d7ff 35%,#2f6bff 100%);border-color:transparent;box-shadow:0 0 0 4px rgba(77,141,255,.18),0 0 18px rgba(77,141,255,.85)}
-html:not(.classic) .tl li.now time{color:#b9d7ff}
-html:not(.classic) .tl li.now .tl-b{border-top:1px solid transparent;border-image:linear-gradient(90deg,rgba(77,141,255,.9),rgba(77,141,255,0)) 1}
-html:not(.classic) .nowmark{border-top:1.5px solid transparent;border-image:linear-gradient(90deg,rgba(77,141,255,.9),rgba(77,141,255,.05)) 1}
-html:not(.classic) .nowmark::before{background:radial-gradient(circle at 35% 35%,#fff 0,#b9d7ff 35%,#2f6bff 100%);box-shadow:0 0 0 4px rgba(77,141,255,.18),0 0 18px rgba(77,141,255,.85)}
-html:not(.classic) .nowmark span{font-family:var(--f-body);font-variant-numeric:tabular-nums;color:#b9d7ff}
-html:not(.classic) .tl li.hr .tl-b{border-top-color:rgba(255,255,255,.055)}
-html:not(.classic) .tl li.hr::after{background:#2b2e35}
+html:not(.classic) .fl-now time,html:not(.classic) .fr-now time{color:#b9d7ff}
+html:not(.classic) .fl-now > time::after,html:not(.classic) .fr-now > time::after{background:radial-gradient(circle at 35% 35%,#fff 0,#b9d7ff 35%,#2f6bff 100%)!important;border-color:transparent!important;box-shadow:0 0 0 4px rgba(77,141,255,.18),0 0 18px rgba(77,141,255,.85)}
+html:not(.classic) .fl-now .c2,html:not(.classic) .fr-now .c2{color:#b9d7ff}
+html:not(.classic) .fl-now .c2::after,html:not(.classic) .fr-now .c2::after{border-top:1.5px solid transparent;border-image:linear-gradient(90deg,rgba(77,141,255,.9),rgba(77,141,255,.05)) 1}
 html:not(.classic) .allday span{border-radius:999px}
 html:not(.classic) .ad{border-radius:999px;padding-left:10px;background:color-mix(in oklab,var(--c) 10%,transparent);border-color:color-mix(in oklab,var(--c) 30%,transparent)}
 html:not(.classic) .ad-bar{width:6px;height:6px;border-radius:50%;box-shadow:0 0 8px var(--c)}
