@@ -396,6 +396,10 @@ applyMotion(); if (reduceMQ && reduceMQ.addEventListener) reduceMQ.addEventListe
 let vtKind = null;
 // 押したボタン：描き直しで作り直されても、新しい同じボタンを「ぽんと戻る」ように動かす
 let lastTap = null;
+/* ── ドラッグ（タスクの並べかえ・予定を動かす・予定の上下の端で時刻を変える）
+   ・マウス：押して少し動かすと始まる。指：⠿ や予定の端はすぐ、ほかは長押し（0.35秒）で始まる（ふつうのスクロールをじゃましない）
+   ・ドラッグ中は描き直さない（終わってからまとめて描く） */
+const DRAG = { on: false, pending: false, st: null };
 function tapBack() {
   const t = lastTap; if (!t || Date.now() - t.at > 450) return; lastTap = null;
   const sel = `[data-act="${CSS.escape(t.act)}"]` + (t.arg != null ? `[data-arg="${CSS.escape(t.arg)}"]` : ':not([data-arg])');
@@ -419,7 +423,7 @@ function leaveThen(el, sel, fn) {
 function shake(el) { if (!el) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 400); el.focus({ preventScroll: true }); }
 // ★を付けた瞬間の小さな粒（8つ）
 const BURST = `<span class="burst" aria-hidden="true">${[0, 1, 2, 3, 4, 5, 6, 7].map(i => { const a = i / 8 * Math.PI * 2 - Math.PI / 2, d = i % 2 ? 15 : 19; return `<i style="--px:${(Math.cos(a) * d).toFixed(1)}px;--py:${(Math.sin(a) * d).toFixed(1)}px;--pd:${i % 2 ? 40 : 0}ms"></i>`; }).join('')}</span>`;
-function render() { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; paint(); }); }
+function render() { if (DRAG.on) { DRAG.pending = true; return; } if (raf) return; raf = requestAnimationFrame(() => { raf = 0; paint(); }); }
 document.addEventListener('compositionstart', () => { composing = true; compAt = Date.now(); });
 document.addEventListener('compositionupdate', () => { compAt = Date.now(); });
 document.addEventListener('compositionend', () => { composing = false; render(); });
@@ -719,14 +723,15 @@ function timelineHTML(d) {
         continue;
       }
       const endTxt = x.canceled ? '<span class="evstate">キャンセルした</span>' : x.endedAt ? `〜${hm(x.end)}<span class="evstate">（予定は${hm(x.plannedEnd)}まで）</span>` : `〜${hm(x.end)}`;
-      lis.push(`<li class="ev ${isNow ? 'is-now' : ''} ${x.canceled ? 'canceled' : ''} ${x.endedAt ? 'ended' : ''}" style="--c:${c.color}"><time>${hm(x.start)}</time><div class="tl-b"><div class="ev-head" ${x.ghost ? '' : `data-act="calOpen" data-arg="${esc(key)}"`}>${d === today() ? `<button class="evmore" data-act="evMenu" data-arg="${esc(key)}" aria-label="この予定を終える・キャンセルする" aria-expanded="${S.evMenu === key}">⋯</button>` : ''}<div class="t">${esc(x.title)}</div><div class="m">${endTxt}${x.canceled ? '' : bellHTML(x)}</div></div>${S.evMenu === key ? evMenuHTML(d, x, key) : ''}${kidsHTML(list, isNow)}</div></li>`);
+      const dg = !x.ghost && !x.canceled && calEditable(x.cal) ? ` data-drag="${esc(key)}" data-s="${x.start}" data-e="${x.plannedEnd || x.end}"` : '';
+      lis.push(`<li class="ev ${isNow ? 'is-now' : ''} ${x.canceled ? 'canceled' : ''} ${x.endedAt ? 'ended' : ''}${dg ? ' can-drag' : ''}${fxc('moved' + key, 'moved')}" style="--c:${c.color}" data-t="${x.start}"${dg}>${dg ? '<i class="rz rz-t" aria-hidden="true"></i>' : ''}<time>${hm(x.start)}</time><div class="tl-b"><div class="ev-head" ${x.ghost ? '' : `data-act="calOpen" data-arg="${esc(key)}"`}>${d === today() ? `<button class="evmore" data-act="evMenu" data-arg="${esc(key)}" aria-label="この予定を終える・キャンセルする" aria-expanded="${S.evMenu === key}">⋯</button>` : ''}<div class="t">${esc(x.title)}</div><div class="m">${endTxt}${x.canceled ? '' : bellHTML(x)}</div></div>${S.evMenu === key ? evMenuHTML(d, x, key) : ''}${kidsHTML(list, isNow)}</div>${dg ? '<i class="rz rz-b" aria-hidden="true"></i>' : ''}</li>`);
     } else if (it.kind === 'wake') {
       const y = addDays(d, -1); const sl = sleepAt(y);
       lis.push(`<li class="wakeline"><time>${hm(it.t)}</time><div class="tl-b">${S.timeFix && S.timeFix.key === 'wake:' + d ? timeFixHTML() : `<span>☀ 起きた</span>${fixBtn('wake:' + d, '起きた時刻を直す')}`}
         ${S.timeFix && S.timeFix.key === 'sleep:' + y ? timeFixHTML() : `<span class="wk-prev">前の晩 ${sl ? hm(sl) + ' 就寝' : 'の就寝 —'}${fixBtn('sleep:' + y, '前の晩に寝た時刻を直す')}</span>`}</div></li>`);
     } else {
       const future = d === today() && it.t > now;
-      lis.push(`<li class="hr ${it.list.length ? 'has' : ''} ${future ? 'future' : ''}" style="--c:var(--fg-3)"><time>${hm(it.t)}</time><div class="tl-b">${it.list.length ? kidsHTML(it.list, false) : ''}</div></li>`);
+      lis.push(`<li class="hr ${it.list.length ? 'has' : ''} ${future ? 'future' : ''}" style="--c:var(--fg-3)" data-t="${it.t}"><time>${hm(it.t)}</time><div class="tl-b">${it.list.length ? kidsHTML(it.list, false) : ''}</div></li>`);
     }
   }
   if (!nowPlaced) lis.push(nowLI(now));
@@ -819,12 +824,12 @@ function taskHTML(t) {
   const goal = t.goalId && S.goals[t.goalId];
   const open = S.openTask === t.id;
   const fl = taskFlags(t);
-  return `<li class="task ${t.status === 'done' ? 'done' : ''}${fl.cls}${fxc('new' + t.id, 'new')}">
+  return `<li class="task ${t.status === 'done' ? 'done' : ''}${fl.cls}${fxc('new' + t.id, 'new')}${fxc('drop' + t.id, 'dropped')}"${t.status === 'open' ? ` data-sort="${t.id}"` : ''}>
     <div class="head"><button class="check ${t.status === 'done' ? 'on' + fxc('task' + t.id) : ''}" data-act="${t.status === 'done' ? 'taskUndo' : 'taskDone'}" data-arg="${t.id}" aria-label="完了にする">${t.status === 'done' ? CHECK : ''}</button>
       <div class="title" data-act="taskOpen" data-arg="${t.id}" style="cursor:pointer">${esc(t.title)}
         <div class="chips">${fl.icons}${weightMark(t.weight)}${deadlinePill(t)}${goal ? `<span class="pill gold">✦ ${esc(goal.title)}</span>` : ''}${t.plannedDate && t.status === 'open' && !(t.plannedDate < today()) ? `<span class="pill" title="${shortLabel(t.plannedDate)}にやる予定">▸ ${shortLabel(t.plannedDate)}</span>` : ''}${steps.length ? `<span class="pill">${done}/${steps.length}</span>` : ''}</div>
       </div>
-      <button class="iconbtn chev ${open ? 'open' : ''}" data-act="taskOpen" data-arg="${t.id}" aria-expanded="${open}" aria-label="${open ? '閉じる' : '開く'}">${ICON.chev}</button></div>
+      ${t.status === 'open' ? `<span class="grip" aria-hidden="true" title="ドラッグで並べかえ"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>` : ''}<button class="iconbtn chev ${open ? 'open' : ''}" data-act="taskOpen" data-arg="${t.id}" aria-expanded="${open}" aria-label="${open ? '閉じる' : '開く'}">${ICON.chev}</button></div>
     ${steps.length ? `<div class="bar" aria-hidden="true"><i style="width:${Math.round(done / steps.length * 100)}%"></i></div>` : ''}
     ${open ? `<ul class="steps${fxc('open' + t.id, 'fx')}">${steps.map(s => `<li class="${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' + fxc('step' + s.id) : ''}" style="width:18px;height:18px" data-act="stepToggle" data-arg="${t.id}:${s.id}" aria-label="ステップを完了">${s.done ? CHECK : ''}</button><span>${esc(s.title)}</span><span class="spacer"></span><button class="btn ghost sm" data-act="stepDel" data-arg="${t.id}:${s.id}" aria-label="ステップを消す">×</button></li>`).join('')}
       <li><input class="field grow" id="step-${t.id}" data-draft placeholder="ステップを足す（Enterで追加）" value="${esc(draft('step-' + t.id))}" data-enter="stepAdd" data-arg="${t.id}"><button class="btn sm" data-act="stepAdd" data-arg="${t.id}">追加</button></li></ul>
@@ -851,12 +856,15 @@ function tasksView() {
   const mode = getDay(d).mode; const easy = mode === 'bad' || mode === 'rest';
   const wv = t => (WEIGHTS[t.weight] ? WEIGHTS[t.weight].n : 2);
   const urgent = t => t.deadline && diffDays(d, t.deadline) <= 0;
-  const open = all.filter(t => t.status === 'open').sort((a, b) => easy ? (urgent(b) - urgent(a)) || (wv(a) - wv(b)) || byDeadline(a, b) : byDeadline(a, b));
+  // 自分で並べかえたあとは、その順（order）。並べかえる前は締切順（不調・休養の日は軽い順）
+  const manual = all.some(t => t.status === 'open' && t.order != null);
+  const autoSort = (a, b) => easy ? (urgent(b) - urgent(a)) || (wv(a) - wv(b)) || byDeadline(a, b) : byDeadline(a, b);
+  const open = all.filter(t => t.status === 'open').sort(manual ? (a, b) => (a.order ?? -Infinity) - (b.order ?? -Infinity) || (b.createdAt || 0) - (a.createdAt || 0) : autoSort);
   const held = all.filter(t => t.status === 'held').sort(byDeadline);
   const done = all.filter(t => t.status === 'done').sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0)).slice(0, 20);
   let h = headerHTML('タスク', `<span>やること ${num('todo', open.length)} 件</span>${held.length ? `<span>保留箱 ${held.length} 件</span>` : ''}`);
   h += goalsSection();
-  h += `<h2 class="sec"><span>タスク</span>${easy ? `<span class="r faint">${MODES[mode].label}の日は軽い順</span>` : ''}</h2>`;
+  h += `<h2 class="sec"><span>タスク</span>${manual ? `<button class="r link" data-act="taskAutoOrder">締切順に戻す</button>` : easy ? `<span class="r faint">${MODES[mode].label}の日は軽い順</span>` : open.length > 1 ? `<span class="r faint">⠿ をつまむと並べかえ</span>` : ''}</h2>`;
   if (f) h += `<div class="filterbar"><span>△ ${esc(S.goals[f].title)} のタスクだけ表示中</span><button class="link" data-act="taskFilter" data-arg="">すべて表示</button></div>`;
   // 書き込むまでは1行だけ。書き始める（または欄に触れる）と、重さ・締切・目標が出る
   const tOpen = S.taskAddOpen || !!String(draft('task-title')).trim() || !!draft('task-w') || !!draft('task-dl') || !!draft('task-goal');
@@ -1282,7 +1290,8 @@ function weekGrid(r, list) {
   const cols = r.days.map(d => {
     const blocks = lanes(calEventsFor(list, d).filter(e => !e.allDay), d).map(x => {
       const c = calOf(x.e.cal); const top = x.s / 60 * H_PX, hh = Math.max(18, (x.t - x.s) / 60 * H_PX - 2);
-      return `<button class="wk-ev" style="--c:${c.color};top:${top}px;height:${hh}px;left:calc(${x.lane / x.lanes * 100}% + 1px);width:calc(${100 / x.lanes}% - 2px)" data-act="calOpen" data-arg="${x.e.cal}|${esc(x.e.id)}" title="${esc(x.e.title)}"><span class="t">${esc(x.e.title)}</span>${hh >= 34 ? `<span class="m">${hm(x.e.start)}</span>` : ''}</button>`;
+      const dg = calEditable(x.e.cal) && !/^(🌙|☀)/.test(x.e.title) ? ` data-drag="${x.e.cal}|${esc(x.e.id)}" data-s="${x.e.start}" data-e="${x.e.end}"` : '';
+      return `<button class="wk-ev${dg ? ' can-drag' : ''}${hh < 30 ? ' short' : ''}${fxc('moved' + x.e.cal + '|' + x.e.id, 'moved')}" style="--c:${c.color};top:${top}px;height:${hh}px;left:calc(${x.lane / x.lanes * 100}% + 1px);width:calc(${100 / x.lanes}% - 2px)" data-act="calOpen" data-arg="${x.e.cal}|${esc(x.e.id)}"${dg} title="${esc(x.e.title)}">${dg ? '<i class="rz rz-t" aria-hidden="true"></i>' : ''}<span class="t">${esc(x.e.title)}</span><span class="m">${hh >= 34 ? hm(x.e.start) : ''}</span>${dg ? '<i class="rz rz-b" aria-hidden="true"></i>' : ''}</button>`;
     }).join('');
     const nowLine = d === t ? `<div class="wk-now" style="top:${minFromDayStart(d, now) / 60 * H_PX}px"></div>` : '';
     return `<div class="wk-col ${d === t ? 'is-today' : ''}" data-day="${d}">${blocks}${nowLine}</div>`;
@@ -1965,6 +1974,7 @@ A.taskAdd = () => {
   const t = clean({ id, title, weight: S.drafts['task-w'] || undefined, deadline: S.drafts['task-dl'] || undefined, goalId: S.drafts['task-goal'] || undefined, status: 'open', steps: [], createdAt: Date.now() });
   S.drafts['task-title'] = ''; S.drafts['task-w'] = ''; S.drafts['task-dl'] = ''; S.drafts['task-goal'] = ''; S.taskAddOpen = false; S.tasks[id] = t; fx('new' + id); render(); putDoc('tasks/' + id, t);
 };
+A.taskAutoOrder = () => { const ids = Object.values(S.tasks).filter(t => t.order != null).map(t => t.id); for (const id of ids) { const t = { ...S.tasks[id] }; delete t.order; S.tasks[id] = t; putDoc('tasks/' + id, t); } render(); toast('締切順に戻した。'); };
 A.taskOpen = id => { S.openTask = S.openTask === id ? null : id; if (S.openTask) fx('open' + id); render(); };
 A.taskDone = id => { const t = S.tasks[id]; if (!t) return; fx('task' + id); patchTask(id, { status: 'done', doneAt: Date.now() }); toast('終わった。青い星がひとつ増えた。'); };
 A.taskUndo = id => patchTask(id, { status: 'open', doneAt: null });
@@ -2430,6 +2440,144 @@ A.csDelete = async () => {
   try { await S.mcp.callTool(CFG.GCAL, 'delete_event', { calendarId: calOf(s.cal).id, eventId: s.id }); S.calSheet = null; toast('予定を消した。'); afterCalWrite(); }
   catch (e) { csFail(calWriteErr(e)); }
 };
+/* ── ドラッグの中身 ── */
+const SNAP = 15; // 分きざみ
+let dragNoClick = 0;
+document.addEventListener('click', e => { if (Date.now() - dragNoClick < 450) { e.stopPropagation(); e.preventDefault(); } }, true);
+document.addEventListener('touchmove', e => { if (DRAG.on) e.preventDefault(); }, { passive: false });
+document.addEventListener('contextmenu', e => { if (DRAG.on || (DRAG.st && DRAG.st.type !== 'mouse')) e.preventDefault(); });
+const scroller = () => document.body.scrollHeight > document.body.clientHeight ? document.body : (document.scrollingElement || document.documentElement);
+document.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || DRAG.st || S.calSheet || S.timerOpen) return;
+  const task = e.target.closest('li.task[data-sort]'), ev = !task && e.target.closest('[data-drag]');
+  if (!task && !ev) return;
+  const handle = e.target.closest('.grip, .rz');
+  if (task && !handle && e.target.closest('.check, .steps, .row, input, select, textarea, .gmenu, a')) return;
+  if (ev && !handle && ev.tagName === 'LI' && !e.target.closest('.ev-head, time')) return;
+  if (ev && e.target.closest('.evmore, .evmenu')) return;
+  const kind = task ? 'task' : e.target.closest('.rz-t') ? 'start' : e.target.closest('.rz-b') ? 'end' : 'move';
+  const st = DRAG.st = { kind, el: task || ev, pid: e.pointerId, type: e.pointerType, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, started: false, timer: 0, handle: !!handle };
+  if (handle && e.pointerType !== 'mouse') { e.preventDefault(); dragBegin(st); }
+  else if (e.pointerType !== 'mouse') st.timer = setTimeout(() => { if (DRAG.st === st && !st.started) dragBegin(st); }, 350);
+}, true);
+document.addEventListener('pointermove', e => {
+  const st = DRAG.st; if (!st || e.pointerId !== st.pid) return;
+  st.x = e.clientX; st.y = e.clientY;
+  const dist = Math.hypot(st.x - st.x0, st.y - st.y0);
+  if (!st.started) {
+    if (st.type === 'mouse' ? dist > 5 : false) dragBegin(st);
+    else if (st.type !== 'mouse' && dist > 9) { clearTimeout(st.timer); DRAG.st = null; } // 長押しの前に動いた＝スクロール
+    return;
+  }
+  e.preventDefault(); dragMove(st);
+}, { passive: false });
+const dragStop = e => { const st = DRAG.st; if (!st || (e && e.pointerId !== st.pid)) return; clearTimeout(st.timer); DRAG.st = null; if (st.started) dragFinish(st, e && e.type === 'pointercancel'); };
+document.addEventListener('pointerup', dragStop); document.addEventListener('pointercancel', dragStop);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && DRAG.st && DRAG.st.started) { const st = DRAG.st; DRAG.st = null; dragFinish(st, true); } });
+
+function dragBegin(st) {
+  st.started = true; DRAG.on = true; clearTimeout(st.timer);
+  document.documentElement.classList.add('dragging');
+  try { if (navigator.vibrate) navigator.vibrate(8); } catch (_) {}
+  try { getSelection().removeAllRanges(); } catch (_) {}
+  const el = st.el; el.classList.add('lifted');
+  if (st.kind === 'task') {
+    st.rows = [...el.parentElement.querySelectorAll(':scope > li.task[data-sort]')];
+    st.rects = st.rows.map(r => r.getBoundingClientRect()); st.i0 = st.rows.indexOf(el); st.to = st.i0;
+    st.gap = st.rows.length > 1 ? st.rects[1].top - st.rects[0].bottom : 8; st.h = st.rects[st.i0].height + st.gap;
+    st.sc = scroller(); st.scroll0 = st.sc.scrollTop;
+  } else {
+    st.s0 = Number(el.dataset.s); st.e0 = Number(el.dataset.e); st.ns = st.s0; st.ne = st.e0;
+    st.wk = el.classList.contains('wk-ev');
+    if (st.wk) {
+      st.sc = $('#wk-scroll'); st.scroll0 = st.sc.scrollTop; st.cols = [...document.querySelectorAll('.wk-col')]; st.col0 = st.cols.indexOf(el.parentElement); st.col = st.col0;
+      st.top0 = parseFloat(el.style.top); st.h0 = parseFloat(el.style.height);
+    } else {
+      // 今日の流れは時間に比例していない（先の時間は詰めて出す）ので、指で動かした距離をそのまま時間にする：72px で1時間（15分＝18px）
+      st.sc = scroller(); st.scroll0 = st.sc.scrollTop;
+    }
+    st.badge = document.createElement('span'); st.badge.className = 'drag-time mono'; el.appendChild(st.badge); dragBadge(st);
+  }
+  st.auto = setInterval(() => dragAuto(st), 16);
+}
+const TL_PX_PER_H = 72;
+const snapT = t => Math.round(t / (SNAP * 6e4)) * SNAP * 6e4;
+function dragBadge(st) { if (st.badge) st.badge.textContent = `${hm(st.ns)}–${hm(st.ne)}`; }
+function dragAuto(st) { // 端に近づいたら、ゆっくりスクロールする
+  if (!st.sc) return; const r = st.sc === $('#wk-scroll') ? st.sc.getBoundingClientRect() : { top: 0, bottom: innerHeight - 90 };
+  // つかんだ場所から、その端の方へ動かしたときだけ（端の近くでつかんだだけでは流れない）
+  const Z = 48, v = st.y < r.top + Z && st.y < st.y0 - 12 ? -Math.ceil((r.top + Z - st.y) / 6) : st.y > r.bottom - Z && st.y > st.y0 + 12 ? Math.ceil((st.y - r.bottom + Z) / 6) : 0;
+  if (v) { const before = st.sc.scrollTop; st.sc.scrollTop += Math.max(-14, Math.min(14, v)); if (st.sc.scrollTop !== before) dragMove(st); }
+}
+function dragMove(st) {
+  const el = st.el, dScroll = st.sc ? st.sc.scrollTop - st.scroll0 : 0, dy = st.y - st.y0 + dScroll;
+  if (st.kind === 'task') {
+    el.style.transform = `translateY(${dy}px) scale(1.02)`;
+    const c = st.rects[st.i0].top + st.rects[st.i0].height / 2 + dy;
+    let to = 0; st.rows.forEach((r, i) => { if (i !== st.i0 && st.rects[i].top + st.rects[i].height / 2 - (st.scroll0 - st.scroll0) < c) to++; });
+    st.to = to;
+    st.rows.forEach((r, i) => { if (i === st.i0) return; const sh = st.i0 < to && i > st.i0 && i <= to ? -st.h : st.i0 > to && i >= to && i < st.i0 ? st.h : 0; r.style.transform = sh ? `translateY(${sh}px)` : ''; });
+    return;
+  }
+  if (st.wk) {
+    const dMin = Math.round(dy / H_PX * 60 / SNAP) * SNAP; let col = st.col0;
+    if (st.kind === 'move') { st.cols.forEach((c, i) => { const r = c.getBoundingClientRect(); if (st.x >= r.left && st.x < r.right) col = i; }); }
+    const dDay = col - st.col0, len = st.e0 - st.s0;
+    if (st.kind === 'move') { st.ns = st.s0 + dMin * 6e4 + dDay * 864e5; st.ne = st.ns + len; }
+    else if (st.kind === 'start') { st.ns = Math.min(st.e0 - SNAP * 6e4, st.s0 + dMin * 6e4); st.ne = st.e0; }
+    else { st.ne = Math.max(st.s0 + SNAP * 6e4, st.e0 + dMin * 6e4); st.ns = st.s0; }
+    const top = st.top0 + (st.ns - st.s0) / 6e4 / 60 * H_PX - dDay * 0, h = Math.max(18, (st.ne - st.ns) / 3600e3 * H_PX - 2);
+    if (col !== st.col) { st.cols[col].appendChild(el); st.col = col; }
+    el.style.top = (st.kind === 'move' ? st.top0 + dMin / 60 * H_PX : top) + 'px'; el.style.height = h + 'px';
+    if (st.kind === 'move') { el.style.left = '1px'; el.style.width = 'calc(100% - 2px)'; }
+    dragBadge(st); return;
+  }
+  // 今日の流れ
+  const off = snapT(dy / TL_PX_PER_H * 3600e3);
+  if (st.kind === 'move') { st.ns = st.s0 + off; st.ne = st.e0 + off; el.style.transform = `translateY(${dy}px)`; }
+  else if (st.kind === 'start') st.ns = Math.min(st.e0 - SNAP * 6e4, st.s0 + off);
+  else st.ne = Math.max(st.s0 + SNAP * 6e4, st.e0 + off);
+  dragBadge(st);
+}
+function dragFinish(st, cancel) {
+  clearInterval(st.auto); dragNoClick = Date.now();
+  const el = st.el;
+  document.documentElement.classList.remove('dragging');
+  if (st.badge) st.badge.remove();
+  if (st.kind === 'task') {
+    const ids = st.rows.map(r => r.dataset.sort); const id = ids.splice(st.i0, 1)[0]; ids.splice(st.to, 0, id);
+    st.rows.forEach(r => { r.style.transform = ''; }); el.classList.remove('lifted');
+    DRAG.on = false; DRAG.pending = false;
+    if (!cancel && st.to !== st.i0) taskReorder(ids, id); else render();
+    return;
+  }
+  el.classList.remove('lifted'); el.style.transform = '';
+  DRAG.on = false; DRAG.pending = false;
+  const [cal, ...rest] = el.dataset.drag.split('|'), id = rest.join('|');
+  if (cancel || (st.ns === st.s0 && st.ne === st.e0)) { last.main = ''; render(); return; }
+  moveEvent(cal, id, st.ns, st.ne, { s: st.s0, e: st.e0 });
+}
+// 並べかえた順を order に書く（前後の間の数を入れる。間がなくなったら全部を振り直す）
+function taskReorder(ids, moved) {
+  const T = id => S.tasks[id], has = ids.every(i => T(i) && T(i).order != null);
+  fx('drop' + moved);
+  if (!has) { ids.forEach((i, k) => { if (T(i) && T(i).order !== (k + 1) * 1024) patchTask(i, { order: (k + 1) * 1024 }); }); return; }
+  const k = ids.indexOf(moved), a = k > 0 ? T(ids[k - 1]).order : null, b = k < ids.length - 1 ? T(ids[k + 1]).order : null;
+  let o = a == null ? b - 1024 : b == null ? a + 1024 : (a + b) / 2;
+  if (a != null && b != null && b - a < 1e-6) { ids.forEach((i, j) => patchTask(i, { order: (j + 1) * 1024 })); return; }
+  patchTask(moved, { order: o });
+}
+// 予定を動かす：先に画面を変えてから、Googleカレンダーに書く（断られたら元に戻す）
+async function moveEvent(cal, id, ns, ne, prev) {
+  const upd = (s0, e0) => { const f = e => { if (e && e.cal === cal && e.id === id && !e.allDay) { e.start = s0; e.end = e0; } }; for (const k in S.calCache) (S.calCache[k].list || []).forEach(f); for (const k in S.events) (S.events[k].list || []).forEach(f); };
+  upd(ns, ne); fx('moved' + cal + '|' + id); last.main = ''; render();
+  if (!S.mcp) return;
+  try {
+    await S.mcp.callTool(CFG.GCAL, 'update_event', { calendarId: calOf(cal).id, eventId: id, startTime: isoLocal(new Date(ns)), endTime: isoLocal(new Date(ne)) });
+    if (prev) { S.undo = () => moveEvent(cal, id, prev.s, prev.e, null); toast(`予定を ${hm(ns)}〜${hm(ne)} にした。`, true); } else toast('もとに戻した。');
+    setTimeout(afterCalWrite, 600);
+  } catch (e) { if (prev) upd(prev.s, prev.e); toast(calWriteErr(e)); afterCalWrite(); }
+}
 // シート
 A.showGoals = () => { S.sheet = { kind: 'first' }; render(); };
 A.closeSheet = () => { S.sheet = null; render(); };

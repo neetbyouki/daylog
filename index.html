@@ -409,6 +409,32 @@ html .ne-body.ne-body:focus,html .ne-body.ne-body:focus-visible{outline:none;box
 @keyframes t-toast-out{to{opacity:0;translate:0 6px;scale:.98}}
 /* 入力欄にふれたとき：枠の色がなめらかに変わる */
 .field{transition:border-color 160ms var(--t-ease),box-shadow 160ms var(--t-ease),background-color 160ms var(--t-ease)}
+/* ドラッグ：つまんだものは少し浮き、ほかの行はすっとよける */
+html.dragging,html.dragging *{cursor:grabbing!important;user-select:none!important;-webkit-user-select:none!important}
+li.task[data-sort],.can-drag{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.grip{display:inline-grid;place-items:center;width:28px;height:32px;margin:0 -4px 0 2px;color:var(--fg-3);opacity:.45;cursor:grab;touch-action:none;flex:none;border-radius:8px}
+.grip:hover{opacity:.9;background:rgba(255,255,255,.05)}
+ul.tasks > li.task{transition:transform 180ms var(--t-ease)}
+li.task.lifted{position:relative;z-index:6;transition:none;box-shadow:0 14px 34px rgba(0,0,0,.45),0 0 0 1px rgba(142,197,255,.35);border-radius:14px}
+li.task.dropped{animation:t-drop-in 360ms var(--t-spring)}
+@keyframes t-drop-in{from{transform:scale(1.03)}}
+.wk-ev.can-drag{touch-action:pan-y}
+.rz{position:absolute;left:0;right:0;height:8px;z-index:2;cursor:ns-resize;touch-action:none}
+.wk-ev .rz-t{top:-2px}.wk-ev .rz-b{bottom:-2px}
+.wk-ev.short .rz-t{display:none}
+@media (pointer:coarse){.wk-ev .rz{height:12px}}
+.wk-ev.lifted{overflow:visible;z-index:8;box-shadow:0 10px 26px rgba(0,0,0,.5),0 0 0 1.5px var(--c);opacity:.96}
+.wk-ev.moved,.tl > li.ev.moved .ev-head{animation:t-drop-in 380ms var(--t-spring)}
+.tl > li.ev.can-drag{position:relative}
+.tl > li.ev .rz{height:12px}
+.tl > li.ev .rz-t{top:-4px}.tl > li.ev .rz-b{bottom:-4px}
+.tl > li.ev .rz::after{content:"";position:absolute;left:50%;top:50%;width:28px;height:4px;margin:-2px 0 0 -14px;border-radius:2px;background:var(--c);opacity:0;transition:opacity 150ms var(--t-ease)}
+@media (hover:hover){.tl > li.ev.can-drag:hover .rz::after{opacity:.55}}
+.tl > li.ev.lifted{z-index:6;transition:none}
+.tl > li.ev.lifted .tl-b{box-shadow:0 12px 30px rgba(0,0,0,.45);border-radius:12px}
+.tl > li.ev.lifted .rz::after{opacity:.9}
+.drag-time{position:absolute;right:6px;top:-12px;z-index:9;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;background:color-mix(in oklab,var(--c,#4d8dff) 75%,#000);box-shadow:0 4px 14px rgba(0,0,0,.4);pointer-events:none;white-space:nowrap}
+.wk-ev .drag-time{right:auto;left:50%;top:-22px;transform:translateX(-50%);font-size:11px}
 /* 動きを止める（端末の設定・アプリの「控えめ」） */
 html[data-motion="calm"] *,html[data-motion="calm"] *::before,html[data-motion="calm"] *::after{animation:none!important;transition:none!important}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;transition-duration:1ms!important}}
