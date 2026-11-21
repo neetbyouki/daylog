@@ -320,27 +320,25 @@ html .ne-body.ne-body:focus,html .ne-body.ne-body:focus-visible{outline:none;box
 /* ── 動き（transitions.dev の無料の部品をもとに作り直したもの。同サイトの条件で、自分のアプリに改造して使ってよい。数値は同サイトの既定値をもとに調整）
    速さ・曲線はここだけで決める。端末の「視差効果を減らす」か、設定の「控えめ」で html[data-motion="calm"] になり、全部止まる */
 :root{--t-ease:cubic-bezier(.22,1,.36,1);--t-spring:cubic-bezier(.34,1.56,.64,1);--t-pop:cubic-bezier(.34,1.96,.64,1);--t-open:250ms;--t-close:150ms;--t-page:260ms;--t-shift:10px;--t-blur:3px;--t-scale:.96}
-/* 画面の切りかえ（View Transitions）。下のタブ・重なる画面は、それぞれ別に動かす */
-::view-transition-group(*){animation-duration:var(--t-page);animation-timing-function:var(--t-ease)}
-::view-transition-old(root){animation:var(--t-close) var(--t-ease) both t-vt-out}
-::view-transition-new(root){animation:var(--t-page) var(--t-ease) both t-vt-in}
-html[data-vt] .nav{view-transition-name:nav}
-html[data-vt] #app-toast .toast{view-transition-name:toast}
-html[data-vt="tab"]:not(.classic) .nav button[aria-current="page"] .gi{view-transition-name:navpill}
-html[data-vt="tab"]{--vt-x:0px;--vt-y:var(--t-shift)}
-html[data-vt="fwd"]{--vt-x:var(--t-shift);--vt-y:0px}
-html[data-vt="back"]{--vt-x:calc(var(--t-shift) * -1);--vt-y:0px}
-html[data-vt="fade"],html[data-vt="tabs"]{--vt-x:0px;--vt-y:4px}
-@keyframes t-vt-in{from{opacity:0;transform:translate(var(--vt-x,0px),var(--vt-y,0px));filter:blur(var(--t-blur))}}
-@keyframes t-vt-out{to{opacity:0;transform:translate(calc(var(--vt-x,0px) * -1),calc(var(--vt-y,0px) * -.4));filter:blur(var(--t-blur))}}
-html[data-vt="tabs"] .mtabs [aria-selected="true"]{view-transition-name:mtab}
-html[data-vt="tabs"] .mtabs{view-transition-name:mtabs}
-::view-transition-new(mtab),::view-transition-old(mtab){animation-duration:var(--t-page)}
-/* 重なる画面（タイマー・予定・夜モードなど）：中心から少しふくらんで開き、閉じるときは早めに縮む */
-html[data-vt="sheet"]::view-transition-old(root),html[data-vt="sheet"]::view-transition-new(root){animation:none}
-html[data-vt="sheet"] #app-over > *{view-transition-name:sheet}
-::view-transition-new(sheet):only-child{animation:var(--t-open) var(--t-ease) both t-sheet-in}
-::view-transition-old(sheet):only-child{animation:var(--t-close) var(--t-ease) both t-sheet-out}
+/* 画面の切りかえ：新しい中身だけを短く出す（下のタブ＝下から／奥へ＝右から／手前へ＝左から／上の切りかえ＝少しだけ） */
+.enter-tab{animation:t-enter var(--t-page) var(--t-ease) both;--ex:0px;--ey:var(--t-shift)}
+.enter-fwd{animation:t-enter var(--t-page) var(--t-ease) both;--ex:var(--t-shift);--ey:0px}
+.enter-back{animation:t-enter var(--t-page) var(--t-ease) both;--ex:calc(var(--t-shift) * -1);--ey:0px}
+.enter-tabs,.enter-fade{animation:t-enter 220ms var(--t-ease) both;--ex:0px;--ey:4px}
+@keyframes t-enter{from{opacity:0;transform:translate(var(--ex),var(--ey))}}
+/* 選んだタブの丸・背景が、前の場所から滑ってくる影 */
+.mtabs,.tm-presets{position:relative}
+.mtabs > button,.tm-presets > button{position:relative;z-index:1}
+.nav button{z-index:1}
+.slide-ghost{position:absolute;z-index:0;pointer-events:none;transition:transform var(--t-page) var(--t-ease),width var(--t-page) var(--t-ease),height var(--t-page) var(--t-ease)}
+.slide-hide,.mtabs > button.slide-hide,.tm-presets > button.slide-hide{background:transparent!important;box-shadow:none!important;border-color:transparent!important}
+/* 重なる画面（タイマー・予定・夜モードなど）：中身は中心からふくらみ、後ろのぼかしは薄く出る。閉じるときは逆（消してから外す） */
+#app-over > .entering{animation:t-ov-in var(--t-open) var(--t-ease) both}
+#app-over > .entering > *{animation:t-sheet-in var(--t-open) var(--t-ease) both}
+#app-over > .leaving{animation:t-ov-out var(--t-close) var(--t-ease) both;pointer-events:none}
+#app-over > .leaving > *{animation:t-sheet-out var(--t-close) var(--t-ease) both}
+@keyframes t-ov-in{from{opacity:0}}
+@keyframes t-ov-out{to{opacity:0}}
 @keyframes t-sheet-in{from{opacity:0;transform:scale(var(--t-scale))}}
 @keyframes t-sheet-out{to{opacity:0;transform:scale(var(--t-scale))}}
 /* ★：押した瞬間に縮んでから戻り、まわりに小さな粒（like-button） */

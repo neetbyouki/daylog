@@ -438,22 +438,53 @@ try { if (localStorage.getItem('daylog-look') === 'classic') document.documentEl
 function paint() {
   // 日本語入力の途中では描き直さない（ただし入力が止まって4秒たったら描き直す）
   if (composing) { applyLook(); if (Date.now() - compAt < 4000) { setTimeout(render, 500); return; } composing = false; }
-  let kind = vtKind; vtKind = null;
-  if (!kind && !!overHTML() !== !!last.over) kind = 'sheet'; // 重なる画面が開く・閉じる
-  const de = document.documentElement;
-  if (kind && document.startViewTransition && !motionCalm() && !document.hidden && S.ready) {
-    de.dataset.vt = kind;
-    try {
-      const t = document.startViewTransition(() => paintNow());
-      t.finished.finally(() => { if (de.dataset.vt === kind) delete de.dataset.vt; });
-      return;
-    } catch (_) { delete de.dataset.vt; }
-  }
   paintNow();
+}
+/* 画面の切りかえの動き（View Transitions はやめた：ガラスのぼかしが写真に写らず、終わりにちらつくため）
+   ・新しい中身だけを、下から／横から短く出す（前の画面は消すだけ）。上の「ひとこと｜ノート」から下だけを動かす画面もある
+   ・選んだタブの丸や背景は、前の場所から新しい場所へ「影」を滑らせる
+   ・重なる画面は、開くときにふくらみ、閉じるときは消える前に縮む（ぼかしごと薄くなるので、ちらつかない） */
+const SLIDES = [['.nav button[aria-current="page"] .gi', '.nav'], ['.mtabs [aria-selected="true"]', '.mtabs'], ['.tm-presets [aria-pressed="true"]', '.tm-presets']];
+const slidePrep = () => SLIDES.map(([sel]) => { const e = document.querySelector(sel); return e ? e.getBoundingClientRect() : null; });
+function slideRun(prev) {
+  if (motionCalm()) return;
+  SLIDES.forEach(([sel, box], i) => {
+    const o = prev[i], e = document.querySelector(sel); if (!o || !e) return;
+    const n = e.getBoundingClientRect(); if (Math.abs(o.left - n.left) < 1 && Math.abs(o.top - n.top) < 1) return;
+    const c = e.closest(box); if (!c) return; const cr = c.getBoundingClientRect(), cs = getComputedStyle(e);
+    const g = document.createElement('i'); g.className = 'slide-ghost'; g.setAttribute('aria-hidden', 'true');
+    Object.assign(g.style, { left: o.left - cr.left + 'px', top: o.top - cr.top + 'px', width: o.width + 'px', height: o.height + 'px', background: cs.backgroundColor, borderRadius: cs.borderRadius, boxShadow: cs.boxShadow });
+    c.appendChild(g); e.classList.add('slide-hide');
+    requestAnimationFrame(() => requestAnimationFrame(() => { g.style.transform = `translate(${n.left - o.left}px,${n.top - o.top}px)`; g.style.width = n.width + 'px'; g.style.height = n.height + 'px'; }));
+    setTimeout(() => { e.classList.remove('slide-hide'); g.remove(); }, 300);
+  });
+}
+function enterRun(kind) {
+  if (!kind || motionCalm()) return;
+  const main = $('#app-main .main'); if (!main) return;
+  const anchor = kind !== 'tab' && main.querySelector('.mtabs, .mfav-head');
+  let targets = [main];
+  if (anchor && anchor.parentElement) { targets = []; let n = anchor.nextElementSibling; while (n) { targets.push(n); n = n.nextElementSibling; } }
+  for (const t of targets) { t.classList.add('enter-' + kind); setTimeout(() => t.classList.remove('enter-' + kind), 400); }
+}
+let overLeave = 0;
+function paintOver(over) {
+  const host = $('#app-over'), wasOpen = !!last.over, calm = motionCalm();
+  clearTimeout(overLeave);
+  if (!over && wasOpen && !calm && host.firstElementChild) {
+    const el = host.firstElementChild; last.over = '';
+    el.classList.add('leaving'); el.setAttribute('aria-hidden', 'true');
+    overLeave = setTimeout(() => { if (!last.over) { host.innerHTML = ''; afterOver(); } }, 170);
+    return;
+  }
+  host.innerHTML = over; last.over = over;
+  if (over && (!wasOpen || host.dataset.leaving) && !calm && host.firstElementChild) host.firstElementChild.classList.add('entering');
+  afterOver();
 }
 function paintNow() {
   applyLook();
   const fx = captureFocus();
+  const slides = slidePrep(), kind = vtKind; vtKind = null;
   const main = mainHTML(), over = overHTML(), t = toastHTML();
   const showComp = S.ready && !S.fatal && S.view === 'today';
   $('#app-comp').hidden = !showComp;
@@ -464,10 +495,10 @@ function paintNow() {
     $('#app-main').innerHTML = main; last.main = main; changedMain = true;
     const wk = $('#wk-scroll'); if (wk) wk.scrollTop = wkPrev && wkPrev.key === wk.dataset.key ? wkPrev.top : wkDefaultScroll();
   }
-  if (over !== last.over) { $('#app-over').innerHTML = over; last.over = over; afterOver(); }
+  if (over !== last.over) paintOver(over);
   if (t !== last.toast) { $('#app-toast').innerHTML = t; last.toast = t; }
   restoreFocus(fx);
-  tapBack();
+  tapBack(); if (changedMain) enterRun(kind); slideRun(slides);
   if (changedMain) afterMain();
   else if (S.view === 'memos' && S.nOpen) NE.sync();
   else if (S.view === 'sky' && galaxyOk() && $('#gx-host')) window.DaylogGalaxy.attach($('#gx-host'), galaxyApi());
@@ -857,7 +888,7 @@ const liveNotes = () => Object.values(S.notes).filter(n => !n.trashed && !n.loca
 const trashNotes = () => Object.values(S.notes).filter(n => n.trashed);
 const folderName = id => (id && S.nfolders[id] ? S.nfolders[id].name : '');
 const noteWhen = t => { if (!t) return ''; const d = logicalDate(t), td = today(); return d === td ? hm(t) : d === addDays(td, -1) ? '昨日' : d.slice(0, 4) === td.slice(0, 4) ? shortLabel(d) : d.replace(/-/g, '/'); };
-const byFavNew = (a, b) => (!!b.fav - !!a.fav) || ((b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+const byFavNew = (a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0); // 新しい順（★は並びを変えない）
 const starBtn = (act, id, on, what) => { const pop = on ? fxc('star' + id, 'pop') : ''; return `<button class="mstar${on ? ' on' : ''}${pop}" data-act="${act}" data-arg="${id}" aria-pressed="${!!on}" aria-label="${what}をお気に入り${on ? 'から外す' : 'にする'}" title="お気に入り"><span class="mi">${on ? MI.star : MI.starO}</span>${pop ? BURST : ''}</button>`; };
 function noteRowHTML(n, opts = {}) {
   const lines = String(n.text || '').split('\n').map(x => x.trim()).filter(Boolean);
@@ -2149,7 +2180,7 @@ const NE = (() => {
   function status(t) { const s = E.el && E.el.querySelector('.ne-st'); if (!s || s.textContent === t) return; s.textContent = t; s.classList.remove('swap'); void s.offsetWidth; s.classList.add('swap'); }
   function save(patch, now) {
     const n = S.notes[E.id]; if (!n) return;
-    const nd = { ...n, ...patch, updatedAt: Date.now() }; delete nd.local;
+    const nd = { ...n, ...patch, updatedAt: Object.keys(patch).every(k => k === 'fav') ? (n.updatedAt || Date.now()) : Date.now() }; delete nd.local;
     const empty = !String(nd.text || '').trim() && !(nd.imgs && nd.imgs.length);
     S.notes[E.id] = nd;
     if (empty && n.local) { S.notes[E.id] = { ...nd, local: true }; return; } // まだ何も書いていない新しいノートは送らない
