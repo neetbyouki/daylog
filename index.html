@@ -316,6 +316,79 @@ html .ne-body.ne-body:focus,html .ne-body.ne-body:focus-visible{outline:none;box
 .ne-body img.missing{min-height:60px;width:100%;opacity:.4}
 @keyframes nepulse{50%{opacity:.5}}
 @media (prefers-reduced-motion:reduce){.ne-body img.loading{animation:none}}
+/* ── 動き（transitions.dev の無料の部品をもとに作り直したもの。同サイトの条件で、自分のアプリに改造して使ってよい。数値は同サイトの既定値をもとに調整）
+   速さ・曲線はここだけで決める。端末の「視差効果を減らす」か、設定の「控えめ」で html[data-motion="calm"] になり、全部止まる */
+:root{--t-ease:cubic-bezier(.22,1,.36,1);--t-spring:cubic-bezier(.34,1.56,.64,1);--t-pop:cubic-bezier(.34,1.96,.64,1);--t-open:250ms;--t-close:150ms;--t-page:260ms;--t-shift:10px;--t-blur:3px;--t-scale:.96}
+/* 画面の切りかえ（View Transitions）。下のタブ・重なる画面は、それぞれ別に動かす */
+::view-transition-group(*){animation-duration:var(--t-page);animation-timing-function:var(--t-ease)}
+::view-transition-old(root){animation:var(--t-close) var(--t-ease) both t-vt-out}
+::view-transition-new(root){animation:var(--t-page) var(--t-ease) both t-vt-in}
+html[data-vt] .nav{view-transition-name:nav}
+html[data-vt] #app-toast .toast{view-transition-name:toast}
+html[data-vt="tab"]:not(.classic) .nav button[aria-current="page"] .gi{view-transition-name:navpill}
+html[data-vt="tab"]{--vt-x:0px;--vt-y:var(--t-shift)}
+html[data-vt="fwd"]{--vt-x:var(--t-shift);--vt-y:0px}
+html[data-vt="back"]{--vt-x:calc(var(--t-shift) * -1);--vt-y:0px}
+html[data-vt="fade"],html[data-vt="tabs"]{--vt-x:0px;--vt-y:4px}
+@keyframes t-vt-in{from{opacity:0;transform:translate(var(--vt-x,0px),var(--vt-y,0px));filter:blur(var(--t-blur))}}
+@keyframes t-vt-out{to{opacity:0;transform:translate(calc(var(--vt-x,0px) * -1),calc(var(--vt-y,0px) * -.4));filter:blur(var(--t-blur))}}
+html[data-vt="tabs"] .mtabs [aria-selected="true"]{view-transition-name:mtab}
+html[data-vt="tabs"] .mtabs{view-transition-name:mtabs}
+::view-transition-new(mtab),::view-transition-old(mtab){animation-duration:var(--t-page)}
+/* 重なる画面（タイマー・予定・夜モードなど）：中心から少しふくらんで開き、閉じるときは早めに縮む */
+html[data-vt="sheet"]::view-transition-old(root),html[data-vt="sheet"]::view-transition-new(root){animation:none}
+html[data-vt="sheet"] #app-over > *{view-transition-name:sheet}
+::view-transition-new(sheet):only-child{animation:var(--t-open) var(--t-ease) both t-sheet-in}
+::view-transition-old(sheet):only-child{animation:var(--t-close) var(--t-ease) both t-sheet-out}
+@keyframes t-sheet-in{from{opacity:0;transform:scale(var(--t-scale))}}
+@keyframes t-sheet-out{to{opacity:0;transform:scale(var(--t-scale))}}
+/* ★：押した瞬間に縮んでから戻り、まわりに小さな粒（like-button） */
+.mstar{position:relative}
+.mstar .mi{display:inline-grid;place-items:center}
+.mstar.pop .mi{animation:t-like-pop 350ms var(--t-pop)}
+@keyframes t-like-pop{0%{transform:scale(1)}30%{transform:scale(.72)}100%{transform:scale(1)}}
+.burst{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;color:var(--gold)}
+.burst i{position:absolute;left:-1.5px;top:-1.5px;width:3px;height:3px;border-radius:50%;background:currentColor;opacity:0;animation:t-burst 600ms var(--t-ease) var(--pd,0ms) both}
+@keyframes t-burst{0%{opacity:0;transform:translate(0,0) scale(.4)}20%{opacity:1;transform:translate(calc(var(--px) * .25),calc(var(--py) * .25)) scale(1)}100%{opacity:0;transform:translate(var(--px),var(--py)) scale(.6)}}
+/* タスクのチェック：丸がはずみ、印が線で描かれる（checkbox-check / success-check） */
+.check.fx{animation:t-like-pop 320ms var(--t-spring)}
+.check.fx svg path{stroke-dasharray:14;stroke-dashoffset:14;animation:t-draw 300ms var(--t-ease) 60ms forwards}
+@keyframes t-draw{to{stroke-dashoffset:0}}
+/* ノートのチェックリスト：丸の中に色が満ちる */
+.ne-body ul.ck > li::before{transition:background-color 180ms var(--t-ease),border-color 180ms var(--t-ease),transform 200ms var(--t-spring)}
+.ne-body ul.ck > li[data-ck="1"]::before{transform:scale(1.06)}
+/* 足りないとき：小さく左右に揺れる（error-state-shake） */
+.shake{animation:t-shake 280ms linear}
+@keyframes t-shake{0%{transform:translateX(0);animation-timing-function:var(--t-ease)}28.57%{transform:translateX(6px);animation-timing-function:var(--t-ease)}57.14%{transform:translateX(-6px);animation-timing-function:var(--t-ease)}78.57%{transform:translateX(4px);animation-timing-function:var(--t-ease)}100%{transform:translateX(0)}}
+.tm-need.flash{animation:t-flash 900ms var(--t-ease)}
+@keyframes t-flash{0%,40%{color:#ffd28a}100%{color:rgba(200,214,242,.6)}}
+.tm-ic[aria-disabled="true"]{background:rgba(110,165,255,.22);box-shadow:none;color:rgba(255,255,255,.6)}
+/* 数字が変わったとき：下からふわっと入れかわる（number-pop-in） */
+.num{display:inline-block}
+.num.pop{animation:t-num 320ms var(--t-ease) both}
+@keyframes t-num{from{opacity:0;transform:translateY(6px);filter:blur(2px)}}
+/* ノートの「保存中→保存した」：上へ抜けて下から入る（text-states-swap） */
+.ne-st{display:inline-block}
+.ne-st.swap{animation:t-num 240ms var(--t-ease) both}
+/* 知らせ（toast）：下から少し上がって出る */
+.toast{animation:t-toast var(--t-open) var(--t-ease) both}
+@keyframes t-toast{from{opacity:0;translate:0 8px;scale:.98}}
+/* メニュー（⋯）：押したところから開く（menu-dropdown） */
+.mmenu,.gmenu,.ne-menu{transform-origin:top right;animation:t-drop var(--t-open) var(--t-ease) both}
+@keyframes t-drop{from{opacity:0;transform:scale(.97) translateY(-3px)}}
+/* タイマーが最後まで行ったとき：印が回りながら描かれる（success-check）。記録したとき：✓がはずむ */
+.tm-ok{display:grid;place-items:center;width:30px;height:30px;margin:0 auto 2px;color:var(--gold)}
+.tm-ok svg{width:30px;height:30px;overflow:visible}
+.tm-ok.in{animation:t-ok-in 500ms var(--t-ease) both}
+.tm-ok.in svg path{stroke-dasharray:20;stroke-dashoffset:20;animation:t-draw 500ms var(--t-ease) 80ms forwards}
+@keyframes t-ok-in{from{opacity:0;transform:rotate(80deg) translateY(16px);filter:blur(8px)}}
+.tm-ic.pop{animation:t-like-pop 350ms var(--t-pop)}
+/* ノートの画像：読み込めたら、ぼかしから浮かび上がる（skeleton-reveal） */
+.ne-body img.reveal{animation:t-reveal 420ms var(--t-ease) both}
+@keyframes t-reveal{from{opacity:0;filter:blur(8px)}}
+/* 動きを止める（端末の設定・アプリの「控えめ」） */
+html[data-motion="calm"] *,html[data-motion="calm"] *::before,html[data-motion="calm"] *::after{animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;transition-duration:1ms!important}}
 /* ── タイマー（全画面） ── */
 .tm-btn.on{border-color:color-mix(in oklab,#8ec5ff 55%,transparent);color:#d6e8ff;padding:0 12px;gap:6px}
 .tm-btn.on.pause{opacity:.7}

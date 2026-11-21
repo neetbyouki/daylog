@@ -384,6 +384,26 @@ function schedulePCPush() { clearTimeout(pcPushT); pcPushT = setTimeout(() => pu
 
 /* ───────── 描画 ───────── */
 let raf = 0, composing = false, compAt = 0; const last = { main: '', over: '', toast: '', comp: '' };
+/* ── 動き（transitions.dev の無料の部品をもとに調整。速さと曲線は index.html の --t-* にまとめてある）
+   ・画面の切りかえ：描き直しの前後を View Transitions（ブラウザの標準機能）でつなぐ。使えない端末ではそのまま切りかわる
+   ・小さな動き（★・チェック・数字など）：押した直後の描き直しだけで1回鳴らす（fx）
+   ・端末の「視差効果を減らす」か、設定の「画面の動き：控えめ」では動かさない */
+const MOTION_KEY = 'daylog-motion';
+const reduceMQ = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+const motionCalm = () => { try { if (localStorage.getItem(MOTION_KEY) === 'calm') return true; } catch (_) {} return !!(reduceMQ && reduceMQ.matches); };
+const applyMotion = () => { document.documentElement.dataset.motion = motionCalm() ? 'calm' : 'full'; };
+applyMotion(); if (reduceMQ && reduceMQ.addEventListener) reduceMQ.addEventListener('change', applyMotion);
+let vtKind = null;
+const vt = k => { vtKind = k; }; // 次の描き直しを、なめらかにつなぐ（tab：下のタブ／fwd・back：奥へ・手前へ／tabs：上の切りかえ／sheet：重なる画面）
+const FX = new Map();
+const fx = k => FX.set(k, Date.now());
+const fxc = (k, cls = 'fx') => (Date.now() - (FX.get(k) || 0) < 650 ? ' ' + cls : '');
+const NUMS = new Map(); // 数字が変わったときだけ、ふわっと入れかえる
+const num = (k, n) => { const p = NUMS.get(k); NUMS.set(k, n); return `<span class="num${p != null && p !== n ? ' pop' : ''}">${n}</span>`; };
+// 足りないとき：欄を小さく揺らして知らせる（文字の注意書きの代わり）
+function shake(el) { if (!el) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 400); el.focus({ preventScroll: true }); }
+// ★を付けた瞬間の小さな粒（8つ）
+const BURST = `<span class="burst" aria-hidden="true">${[0, 1, 2, 3, 4, 5, 6, 7].map(i => { const a = i / 8 * Math.PI * 2 - Math.PI / 2, d = i % 2 ? 15 : 19; return `<i style="--px:${(Math.cos(a) * d).toFixed(1)}px;--py:${(Math.sin(a) * d).toFixed(1)}px;--pd:${i % 2 ? 40 : 0}ms"></i>`; }).join('')}</span>`;
 function render() { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; paint(); }); }
 document.addEventListener('compositionstart', () => { composing = true; compAt = Date.now(); });
 document.addEventListener('compositionupdate', () => { compAt = Date.now(); });
@@ -401,9 +421,23 @@ function applyLook() {
 }
 try { if (localStorage.getItem('daylog-look') === 'classic') document.documentElement.classList.add('classic'); } catch (_) {}
 function paint() {
-  applyLook();
   // 日本語入力の途中では描き直さない（ただし入力が止まって4秒たったら描き直す）
-  if (composing) { if (Date.now() - compAt < 4000) { setTimeout(render, 500); return; } composing = false; }
+  if (composing) { applyLook(); if (Date.now() - compAt < 4000) { setTimeout(render, 500); return; } composing = false; }
+  let kind = vtKind; vtKind = null;
+  if (!kind && !!overHTML() !== !!last.over) kind = 'sheet'; // 重なる画面が開く・閉じる
+  const de = document.documentElement;
+  if (kind && document.startViewTransition && !motionCalm() && !document.hidden && S.ready) {
+    de.dataset.vt = kind;
+    try {
+      const t = document.startViewTransition(() => paintNow());
+      t.finished.finally(() => { if (de.dataset.vt === kind) delete de.dataset.vt; });
+      return;
+    } catch (_) { delete de.dataset.vt; }
+  }
+  paintNow();
+}
+function paintNow() {
+  applyLook();
   const fx = captureFocus();
   const main = mainHTML(), over = overHTML(), t = toastHTML();
   const showComp = S.ready && !S.fatal && S.view === 'today';
@@ -739,7 +773,7 @@ function taskHTML(t) {
   const open = S.openTask === t.id;
   const fl = taskFlags(t);
   return `<li class="task ${t.status === 'done' ? 'done' : ''}${fl.cls}">
-    <div class="head"><button class="check ${t.status === 'done' ? 'on' : ''}" data-act="${t.status === 'done' ? 'taskUndo' : 'taskDone'}" data-arg="${t.id}" aria-label="完了にする">${t.status === 'done' ? CHECK : ''}</button>
+    <div class="head"><button class="check ${t.status === 'done' ? 'on' + fxc('task' + t.id) : ''}" data-act="${t.status === 'done' ? 'taskUndo' : 'taskDone'}" data-arg="${t.id}" aria-label="完了にする">${t.status === 'done' ? CHECK : ''}</button>
       <div class="title" data-act="taskOpen" data-arg="${t.id}" style="cursor:pointer">${esc(t.title)}
         <div class="chips">${fl.icons}${weightMark(t.weight)}${deadlinePill(t)}${goal ? `<span class="pill gold">✦ ${esc(goal.title)}</span>` : ''}${t.plannedDate && t.status === 'open' && !(t.plannedDate < today()) ? `<span class="pill" title="${shortLabel(t.plannedDate)}にやる予定">▸ ${shortLabel(t.plannedDate)}</span>` : ''}${steps.length ? `<span class="pill">${done}/${steps.length}</span>` : ''}</div>
       </div>
@@ -808,7 +842,7 @@ const trashNotes = () => Object.values(S.notes).filter(n => n.trashed);
 const folderName = id => (id && S.nfolders[id] ? S.nfolders[id].name : '');
 const noteWhen = t => { if (!t) return ''; const d = logicalDate(t), td = today(); return d === td ? hm(t) : d === addDays(td, -1) ? '昨日' : d.slice(0, 4) === td.slice(0, 4) ? shortLabel(d) : d.replace(/-/g, '/'); };
 const byFavNew = (a, b) => (!!b.fav - !!a.fav) || ((b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
-const starBtn = (act, id, on, what) => `<button class="mstar${on ? ' on' : ''}" data-act="${act}" data-arg="${id}" aria-pressed="${!!on}" aria-label="${what}をお気に入り${on ? 'から外す' : 'にする'}" title="お気に入り">${on ? MI.star : MI.starO}</button>`;
+const starBtn = (act, id, on, what) => { const pop = on ? fxc('star' + id, 'pop') : ''; return `<button class="mstar${on ? ' on' : ''}${pop}" data-act="${act}" data-arg="${id}" aria-pressed="${!!on}" aria-label="${what}をお気に入り${on ? 'から外す' : 'にする'}" title="お気に入り"><span class="mi">${on ? MI.star : MI.starO}</span>${pop ? BURST : ''}</button>`; };
 function noteRowHTML(n, opts = {}) {
   const lines = String(n.text || '').split('\n').map(x => x.trim()).filter(Boolean);
   const title = n.title || lines[0] || '新しいノート', rest = lines.slice(1).join(' ');
@@ -833,10 +867,10 @@ function memosView() {
   let h = headerHTML('メモ', `<span>ひとこと ${memos.length}</span><span>ノート ${notes.length}</span>`);
   const q = String(draft('memo-q')).trim();
   // お気に入りは、検索欄の右にある小さな★から（押すと★だけの一覧。もう一度押すと戻る）
-  h += `<div class="mbar"><div class="msearch">${MI.search}<input id="memo-q" data-draft type="search" enterkeyhint="search" placeholder="ひとこと・ノートをさがす" value="${esc(draft('memo-q'))}" aria-label="メモをさがす" autocomplete="off">${q ? '<button class="msearch-x" data-act="memoSearchClear" aria-label="さがすのをやめる">×</button>' : ''}</div><button class="mfav-btn${tab === 'fav' ? ' on' : ''}" data-act="memoTab" data-arg="${tab === 'fav' ? (S.memoTabPrev || 'quick') : 'fav'}" aria-pressed="${tab === 'fav'}" aria-label="お気に入り（${favN}件）${tab === 'fav' ? 'を閉じる' : 'を見る'}" title="お気に入り">${tab === 'fav' ? MI.star : MI.starO}${favN ? `<span>${favN}</span>` : ''}</button></div>`;
+  h += `<div class="mbar"><div class="msearch">${MI.search}<input id="memo-q" data-draft type="search" enterkeyhint="search" placeholder="ひとこと・ノートをさがす" value="${esc(draft('memo-q'))}" aria-label="メモをさがす" autocomplete="off">${q ? '<button class="msearch-x" data-act="memoSearchClear" aria-label="さがすのをやめる">×</button>' : ''}</div><button class="mfav-btn${tab === 'fav' ? ' on' : ''}" data-act="memoTab" data-arg="${tab === 'fav' ? (S.memoTabPrev || 'quick') : 'fav'}" aria-pressed="${tab === 'fav'}" aria-label="お気に入り（${favN}件）${tab === 'fav' ? 'を閉じる' : 'を見る'}" title="お気に入り">${tab === 'fav' ? MI.star : MI.starO}${favN ? `<span>${num('fav', favN)}</span>` : ''}</button></div>`;
   if (q) return h + memoSearchHTML(q.toLowerCase());
   if (tab === 'fav') h += `<div class="mfav-head"><span class="mfav-t">${MI.star}お気に入り</span><button class="link" data-act="memoTab" data-arg="${S.memoTabPrev || 'quick'}">閉じる</button></div>`;
-  else h += `<div class="mtabs" role="tablist" aria-label="メモの種類">${[['quick', 'ひとこと', memos.length], ['notes', 'ノート', notes.length]].map(([k, l, n]) => `<button role="tab" data-act="memoTab" data-arg="${k}" aria-selected="${tab === k}">${l}<span class="mt-n">${n}</span></button>`).join('')}</div>`;
+  else h += `<div class="mtabs" role="tablist" aria-label="メモの種類">${[['quick', 'ひとこと', memos.length], ['notes', 'ノート', notes.length]].map(([k, l, n]) => `<button role="tab" data-act="memoTab" data-arg="${k}" aria-selected="${tab === k}">${l}<span class="mt-n">${num('mt' + k, n)}</span></button>`).join('')}</div>`;
   if (tab === 'quick') {
     h += `<div class="card" style="margin-top:12px"><div class="form"><div class="line memo-add"><textarea class="field grow autosize" id="memo-text" data-draft rows="1" placeholder="思いついたことを書く（改行できる）" aria-label="メモ。改行できる。Ctrl＋Enterで置く">${esc(draft('memo-text'))}</textarea><button class="btn primary" data-act="memoAdd" aria-label="メモを置く">＋</button></div></div></div>`;
     const list = memos.sort(byFavNew);
@@ -1092,7 +1126,7 @@ function settingsView() {
   const sw = (key, label, small) => `<div class="item"><div class="l">${label}${small ? `<small>${small}</small>` : ''}</div><button class="switch" role="switch" aria-checked="${!!st[key]}" data-act="toggleSetting" data-arg="${key}" aria-label="${label}"></button></div>`;
   let h = headerHTML('設定', 'もう一度右上のボタンを押すと、もとの画面に戻る');
   const look = st.look === 'classic' ? 'classic' : 'nova';
-  h += `<h2 class="sec"><span>見た目</span></h2><div class="card settings"><div class="item"><div class="l">画面の見た目<small>記録はどちらでも同じ。いつでも切り替えられる。</small></div><div class="seg" role="group" aria-label="画面の見た目"><button data-act="setLook" data-arg="nova" aria-pressed="${look === 'nova'}">新しい見た目</button><button data-act="setLook" data-arg="classic" aria-pressed="${look === 'classic'}">前の見た目</button></div></div></div>`;
+  h += `<h2 class="sec"><span>見た目</span></h2><div class="card settings"><div class="item"><div class="l">画面の見た目<small>記録はどちらでも同じ。いつでも切り替えられる。</small></div><div class="seg" role="group" aria-label="画面の見た目"><button data-act="setLook" data-arg="nova" aria-pressed="${look === 'nova'}">新しい見た目</button><button data-act="setLook" data-arg="classic" aria-pressed="${look === 'classic'}">前の見た目</button></div></div><div class="item"><div class="l">画面の動き<small>「控えめ」にすると、画面の切りかえや★・チェックの動きを止める。この端末だけの設定。</small></div><div class="seg" role="group" aria-label="画面の動き"><button data-act="setMotion" data-arg="full" aria-pressed="${!motionCalm()}">ふつう</button><button data-act="setMotion" data-arg="calm" aria-pressed="${motionCalm()}">控えめ</button></div></div></div>`;
   h += `<h2 class="sec"><span>朝と夜</span></h2><div class="card settings">
     <div class="item"><div class="l">「起きる」予定の時刻<small>夜モードで翌朝の予定として.｡oOに入る。夜モードでその日だけ変えることもできる。</small></div><input class="field" type="time" id="set-wake" value="${esc(st.wakeTime)}" data-onchg="setWake" aria-label="起きる時刻"></div>
     ${pushItemHTML()}
@@ -1584,16 +1618,16 @@ function timerHTML() {
   const digits = st === 'done' ? tmFmt(TM.spent) : tmFmt(left);
   const stateTx = st === 'idle' ? tmMin(TM.dur) : st === 'run' ? `${hm(TM.endAt)} まで` : st === 'pause' ? '一時停止中' : TM.early ? `${tmMin(TM.dur)}のうち` : 'おつかれさま';
   const ring = `<div class="tm-ring ${st}${st === 'done' && TM.early ? ' early' : ''}"><svg viewBox="0 0 300 300" aria-hidden="true"><circle class="tm-track" cx="150" cy="150" r="${TM_R}"/><circle class="tm-arc" id="tm-arc" cx="150" cy="150" r="${TM_R}" stroke-dasharray="${TM_C.toFixed(2)}" stroke-dashoffset="${(TM_C * (1 - frac)).toFixed(2)}" transform="rotate(-90 150 150)"/></svg>
-    <div class="tm-center">${st === 'done' && TM.early ? `<div class="tm-state">${stateTx}</div>` : ''}<div class="tm-digits mono" id="tm-digits" role="timer" aria-live="off">${digits}</div>${st === 'done' && TM.early ? '<div class="tm-state">やった</div>' : `<div class="tm-state" id="tm-state">${stateTx}</div>`}</div></div>`;
+    <div class="tm-center">${st === 'done' && !TM.early ? `<span class="tm-ok${fxc('tmdone', 'in')}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 12.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>` : ''}${st === 'done' && TM.early ? `<div class="tm-state">${stateTx}</div>` : ''}<div class="tm-digits mono" id="tm-digits" role="timer" aria-live="off">${digits}</div>${st === 'done' && TM.early ? '<div class="tm-state">やった</div>' : `<div class="tm-state" id="tm-state">${stateTx}</div>`}</div></div>`;
   let top, bottom;
   if (st === 'idle') {
     top = `<input class="field tm-purpose" id="tm-purpose" data-draft maxlength="60" placeholder="この時間の目的" value="${esc(purpose)}" data-enter="timerStart" autocomplete="off" aria-label="この時間の目的（書くと始められる）">`;
     bottom = `<div class="tm-presets" role="group" aria-label="時間をえらぶ">${[[300, '5分'], [900, '15分'], [1800, '30分'], [3600, '1時間']].map(([v, l]) => `<button data-act="timerSet" data-arg="${v}" aria-pressed="${TM.dur === v}">${l}</button>`).join('')}</div>
       <div class="tm-adj">${tmBtn('timerAdj', '−5', '5分へらす', 'sm', -300, TM.dur <= 300 ? 'disabled' : '')}${tmBtn('timerAdj', '−1', '1分へらす', 'sm', -60, TM.dur <= 60 ? 'disabled' : '')}${tmBtn('timerAdj', '＋1', '1分ふやす', 'sm', 60)}${tmBtn('timerAdj', '＋5', '5分ふやす', 'sm', 300)}</div>
-      <div class="tm-row">${tmBtn('timerStart', TMI.play, '始める', 'big primary', '', `id="tm-start" ${ok ? '' : 'disabled'}`)}</div><div class="tm-need" id="tm-need" ${ok ? 'hidden' : ''}>目的を書くと始められる</div>`;
+      <div class="tm-row">${tmBtn('timerStart', TMI.play, '始める', 'big primary', '', `id="tm-start" aria-disabled="${!ok}"`)}</div><div class="tm-need" id="tm-need" ${ok ? 'hidden' : ''}>目的を書くと始められる</div>`;
   } else {
     top = `<div class="tm-what"><span class="tm-aim">${TMI.aim}</span>${esc(TM.purpose)}</div>`;
-    if (st === 'done') bottom = `<div class="tm-row">${tmBtn('timerReset', TMI.close, TM.logged ? '閉じて、別のタイマーにする' : '記録せずに閉じて、別のタイマーにする')}${tmBtn('timerLog', TM.logged ? TMI.log : TMI.log, TM.logged ? '記録に残した' : `${tmMin(TM.spent)}を記録に残す`, 'big primary log', '', TM.logged || TM.spent < 1 ? 'disabled' : '')}${TM.early && !TM.logged ? tmBtn('timerResume', TMI.play, '続ける（残り ' + tmFmt(TM.left) + '）') : tmBtn('timerAgain', TMI.again, 'もう一度同じ時間で')}</div><div class="tm-need">${TM.logged ? '今日の流れに残した' : `✓ で「${tmMin(TM.spent)}」を記録に残す`}</div>`;
+    if (st === 'done') bottom = `<div class="tm-row">${tmBtn('timerReset', TMI.close, TM.logged ? '閉じて、別のタイマーにする' : '記録せずに閉じて、別のタイマーにする')}${tmBtn('timerLog', TM.logged ? TMI.log : TMI.log, TM.logged ? '記録に残した' : `${tmMin(TM.spent)}を記録に残す`, 'big primary log' + fxc('tmlog', 'pop'), '', TM.logged || TM.spent < 1 ? 'disabled' : '')}${TM.early && !TM.logged ? tmBtn('timerResume', TMI.play, '続ける（残り ' + tmFmt(TM.left) + '）') : tmBtn('timerAgain', TMI.again, 'もう一度同じ時間で')}</div><div class="tm-need">${TM.logged ? '今日の流れに残した' : `✓ で「${tmMin(TM.spent)}」を記録に残す`}</div>`;
     else bottom = `<div class="tm-row">${tmBtn('timerStop', TMI.stop, 'ここでやめる（やった分を記録できる）')}${st === 'run' ? tmBtn('timerPause', TMI.pause, '一時停止', 'big primary') : tmBtn('timerPause', TMI.play, '再開', 'big primary')}${tmBtn('timerAdd', '＋1', '1分のばす', '', 60)}</div>`;
   }
   return `<div class="overlay tm" role="dialog" aria-modal="true" aria-label="タイマー"><div class="tm-top">${tmBtn('timerClose', TMI.back, '戻る', 'flat')}${tmBtn('timerSound', TM.sound ? TMI.snd : TMI.mute, `終わりの音：${TM.sound ? 'あり' : 'なし'}（押すと切りかえ）`, 'flat' + (TM.sound ? '' : ' off'), '', `aria-pressed="${TM.sound}"`)}</div>
@@ -1625,6 +1659,7 @@ function tmChime() { // 終わりの合図：やわらかい音を3つ
 }
 function tmFinish(live) {
   clearInterval(tmTimer); tmTimer = 0; TM.state = 'done'; TM.left = 0; TM.spent = TM.dur; TM.early = false; TM.logged = false; tmSave();
+  if (live) fx('tmdone');
   if (live) { tmChime(); try { if (navigator.vibrate) navigator.vibrate([200, 120, 200]); } catch (_) {} S.timerOpen = true; }
   tmWake(); render();
 }
@@ -1635,7 +1670,7 @@ A.timerAdj = v => { if (TM.state !== 'idle') return; TM.dur = clamp(TM.dur + Num
 A.timerStart = () => {
   if (TM.state !== 'idle') return;
   const purpose = String(S.drafts['tm-purpose'] || '').trim();
-  if (!purpose) { const el = $('#tm-purpose'); if (el) el.focus(); return; }
+  if (!purpose) { shake($('#tm-purpose')); const n = $('#tm-need'); if (n) { n.hidden = false; n.classList.remove('flash'); void n.offsetWidth; n.classList.add('flash'); } return; }
   try { const AC = window.AudioContext || window.webkitAudioContext; if (AC && !tmAudio) tmAudio = new AC(); if (tmAudio && tmAudio.state === 'suspended') tmAudio.resume(); } catch (_) {}
   Object.assign(TM, { state: 'run', purpose, endAt: Date.now() + TM.dur * 1000, logged: false }); delete S.drafts['tm-purpose']; tmSave(); tmRun(); render();
 };
@@ -1659,11 +1694,12 @@ A.timerLog = () => {
   if (TM.state !== 'done' || TM.logged) return;
   const d = today(), day = getDay(d);
   patchDay(d, { entries: [...(day.entries || []), { id: uid(), t: Date.now(), text: `⏱ ${TM.purpose}（${tmMin(TM.spent || TM.dur)}${TM.early ? ` / 予定${tmMin(TM.dur)}` : ''}）` }] });
-  TM.logged = true; tmSave(); render();
+  TM.logged = true; fx('tmlog'); tmSave(); render();
 };
 // 開き直したとき：動いていたタイマーを続ける（もう時間が過ぎていたら「終了」にする）
 if (TM.state === 'run') { if (Date.now() >= TM.endAt) { TM.state = 'done'; TM.left = 0; TM.spent = TM.dur; TM.early = false; tmSave(); } else tmRun(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { tmTick(); tmWake(); } });
+A.setMotion = v => { try { if (v === 'calm') localStorage.setItem(MOTION_KEY, 'calm'); else localStorage.removeItem(MOTION_KEY); } catch (_) {} applyMotion(); render(); };
 A.setLook = v => { patchSettings({ look: v === 'classic' ? 'classic' : 'nova' }); applyLook(); };
 /* ── Daylogから直接通知（ホーム画面のDaylog・アプリ版） ── */
 S.push = { state: null, busy: false, msg: '' };
@@ -1708,7 +1744,7 @@ A.pushTest = async () => {
 };
 A.toggleSettings = () => (S.view === 'settings' ? A.goBack() : A.go('settings'));
 A.goBack = () => A.go(S.prevView && S.prevView !== 'settings' ? S.prevView : 'today');
-A.go = v => { if (v === 'settings' && S.view !== 'settings') { S.prevView = S.view; refreshPush(); } S.view = v; S.sky.sel = null; S.openTask = null; window.scrollTo(0, 0); render(); if (v === 'today') loadEvents(today()); if (v === 'cal') loadCal(); };
+A.go = v => { if (v !== S.view) vt(v === 'settings' ? 'fwd' : S.view === 'settings' ? 'back' : 'tab'); if (v === 'settings' && S.view !== 'settings') { S.prevView = S.view; refreshPush(); } S.view = v; S.sky.sel = null; S.openTask = null; window.scrollTo(0, 0); render(); if (v === 'today') loadEvents(today()); if (v === 'cal') loadCal(); };
 A.setMode = async m => {
   const d = today(); const day = getDay(d); const patch = { mode: m, modeAt: Date.now() };
   if (!day.wakeAt && !day.mode) patch.wakeAt = Date.now();
@@ -1883,7 +1919,7 @@ A.taskAdd = () => {
   S.drafts['task-title'] = ''; S.drafts['task-w'] = ''; S.drafts['task-dl'] = ''; S.drafts['task-goal'] = ''; S.taskAddOpen = false; S.tasks[id] = t; render(); putDoc('tasks/' + id, t);
 };
 A.taskOpen = id => { S.openTask = S.openTask === id ? null : id; render(); };
-A.taskDone = id => { const t = S.tasks[id]; if (!t) return; patchTask(id, { status: 'done', doneAt: Date.now() }); toast('終わった。青い星がひとつ増えた。'); };
+A.taskDone = id => { const t = S.tasks[id]; if (!t) return; fx('task' + id); patchTask(id, { status: 'done', doneAt: Date.now() }); toast('終わった。青い星がひとつ増えた。'); };
 A.taskUndo = id => patchTask(id, { status: 'open', doneAt: null });
 A.taskHold = id => patchTask(id, { status: 'held', heldAt: Date.now() });
 A.taskRestore = id => patchTask(id, { status: 'open', plannedDate: null, heldAt: null });
@@ -1900,7 +1936,7 @@ A.memoMenu = id => { S.memoMenu = S.memoMenu === id ? null : id; render(); };
 A.memoEdit = id => { const m = S.memos[id]; if (!m) return; S.editMemo = id; S.memoMenu = null; S.drafts['memo-edit'] = m.text; render(); setTimeout(() => { const t = $('#memo-edit'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }, 30); };
 A.memoEditCancel = () => { S.editMemo = null; render(); };
 A.memoSave = id => { const m = S.memos[id]; if (!m) return; const text = String(S.drafts['memo-edit'] || '').replace(/\n{3,}/g, '\n\n').trim(); if (!text) return; const nm = { ...m, text, editedAt: Date.now() }; S.memos[id] = nm; S.editMemo = null; render(); putDoc('memos/' + id, nm); toast('メモを直した。'); };
-A.memoAdd = () => { const text = (S.drafts['memo-text'] || '').replace(/\n{3,}/g, '\n\n').trim(); if (!text) return; const id = uid(); const m = { id, text, createdAt: Date.now() }; S.drafts['memo-text'] = ''; S.memos[id] = m; render(); putDoc('memos/' + id, m); };
+A.memoAdd = () => { const text = (S.drafts['memo-text'] || '').replace(/\n{3,}/g, '\n\n').trim(); if (!text) { shake($('#memo-text')); return; } const id = uid(); const m = { id, text, createdAt: Date.now() }; S.drafts['memo-text'] = ''; S.memos[id] = m; render(); putDoc('memos/' + id, m); };
 A.memoDelete = id => { const m = S.memos[id]; if (!m) return; delete S.memos[id]; render(); delDoc('memos/' + id); S.undo = () => { S.memos[id] = m; render(); putDoc('memos/' + id, m); }; toast('メモを消した。', true); };
 A.memoToTask = id => { const m = S.memos[id]; if (!m) return; const tid = uid(); const t = { id: tid, title: m.text.split('\n')[0].slice(0, 120), status: 'open', steps: [], createdAt: Date.now(), fromMemo: id }; S.tasks[tid] = t; delete S.memos[id]; render(); putDoc('tasks/' + tid, t); delDoc('memos/' + id); toast('タスクにした。タスクの画面にある。'); };
 /* ── ノートを書く画面（太字・下線・斜体・取り消し線・見出し・リスト・チェックリスト・画像）
@@ -1966,7 +2002,7 @@ function fillBlobs(root) { // data-blob の画像に中身を入れる（手元 
     if (img.getAttribute('src')) return; const id = img.dataset.blob;
     const v = S.db.blob.peek(id); if (v && v.src) { img.src = v.src; return; }
     img.classList.add('loading');
-    S.db.blob.get(id).then(d => { img.classList.remove('loading'); if (d && d.src) img.src = d.src; else img.classList.add('missing'); });
+    S.db.blob.get(id).then(d => { img.classList.remove('loading'); if (d && d.src) { img.classList.add('reveal'); img.src = d.src; } else img.classList.add('missing'); });
   });
 }
 const NE = (() => {
@@ -1994,7 +2030,7 @@ const NE = (() => {
     el.querySelector('.ne-tools').addEventListener('pointerdown', e => { if (e.target.closest('.ne-b')) e.preventDefault(); });
     el.querySelector('.ne-tools').addEventListener('click', e => { const b = e.target.closest('.ne-b'); if (b) cmd(b.dataset.cmd); });
     el.querySelector('.ne-back').addEventListener('click', () => A.noteClose());
-    el.querySelector('.ne-fav').addEventListener('click', () => { flush(); const n = S.notes[E.id]; if (!n) return; save({ fav: !n.fav }, true); top(); });
+    el.querySelector('.ne-fav').addEventListener('click', () => { flush(); const n = S.notes[E.id]; if (!n) return; if (!n.fav) fx('star' + E.id); save({ fav: !n.fav }, true); top(); });
     el.querySelector('.ne-more').addEventListener('click', () => { E.menu = !E.menu; menu(); });
     el.querySelector('.ne-menu').addEventListener('click', e => {
       const b = e.target.closest('[data-m]'); if (!b) return; const m = b.dataset.m;
@@ -2094,7 +2130,7 @@ const NE = (() => {
     E.dirty = true; flush();
   }
   const clean = () => noteClean(E.el.querySelector('.ne-body'), false);
-  function status(t) { const s = E.el && E.el.querySelector('.ne-st'); if (s) s.textContent = t; }
+  function status(t) { const s = E.el && E.el.querySelector('.ne-st'); if (!s || s.textContent === t) return; s.textContent = t; s.classList.remove('swap'); void s.offsetWidth; s.classList.add('swap'); }
   function save(patch, now) {
     const n = S.notes[E.id]; if (!n) return;
     const nd = { ...n, ...patch, updatedAt: Date.now() }; delete nd.local;
@@ -2116,7 +2152,7 @@ const NE = (() => {
   }
   function top() {
     const n = S.notes[E.id]; if (!n || !E.el) return;
-    const fav = E.el.querySelector('.ne-fav'); fav.className = 'mstar ne-fav' + (n.fav ? ' on' : ''); fav.innerHTML = n.fav ? MI.star : MI.starO; fav.setAttribute('aria-pressed', String(!!n.fav)); fav.setAttribute('aria-label', n.fav ? 'お気に入りから外す' : 'お気に入りにする');
+    const fav = E.el.querySelector('.ne-fav'), pop = n.fav ? fxc('star' + E.id, 'pop') : ''; fav.className = 'mstar ne-fav' + (n.fav ? ' on' : '') + pop; fav.innerHTML = `<span class="mi">${n.fav ? MI.star : MI.starO}</span>${pop ? BURST : ''}`; fav.setAttribute('aria-pressed', String(!!n.fav)); fav.setAttribute('aria-label', n.fav ? 'お気に入りから外す' : 'お気に入りにする');
     const from = S.nFolder && S.nFolder !== 'all' && S.nFolder !== 'trash' ? folderName(S.nFolder) : S.nFolder === 'all' ? 'すべて' : S.memoTab === 'fav' ? '★' : 'ノート';
     E.el.querySelector('.ne-fn').textContent = from || 'ノート';
     meta();
@@ -2161,11 +2197,11 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) NE.fl
 window.addEventListener('pagehide', () => NE.flush());
 
 // ── メモの画面の操作
-A.memoTab = t => { if (t === 'fav' && S.memoTab !== 'fav') S.memoTabPrev = S.memoTab || 'quick'; S.memoTab = t; S.memoMenu = null; S.editMemo = null; window.scrollTo(0, 0); render(); };
+A.memoTab = t => { if (t !== S.memoTab) vt(t === 'fav' || S.memoTab === 'fav' ? 'fade' : 'tabs'); if (t === 'fav' && S.memoTab !== 'fav') S.memoTabPrev = S.memoTab || 'quick'; S.memoTab = t; S.memoMenu = null; S.editMemo = null; window.scrollTo(0, 0); render(); };
 A.memoSearchClear = () => { S.drafts['memo-q'] = ''; render(); };
-A.memoFav = id => { const m = S.memos[id]; if (!m) return; const nm = { ...m, fav: !m.fav }; S.memos[id] = nm; render(); putDoc('memos/' + id, nm); };
-A.noteFav = id => { const n = S.notes[id]; if (!n) return; const nn = { ...n, fav: !n.fav }; S.notes[id] = nn; render(); putDoc('notes/' + id, nn); };
-A.nFolder = f => { S.nFolder = f || null; S.nfMenu = null; S.memoTab = 'notes'; window.scrollTo(0, 0); render(); };
+A.memoFav = id => { const m = S.memos[id]; if (!m) return; const nm = { ...m, fav: !m.fav }; if (nm.fav) fx('star' + id); S.memos[id] = nm; render(); putDoc('memos/' + id, nm); };
+A.noteFav = id => { const n = S.notes[id]; if (!n) return; const nn = { ...n, fav: !n.fav }; if (nn.fav) fx('star' + id); S.notes[id] = nn; render(); putDoc('notes/' + id, nn); };
+A.nFolder = f => { vt(f ? 'fwd' : 'back'); S.nFolder = f || null; S.nfMenu = null; S.memoTab = 'notes'; window.scrollTo(0, 0); render(); };
 A.nfAddOpen = () => { S.nfAdd = !S.nfAdd; render(); if (S.nfAdd) setTimeout(() => { const el = $('#nf-name'); if (el) el.focus(); }, 30); };
 A.nfAdd = () => { const name = String(S.drafts['nf-name'] || '').trim(); if (!name) return; const id = 'f' + uid(); const f = { id, name: name.slice(0, 40), createdAt: Date.now() }; S.nfolders[id] = f; S.drafts['nf-name'] = ''; S.nfAdd = false; render(); putDoc('nfolders/' + id, f); };
 A.nfMenu = id => { S.nfMenu = S.nfMenu === id ? null : id; render(); };
@@ -2183,10 +2219,10 @@ A.nfDelete = id => {
 A.noteNew = () => {
   const id = 'n' + uid(), now = Date.now();
   S.notes[id] = { id, folder: S.nFolder && S.nFolder !== 'all' && S.nFolder !== 'trash' ? S.nFolder : null, html: '', text: '', title: '', createdAt: now, updatedAt: now, local: true };
-  S.nOpen = id; render();
+  vt('fwd'); S.nOpen = id; render();
 };
-A.noteOpen = id => { if (!S.notes[id]) return; S.nOpen = id; window.scrollTo(0, 0); render(); };
-A.noteClose = () => { NE.unmount(); S.nOpen = null; render(); };
+A.noteOpen = id => { if (!S.notes[id]) return; vt('fwd'); S.nOpen = id; window.scrollTo(0, 0); render(); };
+A.noteClose = () => { vt('back'); NE.unmount(); S.nOpen = null; render(); };
 A.noteTrash = id => {
   const n = S.notes[id]; if (!n) return; NE.flush();
   if (NE.id === id) NE.unmount(); S.nOpen = null;
@@ -2533,7 +2569,7 @@ document.addEventListener('focusout', e => {
 document.addEventListener('input', e => {
   const el = e.target; if (el.id && el.hasAttribute('data-draft')) S.drafts[el.id] = el.value;
   if (el.id === 'memo-q') render();
-  if (el.id === 'tm-purpose') { const b = $('#tm-start'); if (b) b.disabled = !el.value.trim(); const hn = $('#tm-need'); if (hn) hn.hidden = !!el.value.trim(); }
+  if (el.id === 'tm-purpose') { const b = $('#tm-start'); if (b) b.setAttribute('aria-disabled', String(!el.value.trim())); const hn = $('#tm-need'); if (hn) hn.hidden = !!el.value.trim(); }
   if (el.id === 'task-title') { const box = el.closest('.taskadd'); if (box) box.classList.toggle('open', !!el.value.trim()); }
   if (el.id === 'composer-text') { el.style.height = 'auto'; el.style.height = Math.min(120, el.scrollHeight) + 'px'; }
   if (el.classList && el.classList.contains('autosize')) autosize(el);
