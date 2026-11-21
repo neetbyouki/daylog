@@ -115,7 +115,7 @@ do $$ declare t text; begin
   end loop;
 end $$;
 
--- ── 4) pg_net の引っ越しは 20261121d_pg_net.sql に分けた（承認待ち）
+-- ── 4) pg_net の引っ越しは 20261121d_pg_net.sql に分けた（2026-11-22 適用）
 
 -- ── 5) エラーの自動報告
 create table if not exists public.client_errors (
