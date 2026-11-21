@@ -140,7 +140,8 @@
       const touched = new Set(); let hold = null; let max = cursor;
       for (const r of rows || []) {
         const k = r.c + '/' + r.id;
-        if (r.c === BLOB) { if (r.data) { blobs.set(r.id, r.data); idb.put(r.id, r.data); } continue; }
+        // 画像の行は、中身（src）があるときだけ控える（Storage に移った画像の行は場所だけなので、開くときに取りにいく）
+        if (r.c === BLOB) { if (r.data && r.data.src) { blobs.set(r.id, r.data); idb.put(r.id, r.data); } continue; }
         if (skipBusy && busy(k)) { if (hold === null || r.u < hold) hold = r.u; continue; }
         if (max === null || r.u > max) max = r.u;
         const cur = col(r.c).get(r.id);
@@ -290,7 +291,7 @@
         try { rows = be.get ? await be.get(BLOB, part) : []; } catch (e) { console.warn('Daylog blob', e); }
         const got = new Map((rows || []).map(r => [r.id, r.data]));
         for (const id of part) {
-          const d = got.get(id) || null; if (d) { blobs.set(id, d); idb.put(id, d); }
+          const g = got.get(id); const d = g && g.src ? g : null; if (d) { blobs.set(id, d); idb.put(id, d); }
           const w = blobWait.get(id); blobWait.delete(id); if (w) w.forEach(f => f(d));
         }
       }
@@ -302,7 +303,7 @@
       return new Promise(resolve => {
         blobWait.get(id).push(resolve);
         idb.get(id).then(v => {
-          if (v) { blobs.set(id, v); const w = blobWait.get(id); blobWait.delete(id); if (w) w.forEach(f => f(v)); return; }
+          if (v && v.src) { blobs.set(id, v); const w = blobWait.get(id); blobWait.delete(id); if (w) w.forEach(f => f(v)); return; }
           blobQ.add(id); if (!blobT) blobT = setTimeout(blobFetch, 30);
         });
       });

@@ -68,6 +68,22 @@ async function allDocs(uid: string) {
   }
   return out;
 }
+// 画像は Storage にある（docs の blobs は場所だけ）。バックアップには中身も入れる（data: URL）
+function bytesToB64(bytes: Uint8Array) {
+  let s = ""; const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) s += String.fromCharCode(...bytes.subarray(i, i + CH));
+  return btoa(s);
+}
+async function withImages(rows: any[]) {
+  const st = admin.storage.from("daylog-images"); let missing = 0;
+  for (const r of rows) {
+    if (r.collection !== "blobs" || !r.data || r.data.src || !r.data.path) continue;
+    const { data, error } = await st.download(r.data.path);
+    if (error || !data) { missing++; continue; }
+    r.data = { ...r.data, src: `data:${r.data.mime || "image/jpeg"};base64,` + bytesToB64(new Uint8Array(await data.arrayBuffer())) };
+  }
+  return missing;
+}
 async function setState(uid: string, patch: Record<string, unknown>) {
   const { data } = await admin.from("docs").select("data").eq("user_id", uid).eq("collection", "meta").eq("id", "backup").maybeSingle();
   const next = { ...(data?.data || {}), ...patch };
@@ -81,12 +97,13 @@ async function backupFor(uid: string, reason: string, reqAt?: number) {
   try {
     const tok = await accessToken(uid);
     const rows = await allDocs(uid);
+    const imgMissing = await withImages(rows);
     const collections: Record<string, Record<string, unknown>> = {}; const counts: Record<string, number> = {};
     for (const r of rows) {
       if (r.collection === "meta" && (r.id === "backup" || r.id === "backupreq")) continue;
       (collections[r.collection] ||= {})[r.id] = r.data; counts[r.collection] = (counts[r.collection] || 0) + 1;
     }
-    const body = JSON.stringify({ app: "Daylog", kind: "backup", format: 1, reason, exportedAt: new Date(now).toISOString(), counts, collections });
+    const body = JSON.stringify({ app: "Daylog", kind: "backup", format: 1, reason, exportedAt: new Date(now).toISOString(), counts, imgMissing, collections });
     const fid = await folderId(tok, (prev as any).folderId);
     const name = `Daylog-${jstStamp(now)}${reason === "weekly" ? "" : "-手動"}.json`;
     // 大きくても途切れないよう、2回に分けて送る（resumable）

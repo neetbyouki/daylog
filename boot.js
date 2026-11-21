@@ -1,15 +1,28 @@
-// Daylog の起動：ログイン → Googleカレンダーの許可を保存 → データベースとつなぐ → 本体（daylog.js）を読み込む
+// Daylog の起動：ログイン → Googleカレンダーの許可を保存 → データベースとつなぐ → 本体（app/ の部品）を読み込む
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import './store.js?v=2026-11-21b';
+import './store.js?v=2026-11-22a';
 
 const SUPABASE_URL = 'https://etsuxjcrnyoevrasdhde.supabase.co';
 // 公開してよい鍵（データは行ごとの権限で本人だけが読み書きできる）
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0c3V4amNybnlvZXZyYXNkaGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNDM5OTQsImV4cCI6MjEwOTkxOTk5NH0.ae7iJE6mtN0-wEbiEAaPS5A7j7n3Y_zd-qRVREoBJ9o';
-const VERSION = '2026-11-21g';
+const VERSION = '2026-11-22a';
 const GCAL = 'Google Calendar', HOST = 'host:Daylog_PC';
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
 
 const $boot = document.getElementById('boot');
+
+// 本体は役割ごとのファイル（app/parts.json の順）。ログインやカレンダーの読み込みと同時に取りにいき、
+// 1つにつないで1つの関数の中で動かす（claude.ai版の tools/build_claude.py も同じつなぎ方）
+const appCode = (async () => {
+  const v = '?v=' + VERSION;
+  const parts = await (await fetch('app/parts.json' + v)).json();
+  const texts = await Promise.all(parts.map(async p => {
+    const r = await fetch('app/' + p + v); if (!r.ok) throw new Error('app/' + p + ' ' + r.status);
+    return `\n/* ═══ app/${p} ═══ */\n` + await r.text();
+  }));
+  return "(() => {\n'use strict';\n" + texts.join('') + '\n})();\n//# sourceURL=daylog-app.js';
+})();
+appCode.catch(() => {});
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} },
@@ -54,6 +67,17 @@ const isOfflineErr = e => {
   const m = String((e && (e.message || e.details)) || e || '');
   return e instanceof TypeError || /Failed to fetch|NetworkError|Load failed|network|fetch failed|timeout/i.test(m);
 };
+// 画像の中身は Storage（バケット daylog-images の <user_id>/ フォルダ。本人だけ読み書きできる）。
+// docs の blobs には場所（path）と大きさだけを置く。画面には今まで通り src（data: URL）で渡す
+const IMG_BUCKET = 'daylog-images';
+const IMG_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+function dataUrlToBlob(src) {
+  const i = src.indexOf(';base64,'); const mime = src.slice(5, i); const bin = atob(src.slice(i + 8));
+  const u = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) u[k] = bin.charCodeAt(k);
+  return new Blob([u], { type: mime });
+}
+const blobToDataUrl = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
+
 function webBackend(uid) {
   const row = r => ({ c: r.collection, id: r.id, data: r.data, u: r.updated_at });
   const must = ({ data, error }) => { if (error) throw error; return data; };
@@ -74,11 +98,35 @@ function webBackend(uid) {
     },
     async ids() { return must(await sb.from('docs').select('collection,id').neq('collection', 'blobs')).map(r => ({ c: r.collection, id: r.id })); },
     // 画像など、決まった記録だけを取る
-    async get(c, ids) { return must(await sb.from('docs').select('collection,id,data,updated_at').eq('collection', c).in('id', ids)).map(row); },
+    async get(c, ids) {
+      const rows = must(await sb.from('docs').select('collection,id,data,updated_at').eq('collection', c).in('id', ids)).map(row);
+      if (c === 'blobs') await Promise.all(rows.map(async r => {
+        const d = r.data || {}; if (d.src || !d.path) return;
+        const { data, error } = await sb.storage.from(IMG_BUCKET).download(d.path);
+        if (error || !data) { console.warn('Daylog image', d.path, error); return; } // 中身なしで返す → 画面は「読めなかった」印。次に開いたときにまた取りにいく
+        r.data = { ...d, src: await blobToDataUrl(new Blob([data], { type: d.mime || data.type || 'image/jpeg' })) };
+      }));
+      return rows;
+    },
     // 差分を送ると、サーバーで足し合わせた結果が返る
     async patch(c, id, patch) { return must(await sb.rpc('docs_patch', { p_col: c, p_id: id, p_patch: patch })); },
-    async set(c, id, data) { must(await sb.from('docs').upsert({ user_id: uid, collection: c, id, data })); },
-    async del(c, id) { must(await sb.from('docs').delete().eq('collection', c).eq('id', id)); },
+    async set(c, id, data) {
+      if (c === 'blobs' && data && typeof data.src === 'string' && data.src.startsWith('data:')) {
+        const file = dataUrlToBlob(data.src); const mime = file.type || 'image/jpeg';
+        const path = `${uid}/${id}.${IMG_EXT[mime] || 'jpg'}`;
+        must(await sb.storage.from(IMG_BUCKET).upload(path, file, { contentType: mime, upsert: true }));
+        const { src, ...meta } = data; data = { ...meta, mime, path, size: file.size };
+      }
+      must(await sb.from('docs').upsert({ user_id: uid, collection: c, id, data }));
+    },
+    async del(c, id) {
+      if (c === 'blobs') {
+        const got = must(await sb.from('docs').select('data').eq('collection', 'blobs').eq('id', id));
+        const paths = got.map(r => r.data && r.data.path).filter(Boolean);
+        if (paths.length) must(await sb.storage.from(IMG_BUCKET).remove(paths));
+      }
+      must(await sb.from('docs').delete().eq('collection', c).eq('id', id));
+    },
     isOffline: isOfflineErr,
     // 送り直せば通りそうな失敗か（電波・ログインの期限切れ・サーバーの一時的な不調）
     retryable(e) {
@@ -234,13 +282,18 @@ async function start() {
   window.claude = {
     use: async name => (name === 'db' ? db : name === 'user' ? user : name === 'mcp' ? mcp : null),
   };
+  let code;
+  try { code = await appCode; } catch (e) {
+    console.error(e);
+    $boot.innerHTML = '画面の部品を読み込めなかった。電波を確かめて、開き直してみて。<br><button onclick="location.reload()">開き直す</button>';
+    return;
+  }
   $boot.remove();
   // 銀河（galaxy.js）は星空タブを開くときに本体が読み込む。起動時には読まない
   window.__daylogGalaxySrc = 'galaxy.js?v=' + VERSION;
-  const s = document.createElement('script'); s.async = false;
-  s.src = 'daylog.js?v=' + VERSION;
-  s.onload = () => { if (gcalLinked === null) fn('google_status').then(r => { if (window.__daylogState) window.__daylogState.gcalLinked = r.linked; }).catch(() => {}); };
+  const s = document.createElement('script'); s.textContent = code;
   document.body.appendChild(s);
+  if (gcalLinked === null) fn('google_status').then(r => { if (window.__daylogState) window.__daylogState.gcalLinked = r.linked; }).catch(() => {});
 }
 
 sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') location.reload(); });

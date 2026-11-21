@@ -1,11 +1,17 @@
 // Daylog のサービスワーカー
 // ・画面のファイルを覚えておき、電波がなくても開けるようにする（記録は store.js が端末に覚えている）
 // ・Daylogからの通知（Web Push）を受け取って出す
-const CACHE = 'daylog-shell-v27';
-const SHELL = ['./', './index.html', './boot.js', './store.js', './galaxy.js', './daylog.js', './manifest.webmanifest', './icons/icon-192.png'];
+const CACHE = 'daylog-shell-v28';
+const SHELL = ['./', './index.html', './boot.js', './store.js', './galaxy.js', './app/parts.json', './manifest.webmanifest', './icons/icon-192.png'];
 const LIB = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(async c => { await c.addAll(SHELL); try { await c.add(LIB); } catch (_) {} }).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(async c => {
+    await c.addAll(SHELL);
+    // 本体の部品（app/parts.json に書いてあるファイル）も覚えておく
+    const parts = await (await fetch('./app/parts.json', { cache: 'no-cache' })).json();
+    await c.addAll(parts.map(p => './app/' + p));
+    try { await c.add(LIB); } catch (_) {}
+  }).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {

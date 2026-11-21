@@ -2,14 +2,16 @@
 """claude.ai 版 Daylog（アーティファクト用の1ファイル）を、Web版と同じ元ファイルから作る。
 
 使い方: python3 tools/build_claude.py <カレンダーidのJSONファイル> <出力先.html>
-- 元にするのは index.html（見た目と骨組み）と daylog.js（本体）。Web版と同じファイル。
+- 元にするのは index.html（見た目と骨組み）と app/ の部品（本体。app/parts.json の順につなぐ）。Web版と同じファイル。
 - claude.ai 版で違うのは「つなぎ」だけ（claude/shim.js）。
 - カレンダーのidは公開リポジトリに入れないので、外のJSONファイルから読む。
 """
 import json, sys, pathlib
 root = pathlib.Path(__file__).resolve().parent.parent
 html = (root / 'index.html').read_text(encoding='utf-8')
-js = (root / 'daylog.js').read_text(encoding='utf-8')
+# 本体：アプリ版の boot.js と同じく、部品を順につないで1つの関数に入れる
+parts = json.loads((root / 'app' / 'parts.json').read_text(encoding='utf-8'))
+js = "(() => {\n'use strict';\n" + ''.join(f"\n/* ═══ app/{p} ═══ */\n" + (root / 'app' / p).read_text(encoding='utf-8') for p in parts) + "\n})();\n"
 shim = (root / 'claude' / 'shim.js').read_text(encoding='utf-8')
 store = (root / 'store.js').read_text(encoding='utf-8')  # 記録置き場（アプリ版と共通）
 galaxy = (root / 'galaxy.js').read_text(encoding='utf-8')  # 銀河（アプリ版と共通。星空タブを開くまで何も動かさない）
