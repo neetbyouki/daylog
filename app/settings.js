@@ -88,7 +88,33 @@ function backupState() {
   const waiting = req.at && req.at > (b.reqAt || 0) && Date.now() - req.at < 10 * 60000;
   return { b, waiting };
 }
+// 画像の置き場所（Storage）の使用量。無料の枠は1GB。設定を開いたときに数える（1分に1回まで）
+const IMG_LIMIT = 1024 ** 3;
+const mbText = n => (n >= 1024 ** 3 ? (n / 1024 ** 3).toFixed(2) + 'GB' : n >= 1024 ** 2 ? (n / 1024 ** 2).toFixed(1) + 'MB' : Math.max(0, Math.round(n / 1024)) + 'KB');
+function ensureImgStat(force) {
+  const st = S.imgStat || {};
+  if (st.loading || (!force && st.at && Date.now() - st.at < 60000) || !S.db || !S.db.imgStat) return;
+  S.imgStat = { ...st, loading: true };
+  S.db.imgStat().then(r => { S.imgStat = { n: Number(r && r.n) || 0, bytes: Number(r && r.bytes) || 0, at: Date.now() }; })
+    .catch(e => { console.warn('Daylog imgStat', e); S.imgStat = { ...st, loading: false, at: Date.now(), err: true }; })
+    .finally(() => { if (S.view === 'settings') render(); });
+}
+function imgStatHTML() {
+  const st = S.imgStat || {};
+  let txt, pct = 0;
+  if (st.n === undefined) txt = st.err ? '数えられなかった。少しして開き直してみて。' : '数えています…';
+  else {
+    pct = st.bytes / IMG_LIMIT * 100;
+    txt = `画像 ${st.n}枚・${mbText(st.bytes)}／1GB（${pct < 0.1 && st.bytes > 0 ? '0.1%未満' : pct.toFixed(pct < 10 ? 1 : 0) + '%'}）`;
+    // 残りの枚数：今の平均の大きさで。まだ少ないうちは平均がぶれるので、1枚150KB以上として数える
+    if (st.n) { const per = Math.max(st.bytes / st.n, 150 * 1024); txt += `<br>あと約${Math.max(0, Math.floor((IMG_LIMIT - st.bytes) / per)).toLocaleString()}枚入る（1枚${mbText(per)}として）`; }
+  }
+  const warn = pct >= 80;
+  return `<div class="item imgstat"><div class="l">画像の置き場所<small>${txt}${warn ? '<br><span class="bk-err">そろそろいっぱい。古いノートの画像を整理するか、相談してほしい。</span>' : ''}</small>
+    <div class="imgbar${warn ? ' warn' : ''}" role="meter" aria-label="画像の置き場所の使用量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct.toFixed(1)}"><i style="width:${Math.min(100, Math.max(st.bytes ? 1 : 0, pct)).toFixed(2)}%"></i></div></div></div>`;
+}
 function backupCardHTML() {
+  ensureImgStat();
   const { b, waiting } = backupState();
   const web = !!window.daylogRelogin;
   let txt;
@@ -101,6 +127,7 @@ function backupCardHTML() {
   let h = `<h2 class="sec"><span>記録の守り</span></h2><div class="card settings">
     <div class="item"><div class="l">Googleドライブに保存<small>${txt}<br>毎週月曜の朝4:30に、ドライブの「Daylog バックアップ」フォルダへ自動で保存する（新しい12回分を残す）。</small></div><div class="row">${relog ? '<button class="btn sm" data-act="relogin">ログインし直す</button>' : ''}<button class="btn sm${relog ? ' ghost' : ''}" data-act="backupNow" ${waiting ? 'aria-disabled="true"' : ''}>${waiting ? '保存中…' : '今すぐ保存'}</button></div></div>
     <div class="item"><div class="l">ファイルに書き出す<small>記録をまるごと1つのファイル（JSON）にして、この端末に保存する。ノートの画像も入る。</small></div><button class="btn sm" data-act="exportJson" ${S.exporting ? 'aria-disabled="true"' : ''}>${S.exporting ? '書き出し中…' : '書き出す'}</button></div>
+    ${imgStatHTML()}
     <div class="item"><div class="l">画面で起きたエラー<small>こわれた動きがあると、自動でここに記録される（90日で消える）。</small></div><button class="btn sm ghost" data-act="showErrors">${E.open ? '閉じる' : '見る'}</button></div>`;
   if (E.open) {
     let body;

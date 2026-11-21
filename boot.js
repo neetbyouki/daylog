@@ -1,11 +1,11 @@
 // Daylog の起動：ログイン → Googleカレンダーの許可を保存 → データベースとつなぐ → 本体（app/ の部品）を読み込む
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import './store.js?v=2026-11-22a';
+import './store.js?v=2026-11-22b';
 
 const SUPABASE_URL = 'https://etsuxjcrnyoevrasdhde.supabase.co';
 // 公開してよい鍵（データは行ごとの権限で本人だけが読み書きできる）
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0c3V4amNybnlvZXZyYXNkaGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNDM5OTQsImV4cCI6MjEwOTkxOTk5NH0.ae7iJE6mtN0-wEbiEAaPS5A7j7n3Y_zd-qRVREoBJ9o';
-const VERSION = '2026-11-22a';
+const VERSION = '2026-11-22b';
 const GCAL = 'Google Calendar', HOST = 'host:Daylog_PC';
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
 
@@ -126,6 +126,16 @@ function webBackend(uid) {
         if (paths.length) must(await sb.storage.from(IMG_BUCKET).remove(paths));
       }
       must(await sb.from('docs').delete().eq('collection', c).eq('id', id));
+    },
+    // 画像の置き場所の使用量（docs の blobs に書いてある大きさを足す）
+    async imgStat() {
+      let n = 0, bytes = 0;
+      for (let from = 0; ; from += 1000) {
+        const d = must(await sb.from('docs').select('id,size:data->size').eq('collection', 'blobs').range(from, from + 999));
+        n += d.length; for (const r of d) bytes += Number(r.size) || 0;
+        if (d.length < 1000) break;
+      }
+      return { n, bytes };
     },
     isOffline: isOfflineErr,
     // 送り直せば通りそうな失敗か（電波・ログインの期限切れ・サーバーの一時的な不調）

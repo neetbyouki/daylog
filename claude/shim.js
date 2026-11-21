@@ -38,6 +38,7 @@ const __rt = (() => {
     patch: (c, id, patch) => api({ a: 'patch', c, id, patch }),
     set: (c, id, data) => api({ a: 'set', c, id, data }),
     del: (c, id) => api({ a: 'del', c, id }),
+    imgStat: () => api({ a: 'imgstat' }),
     isOffline: e => (typeof navigator !== 'undefined' && navigator.onLine === false) || /network|fetch|offline|timeout/i.test(String((e && e.message) || '')),
     // 形がおかしい・権限がない、はやり直しても通らない。それ以外（つながらない・混んでいる）は送り直す
     retryable: e => !/daylog_api: bad|bad_query|not_granted|not_in_manifest|blocked_by_policy/.test(String((e && (e.code + ' ' + e.message)) || '')),

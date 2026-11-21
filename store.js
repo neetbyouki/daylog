@@ -328,6 +328,8 @@
       status, flush, sync,
       // 書き出し用：今この端末にある記録を全部（画像は含まない）
       dump() { const out = {}; for (const [c, m] of cache) { if (!m.size) continue; out[c] = {}; for (const [id, v] of m) out[c][id] = v; } return out; },
+      // 画像の置き場所（Storage）の使用量 { n: 枚数, bytes }
+      imgStat: () => (be.imgStat ? be.imgStat() : Promise.reject({ code: 'no_stat' })),
       blob: { get: getBlob, put: (id, data) => queue({ op: 'set', c: BLOB, id, data }), del: id => queue({ op: 'del', c: BLOB, id }), peek: id => blobs.get(id) },
     };
   }
