@@ -394,12 +394,27 @@ const motionCalm = () => { try { if (localStorage.getItem(MOTION_KEY) === 'calm'
 const applyMotion = () => { document.documentElement.dataset.motion = motionCalm() ? 'calm' : 'full'; };
 applyMotion(); if (reduceMQ && reduceMQ.addEventListener) reduceMQ.addEventListener('change', applyMotion);
 let vtKind = null;
+// 押したボタン：描き直しで作り直されても、新しい同じボタンを「ぽんと戻る」ように動かす
+let lastTap = null;
+function tapBack() {
+  const t = lastTap; if (!t || Date.now() - t.at > 450) return; lastTap = null;
+  const sel = `[data-act="${CSS.escape(t.act)}"]` + (t.arg != null ? `[data-arg="${CSS.escape(t.arg)}"]` : ':not([data-arg])');
+  const el = document.querySelector(sel); if (!el || el.classList.contains('pop') || el.classList.contains('fx')) return;
+  el.classList.remove('tapped'); void el.offsetWidth; el.classList.add('tapped'); setTimeout(() => el.classList.remove('tapped'), 300);
+}
 const vt = k => { vtKind = k; }; // 次の描き直しを、なめらかにつなぐ（tab：下のタブ／fwd・back：奥へ・手前へ／tabs：上の切りかえ／sheet：重なる画面）
 const FX = new Map();
 const fx = k => FX.set(k, Date.now());
 const fxc = (k, cls = 'fx') => (Date.now() - (FX.get(k) || 0) < 650 ? ' ' + cls : '');
 const NUMS = new Map(); // 数字が変わったときだけ、ふわっと入れかえる
 const num = (k, n) => { const p = NUMS.get(k); NUMS.set(k, n); return `<span class="num${p != null && p !== n ? ' pop' : ''}">${n}</span>`; };
+// 消すとき：その行をすっと縮めてから消す（true を返したら、あとで fn が呼ばれる）
+function leaveThen(el, sel, fn) {
+  const row = el && el.closest && el.closest(sel);
+  if (!row || motionCalm() || row.classList.contains('leave')) return false;
+  row.style.height = row.offsetHeight + 'px'; void row.offsetWidth; row.classList.add('leave');
+  setTimeout(fn, 200); return true;
+}
 // 足りないとき：欄を小さく揺らして知らせる（文字の注意書きの代わり）
 function shake(el) { if (!el) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 400); el.focus({ preventScroll: true }); }
 // ★を付けた瞬間の小さな粒（8つ）
@@ -452,6 +467,7 @@ function paintNow() {
   if (over !== last.over) { $('#app-over').innerHTML = over; last.over = over; afterOver(); }
   if (t !== last.toast) { $('#app-toast').innerHTML = t; last.toast = t; }
   restoreFocus(fx);
+  tapBack();
   if (changedMain) afterMain();
   else if (S.view === 'memos' && S.nOpen) NE.sync();
   else if (S.view === 'sky' && galaxyOk() && $('#gx-host')) window.DaylogGalaxy.attach($('#gx-host'), galaxyApi());
@@ -653,7 +669,7 @@ function timelineHTML(d) {
     let inner = ''; let placed = !withNow;
     for (const e of list) {
       if (!placed && e.t > now) { inner += nowRow(now); placed = true; }
-      inner += `<div class="sub"><time>${hm(e.t)}</time><div class="sub-b">${entryBody(e)}</div></div>`;
+      inner += `<div class="sub${fxc('ent' + e.id, 'new')}"><time>${hm(e.t)}</time><div class="sub-b">${entryBody(e)}</div></div>`;
     }
     if (!placed) inner += nowRow(now);
     return inner ? `<div class="kids">${inner}</div>` : '';
@@ -772,14 +788,14 @@ function taskHTML(t) {
   const goal = t.goalId && S.goals[t.goalId];
   const open = S.openTask === t.id;
   const fl = taskFlags(t);
-  return `<li class="task ${t.status === 'done' ? 'done' : ''}${fl.cls}">
+  return `<li class="task ${t.status === 'done' ? 'done' : ''}${fl.cls}${fxc('new' + t.id, 'new')}">
     <div class="head"><button class="check ${t.status === 'done' ? 'on' + fxc('task' + t.id) : ''}" data-act="${t.status === 'done' ? 'taskUndo' : 'taskDone'}" data-arg="${t.id}" aria-label="完了にする">${t.status === 'done' ? CHECK : ''}</button>
       <div class="title" data-act="taskOpen" data-arg="${t.id}" style="cursor:pointer">${esc(t.title)}
         <div class="chips">${fl.icons}${weightMark(t.weight)}${deadlinePill(t)}${goal ? `<span class="pill gold">✦ ${esc(goal.title)}</span>` : ''}${t.plannedDate && t.status === 'open' && !(t.plannedDate < today()) ? `<span class="pill" title="${shortLabel(t.plannedDate)}にやる予定">▸ ${shortLabel(t.plannedDate)}</span>` : ''}${steps.length ? `<span class="pill">${done}/${steps.length}</span>` : ''}</div>
       </div>
       <button class="iconbtn chev ${open ? 'open' : ''}" data-act="taskOpen" data-arg="${t.id}" aria-expanded="${open}" aria-label="${open ? '閉じる' : '開く'}">${ICON.chev}</button></div>
     ${steps.length ? `<div class="bar" aria-hidden="true"><i style="width:${Math.round(done / steps.length * 100)}%"></i></div>` : ''}
-    ${open ? `<ul class="steps">${steps.map(s => `<li class="${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' : ''}" style="width:18px;height:18px" data-act="stepToggle" data-arg="${t.id}:${s.id}" aria-label="ステップを完了">${s.done ? CHECK : ''}</button><span>${esc(s.title)}</span><span class="spacer"></span><button class="btn ghost sm" data-act="stepDel" data-arg="${t.id}:${s.id}" aria-label="ステップを消す">×</button></li>`).join('')}
+    ${open ? `<ul class="steps${fxc('open' + t.id, 'fx')}">${steps.map(s => `<li class="${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' + fxc('step' + s.id) : ''}" style="width:18px;height:18px" data-act="stepToggle" data-arg="${t.id}:${s.id}" aria-label="ステップを完了">${s.done ? CHECK : ''}</button><span>${esc(s.title)}</span><span class="spacer"></span><button class="btn ghost sm" data-act="stepDel" data-arg="${t.id}:${s.id}" aria-label="ステップを消す">×</button></li>`).join('')}
       <li><input class="field grow" id="step-${t.id}" data-draft placeholder="ステップを足す（Enterで追加）" value="${esc(draft('step-' + t.id))}" data-enter="stepAdd" data-arg="${t.id}"><button class="btn sm" data-act="stepAdd" data-arg="${t.id}">追加</button></li></ul>
       <div class="row" style="margin-top:10px;padding-left:32px">
         ${weightSeg(t.weight, 'taskWeight', t.id)}
@@ -807,7 +823,7 @@ function tasksView() {
   const open = all.filter(t => t.status === 'open').sort((a, b) => easy ? (urgent(b) - urgent(a)) || (wv(a) - wv(b)) || byDeadline(a, b) : byDeadline(a, b));
   const held = all.filter(t => t.status === 'held').sort(byDeadline);
   const done = all.filter(t => t.status === 'done').sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0)).slice(0, 20);
-  let h = headerHTML('タスク', `<span>やること ${open.length} 件</span>${held.length ? `<span>保留箱 ${held.length} 件</span>` : ''}`);
+  let h = headerHTML('タスク', `<span>やること ${num('todo', open.length)} 件</span>${held.length ? `<span>保留箱 ${held.length} 件</span>` : ''}`);
   h += goalsSection();
   h += `<h2 class="sec"><span>タスク</span>${easy ? `<span class="r faint">${MODES[mode].label}の日は軽い順</span>` : ''}</h2>`;
   if (f) h += `<div class="filterbar"><span>△ ${esc(S.goals[f].title)} のタスクだけ表示中</span><button class="link" data-act="taskFilter" data-arg="">すべて表示</button></div>`;
@@ -857,7 +873,7 @@ function memoItemHTML(m) {
   const when = m.createdAt ? `${shortLabel(logicalDate(m.createdAt))} ${hm(m.createdAt)}${m.editedAt ? '（直した）' : ''}` : '';
   if (S.editMemo === m.id) return `<li class="memo editing"><div class="txt"><textarea class="field autosize" id="memo-edit" data-draft rows="2" aria-label="メモを直す。Ctrl＋Enterで保存">${esc(draft('memo-edit', m.text))}</textarea><div class="row" style="margin-top:6px"><span class="spacer"></span><button class="btn ghost sm" data-act="memoEditCancel">やめる</button><button class="btn primary sm" data-act="memoSave" data-arg="${m.id}">保存</button></div></div></li>`;
   const open = S.memoMenu === m.id;
-  return `<li class="memo${m.fav ? ' fav' : ''}"><div class="txt">${esc(m.text)}<div class="when">${when}</div>${open ? `<div class="mmenu"><button class="link" data-act="memoEdit" data-arg="${m.id}">直す</button><button class="link" data-act="memoToNote" data-arg="${m.id}">ノートにする</button><button class="link" data-act="memoToTask" data-arg="${m.id}">タスクにする</button><button class="link danger" data-act="memoDelete" data-arg="${m.id}">消す</button></div>` : ''}</div><div class="memo-side">${starBtn('memoFav', m.id, m.fav, 'このメモ')}<button class="gmore" data-act="memoMenu" data-arg="${m.id}" aria-expanded="${open}" aria-label="このメモの操作">⋯</button></div></li>`;
+  return `<li class="memo${m.fav ? ' fav' : ''}${fxc('new' + m.id, 'new')}"><div class="txt">${esc(m.text)}<div class="when">${when}</div>${open ? `<div class="mmenu"><button class="link" data-act="memoEdit" data-arg="${m.id}">直す</button><button class="link" data-act="memoToNote" data-arg="${m.id}">ノートにする</button><button class="link" data-act="memoToTask" data-arg="${m.id}">タスクにする</button><button class="link danger" data-act="memoDelete" data-arg="${m.id}">消す</button></div>` : ''}</div><div class="memo-side">${starBtn('memoFav', m.id, m.fav, 'このメモ')}<button class="gmore" data-act="memoMenu" data-arg="${m.id}" aria-expanded="${open}" aria-label="このメモの操作">⋯</button></div></li>`;
 }
 function memosView() {
   if (S.nOpen && S.notes[S.nOpen]) return '<div id="ne-host" class="ne-host"></div>'; // ノートを開いている間は、書く画面（noteEditor）だけ
@@ -941,7 +957,7 @@ function goalsSection() {
   let habit;
   if (!day.mode) habit = '<div class="faint gempty">今日の体調を選ぶと、お風呂の目安が決まる。</div>';
   else if (!ht) habit = '<div class="faint gempty">休養の日なのでお休み。</div>';
-  else habit = `<div class="goal"><button class="check gold ${day.habits && day.habits.bath ? 'on' : ''}" data-act="bathToggle" aria-label="お風呂">${day.habits && day.habits.bath ? CHECK : ''}</button><div class="title">${esc(ht)}</div></div>`;
+  else habit = `<div class="goal"><button class="check gold ${day.habits && day.habits.bath ? 'on' + fxc('bath') : ''}" data-act="bathToggle" aria-label="お風呂">${day.habits && day.habits.bath ? CHECK : ''}</button><div class="title">${esc(ht)}</div></div>`;
   const past = Object.values(S.goals).filter(g => !(g.scope === 'month' && g.period === mk) && !(g.scope === 'week' && g.period === wk)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 30);
   if (!S.goalEdit) {
     // ふだんは眺めるだけのコンパクト表示。操作は「編集」ひとつ
@@ -1573,7 +1589,7 @@ function playRise() {
 }
 
 /* ───────── 操作 ───────── */
-function toast(msg, action) { S.toast = { msg, action, id: uid() }; render(); const id = S.toast.id; setTimeout(() => { if (S.toast && S.toast.id === id) { S.toast = null; render(); } }, action ? 6000 : 4200); }
+function toast(msg, action) { S.toast = { msg, action, id: uid() }; render(); const id = S.toast.id; setTimeout(() => { if (S.toast && S.toast.id === id) { const el = $('#app-toast .toast'); if (el && !motionCalm()) { el.classList.add('out'); setTimeout(() => { if (S.toast && S.toast.id === id) { S.toast = null; render(); } }, 160); } else { S.toast = null; render(); } } }, action ? 6000 : 4200); }
 function toastHTML() { const t = S.toast; if (!t) return ''; return `<div class="toast" role="status"><span>${esc(t.msg)}</span>${t.action ? `<button class="link" data-act="undo">元に戻す</button>` : ''}</div>`; }
 
 const A = {};
@@ -1618,7 +1634,7 @@ function timerHTML() {
   const digits = st === 'done' ? tmFmt(TM.spent) : tmFmt(left);
   const stateTx = st === 'idle' ? tmMin(TM.dur) : st === 'run' ? `${hm(TM.endAt)} まで` : st === 'pause' ? '一時停止中' : TM.early ? `${tmMin(TM.dur)}のうち` : 'おつかれさま';
   const ring = `<div class="tm-ring ${st}${st === 'done' && TM.early ? ' early' : ''}"><svg viewBox="0 0 300 300" aria-hidden="true"><circle class="tm-track" cx="150" cy="150" r="${TM_R}"/><circle class="tm-arc" id="tm-arc" cx="150" cy="150" r="${TM_R}" stroke-dasharray="${TM_C.toFixed(2)}" stroke-dashoffset="${(TM_C * (1 - frac)).toFixed(2)}" transform="rotate(-90 150 150)"/></svg>
-    <div class="tm-center">${st === 'done' && !TM.early ? `<span class="tm-ok${fxc('tmdone', 'in')}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 12.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>` : ''}${st === 'done' && TM.early ? `<div class="tm-state">${stateTx}</div>` : ''}<div class="tm-digits mono" id="tm-digits" role="timer" aria-live="off">${digits}</div>${st === 'done' && TM.early ? '<div class="tm-state">やった</div>' : `<div class="tm-state" id="tm-state">${stateTx}</div>`}</div></div>`;
+    <div class="tm-center">${st === 'done' && !TM.early ? `<span class="tm-ok${fxc('tmdone', 'in')}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 12.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>` : ''}${st === 'done' && TM.early ? `<div class="tm-state">${stateTx}</div>` : ''}<div class="tm-digits mono${fxc('tmadd', 'bump')}" id="tm-digits" role="timer" aria-live="off">${digits}</div>${st === 'done' && TM.early ? '<div class="tm-state">やった</div>' : `<div class="tm-state" id="tm-state">${stateTx}</div>`}</div></div>`;
   let top, bottom;
   if (st === 'idle') {
     top = `<input class="field tm-purpose" id="tm-purpose" data-draft maxlength="60" placeholder="この時間の目的" value="${esc(purpose)}" data-enter="timerStart" autocomplete="off" aria-label="この時間の目的（書くと始められる）">`;
@@ -1679,7 +1695,7 @@ A.timerPause = () => {
   else if (TM.state === 'pause') { TM.endAt = Date.now() + TM.left * 1000; TM.state = 'run'; tmRun(); }
   tmSave(); tmWake(); render();
 };
-A.timerAdd = v => { const n = Number(v); if (TM.state === 'run') TM.endAt += n * 1000; else if (TM.state === 'pause') TM.left += n; else return; TM.dur += n; tmSave(); render(); };
+A.timerAdd = v => { fx('tmadd'); const n = Number(v); if (TM.state === 'run') TM.endAt += n * 1000; else if (TM.state === 'pause') TM.left += n; else return; TM.dur += n; tmSave(); render(); };
 A.timerReset = () => { clearInterval(tmTimer); tmTimer = 0; S.drafts['tm-purpose'] = TM.state === 'done' ? '' : TM.purpose; Object.assign(TM, { state: 'idle', endAt: 0, left: 0, spent: 0, early: false, logged: false }); tmSave(); tmWake(); render(); };
 // 途中でやめる：やった分（決めた時間−残り）を出して、記録に残すか選べる。止めただけなので「続ける」もできる
 A.timerStop = () => {
@@ -1768,7 +1784,7 @@ A.sendEntry = () => {
   S.comp = { mood: 0, body: 0, nap: false };
   if (ta) { ta.value = ''; ta.style.height = 'auto'; ta.blur(); }
   setTimeout(compSync, 150);
-  patchDay(d, { entries: [...(day.entries || []), e] });
+  fx('ent' + e.id); patchDay(d, { entries: [...(day.entries || []), e] });
 };
 A.entryMenu = id => { S.openEntry = id || null; render(); };
 A.entryEdit = id => { const e = (getDay(today()).entries || []).find(x => x.id === id); if (!e) return; S.editEntry = id; S.openEntry = null; Object.assign(S.drafts, { 'ee-text': e.text || '', 'ee-mood': e.mood || '', 'ee-body': e.body || '', 'ee-nap': e.nap ? 'on' : '' }); render(); setTimeout(() => { const t = $('#ee-text'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }, 50); };
@@ -1814,7 +1830,7 @@ A.entrySave = id => {
   const entries = (day.entries || []).map(e => e.id !== id ? e : clean({ ...e, text: String(g('ee-text') || '').trim(), mood: Number(g('ee-mood')) || undefined, body: Number(g('ee-body')) || undefined, nap: g('ee-nap') ? true : undefined, editedAt: Date.now() }));
   S.editEntry = null; patchDay(d, { entries }); toast('記録を直した。');
 };
-A.entryDelete = id => {
+A.entryDelete = (id, el) => { if (leaveThen(el, '.sub', () => A.entryDelete(id))) return;
   const d = today(); const day = getDay(d); const e = (day.entries || []).find(x => x.id === id); if (!e) return;
   patchDay(d, { entries: day.entries.filter(x => x.id !== id) }); S.openEntry = null;
   S.undo = () => { const cur = getDay(d); patchDay(d, { entries: [...(cur.entries || []), { ...e, id: uid() }].sort((a, b) => a.t - b.t) }); };
@@ -1916,28 +1932,28 @@ A.taskAdd = () => {
   const title = (S.drafts['task-title'] || '').trim(); if (!title) return;
   const id = uid();
   const t = clean({ id, title, weight: S.drafts['task-w'] || undefined, deadline: S.drafts['task-dl'] || undefined, goalId: S.drafts['task-goal'] || undefined, status: 'open', steps: [], createdAt: Date.now() });
-  S.drafts['task-title'] = ''; S.drafts['task-w'] = ''; S.drafts['task-dl'] = ''; S.drafts['task-goal'] = ''; S.taskAddOpen = false; S.tasks[id] = t; render(); putDoc('tasks/' + id, t);
+  S.drafts['task-title'] = ''; S.drafts['task-w'] = ''; S.drafts['task-dl'] = ''; S.drafts['task-goal'] = ''; S.taskAddOpen = false; S.tasks[id] = t; fx('new' + id); render(); putDoc('tasks/' + id, t);
 };
-A.taskOpen = id => { S.openTask = S.openTask === id ? null : id; render(); };
+A.taskOpen = id => { S.openTask = S.openTask === id ? null : id; if (S.openTask) fx('open' + id); render(); };
 A.taskDone = id => { const t = S.tasks[id]; if (!t) return; fx('task' + id); patchTask(id, { status: 'done', doneAt: Date.now() }); toast('終わった。青い星がひとつ増えた。'); };
 A.taskUndo = id => patchTask(id, { status: 'open', doneAt: null });
 A.taskHold = id => patchTask(id, { status: 'held', heldAt: Date.now() });
 A.taskRestore = id => patchTask(id, { status: 'open', plannedDate: null, heldAt: null });
-A.taskDelete = id => { const t = S.tasks[id]; if (!t) return; delete S.tasks[id]; S.openTask = null; render(); delDoc('tasks/' + id); S.undo = () => { S.tasks[id] = t; render(); putDoc('tasks/' + id, t); }; toast('タスクを消した。', true); };
+A.taskDelete = (id, el) => { if (leaveThen(el, 'li.task', () => A.taskDelete(id))) return; const t = S.tasks[id]; if (!t) return; delete S.tasks[id]; S.openTask = null; render(); delDoc('tasks/' + id); S.undo = () => { S.tasks[id] = t; render(); putDoc('tasks/' + id, t); }; toast('タスクを消した。', true); };
 A.taskWeight = arg => { const [id, w] = arg.split(':'); const t = S.tasks[id]; if (!t) return; patchTask(id, { weight: t.weight === w ? null : w }); };
 A.newWeight = w => { S.drafts['task-w'] = S.drafts['task-w'] === w ? '' : w; render(); };
 A.taskDeadline = (v, el) => patchTask(el.dataset.arg, { deadline: v || null });
 A.taskGoal = (v, el) => patchTask(el.dataset.arg, { goalId: v || null });
 A.stepAdd = id => { const k = 'step-' + id; const title = (S.drafts[k] || '').trim(); if (!title) return; S.drafts[k] = ''; const t = S.tasks[id]; patchTask(id, { steps: [...(t.steps || []), { id: uid(), title, done: false }] }); };
-A.stepToggle = arg => { const [tid, sid] = arg.split(':'); const t = S.tasks[tid]; patchTask(tid, { steps: (t.steps || []).map(s => s.id === sid ? { ...s, done: !s.done, doneAt: !s.done ? Date.now() : null } : s) }); };
+A.stepToggle = arg => { const [tid, sid] = arg.split(':'); const t = S.tasks[tid]; fx('step' + sid); patchTask(tid, { steps: (t.steps || []).map(s => s.id === sid ? { ...s, done: !s.done, doneAt: !s.done ? Date.now() : null } : s) }); };
 A.stepDel = arg => { const [tid, sid] = arg.split(':'); const t = S.tasks[tid]; patchTask(tid, { steps: (t.steps || []).filter(s => s.id !== sid) }); };
 // メモ
 A.memoMenu = id => { S.memoMenu = S.memoMenu === id ? null : id; render(); };
 A.memoEdit = id => { const m = S.memos[id]; if (!m) return; S.editMemo = id; S.memoMenu = null; S.drafts['memo-edit'] = m.text; render(); setTimeout(() => { const t = $('#memo-edit'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }, 30); };
 A.memoEditCancel = () => { S.editMemo = null; render(); };
 A.memoSave = id => { const m = S.memos[id]; if (!m) return; const text = String(S.drafts['memo-edit'] || '').replace(/\n{3,}/g, '\n\n').trim(); if (!text) return; const nm = { ...m, text, editedAt: Date.now() }; S.memos[id] = nm; S.editMemo = null; render(); putDoc('memos/' + id, nm); toast('メモを直した。'); };
-A.memoAdd = () => { const text = (S.drafts['memo-text'] || '').replace(/\n{3,}/g, '\n\n').trim(); if (!text) { shake($('#memo-text')); return; } const id = uid(); const m = { id, text, createdAt: Date.now() }; S.drafts['memo-text'] = ''; S.memos[id] = m; render(); putDoc('memos/' + id, m); };
-A.memoDelete = id => { const m = S.memos[id]; if (!m) return; delete S.memos[id]; render(); delDoc('memos/' + id); S.undo = () => { S.memos[id] = m; render(); putDoc('memos/' + id, m); }; toast('メモを消した。', true); };
+A.memoAdd = () => { const text = (S.drafts['memo-text'] || '').replace(/\n{3,}/g, '\n\n').trim(); if (!text) { shake($('#memo-text')); return; } const id = uid(); const m = { id, text, createdAt: Date.now() }; fx('new' + id); S.drafts['memo-text'] = ''; S.memos[id] = m; render(); putDoc('memos/' + id, m); };
+A.memoDelete = (id, el) => { if (leaveThen(el, 'li.memo', () => A.memoDelete(id))) return; const m = S.memos[id]; if (!m) return; delete S.memos[id]; render(); delDoc('memos/' + id); S.undo = () => { S.memos[id] = m; render(); putDoc('memos/' + id, m); }; toast('メモを消した。', true); };
 A.memoToTask = id => { const m = S.memos[id]; if (!m) return; const tid = uid(); const t = { id: tid, title: m.text.split('\n')[0].slice(0, 120), status: 'open', steps: [], createdAt: Date.now(), fromMemo: id }; S.tasks[tid] = t; delete S.memos[id]; render(); putDoc('tasks/' + tid, t); delDoc('memos/' + id); toast('タスクにした。タスクの画面にある。'); };
 /* ── ノートを書く画面（太字・下線・斜体・取り消し線・見出し・リスト・チェックリスト・画像）
    画面の描き直しで消えないよう、この部分だけは自分で持っている要素を #ne-host に差し込む ── */
@@ -2259,7 +2275,7 @@ A.goalAdd = scope => {
 };
 A.goalToggle = id => { const g = S.goals[id]; if (!g) return; S.goalMenu = null; const done = g.status !== 'done'; patchGoal(id, { status: done ? 'done' : 'active', doneAt: done ? Date.now() : null }); if (done) toast('目標を達成。星座がひとつ完成した。'); };
 A.goalDelete = id => { const g = S.goals[id]; if (!g) return; S.goalMenu = null; delete S.goals[id]; render(); delDoc('goals/' + id); S.undo = () => { S.goals[id] = g; render(); putDoc('goals/' + id, g); }; toast('目標を消した。', true); };
-A.bathToggle = () => { const d = S.night ? S.night.date : today(); const day = getDay(d); const on = !(day.habits && day.habits.bath); patchDay(d, { habits: { ...(day.habits || {}), bath: on, bathAt: on ? Date.now() : null } }); };
+A.bathToggle = () => { fx('bath'); const d = S.night ? S.night.date : today(); const day = getDay(d); const on = !(day.habits && day.habits.bath); patchDay(d, { habits: { ...(day.habits || {}), bath: on, bathAt: on ? Date.now() : null } }); };
 // 星空
 A.skyLevel = lv => { S.sky.level = lv; S.sky.sel = null; if (lv === 'universe') ensureOlder(`${S.sky.year}-01-01`); render(); };
 A.skyDay = d => { S.sky.level = 'day'; S.sky.day = d; S.sky.month = monthKey(d); S.sky.sel = null; render(); };
@@ -2548,6 +2564,7 @@ document.addEventListener('click', e => {
   if (e.target.closest('#sky')) { skyClick(e); return; }
   if (e.target.classList && e.target.classList.contains('wk-col')) { const col = e.target; const y = e.clientY - col.getBoundingClientRect().top; A.calNew(col.dataset.day + '@' + Math.max(0, Math.floor(y / H_PX * 2) * 30)); return; }
   const el = e.target.closest('[data-act]'); if (!el) return;
+  lastTap = { act: el.dataset.act, arg: el.dataset.arg, at: Date.now() };
   const f = A[el.dataset.act]; if (f) { e.preventDefault(); f(el.dataset.arg, el, e); }
 });
 // 入力欄は、触る・打ち始めるまで1行だけ。空のまま離れたら小さく戻る

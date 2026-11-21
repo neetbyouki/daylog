@@ -49,6 +49,7 @@ body{
 button,input,select,textarea{font:inherit;color:inherit}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 html,body{max-width:100%;overflow-x:hidden}
+body{scrollbar-gutter:stable} /* 縦のスクロールバーが出る・消えるときに、画面全体が左右にずれないよう、いつも場所を空けておく（スクロールするのは body） */
 @media (max-width:959px){input,select,textarea{font-size:16px!important}}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--lav);outline-offset:2px}
@@ -386,6 +387,30 @@ html[data-vt="sheet"] #app-over > *{view-transition-name:sheet}
 /* ノートの画像：読み込めたら、ぼかしから浮かび上がる（skeleton-reveal） */
 .ne-body img.reveal{animation:t-reveal 420ms var(--t-ease) both}
 @keyframes t-reveal{from{opacity:0;filter:blur(8px)}}
+/* 押した感触：押している間は少し沈み、離すと（描き直されても）ぽんと戻る */
+.btn,.tm-ic,.mstar,.mfav-btn,.check,.mode,.seg button,.mtabs button,.tm-presets button,.nav button .gi,.iconbtn,.icon-btn,.night-btn,.nfab,.gmore,.gplus,.chip,.pill[data-act]{transition:transform 120ms var(--t-ease),background-color 160ms var(--t-ease),border-color 160ms var(--t-ease),color 160ms var(--t-ease),opacity 160ms var(--t-ease)}
+.btn:active,.tm-ic:active,.mstar:active,.mfav-btn:active,.check:active,.mode:active,.seg button:active,.mtabs button:active,.tm-presets button:active,.iconbtn:active,.icon-btn:active,.night-btn:active,.nfab:active,.gmore:active,.gplus:active{transform:scale(.94);transition-duration:60ms}
+.nav button:active .gi{transform:scale(.9)}
+.tapped{animation:t-tap 280ms var(--t-spring)}
+@keyframes t-tap{from{transform:scale(.94)}}
+/* 行・カードにふれたとき（PC）：ほんのり明るく */
+@media (hover:hover){.memo,.task,.nrow,.frow,.card{transition:background-color 160ms var(--t-ease),border-color 160ms var(--t-ease)}}
+/* 足したもの：上から少し下りて現れる。消すもの：すっと縮んで消える */
+.new{animation:t-new 320ms var(--t-ease) both}
+@keyframes t-new{from{opacity:0;transform:translateY(-6px) scale(.985)}}
+.leave{overflow:hidden;opacity:0;transform:scale(.97);height:0!important;margin-top:0!important;margin-bottom:0!important;padding-top:0!important;padding-bottom:0!important;border-width:0!important;transition:opacity 140ms var(--t-ease),transform 180ms var(--t-ease),height 200ms var(--t-ease),margin 200ms var(--t-ease),padding 200ms var(--t-ease)}
+/* タスクを開いたとき：ステップがふわっと出る。矢印は回る */
+.steps.fx{animation:t-drop var(--t-open) var(--t-ease) both;transform-origin:top center}
+.task:has(.steps.fx) .iconbtn.chev svg{animation:t-turn 240ms var(--t-ease)}
+@keyframes t-turn{from{transform:rotate(0)}}
+/* タイマーで＋1したとき：数字が小さくはねる */
+.tm-digits.bump{animation:t-bump 300ms var(--t-spring)}
+@keyframes t-bump{30%{transform:scale(1.06)}}
+/* 知らせが消えるとき：下へ沈んで消える */
+.toast.out{animation:t-toast-out 160ms var(--t-ease) both}
+@keyframes t-toast-out{to{opacity:0;translate:0 6px;scale:.98}}
+/* 入力欄にふれたとき：枠の色がなめらかに変わる */
+.field{transition:border-color 160ms var(--t-ease),box-shadow 160ms var(--t-ease),background-color 160ms var(--t-ease)}
 /* 動きを止める（端末の設定・アプリの「控えめ」） */
 html[data-motion="calm"] *,html[data-motion="calm"] *::before,html[data-motion="calm"] *::after{animation:none!important;transition:none!important}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;transition-duration:1ms!important}}
