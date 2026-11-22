@@ -166,6 +166,9 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 .gm-chip.live b{color:#fff}
 @media (hover:hover){.gm-chip:hover{background:color-mix(in oklab,var(--game) 24%,var(--ink))}}
 .gm-chip:focus-visible{outline:2px solid var(--game);outline-offset:2px}
+/* 就寝の目安を過ぎてからの部分：同じ帯の上に重ねて、色を一段濃く */
+.gm-band.late{border-radius:0 14px 14px 0;background:linear-gradient(90deg,color-mix(in oklab,var(--game) 26%,transparent),color-mix(in oklab,var(--game) 15%,transparent) 50%,color-mix(in oklab,var(--game) 10%,transparent));box-shadow:inset 3px 0 0 color-mix(in oklab,var(--game) 70%,#ff3b2f);animation:none}
+.gm-chip.late{border-color:color-mix(in oklab,var(--game) 60%,transparent);background:color-mix(in oklab,var(--game) 24%,var(--ink))}
 @media (prefers-reduced-motion:reduce){.gm-band.live{animation:none}}
 html[data-motion="calm"] .gm-band.live{animation:none}
 .wk-game{position:absolute;right:0;width:4px;border-radius:2px 0 0 2px;background:color-mix(in oklab,var(--game) 80%,transparent);z-index:3}

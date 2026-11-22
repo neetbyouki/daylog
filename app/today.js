@@ -195,6 +195,7 @@ function timelineHTML(d) {
   }
   const rng = dayRange(d, timed, loose);
   const games = gameSessions(d); // ゲームをした時間（重ねる帯）
+  if (rng && games.length) rng.to = Math.max(rng.to, ...games.map(g => g.to)); // 就寝の目安より後までゲームをしていたら、その分まで流れを伸ばす
   const ongoing = timed.filter(isOn);
   // 行：起きた／予定／記録／いま（予定の最中なら、そのカードの中に出す）
   const rows = [];
@@ -307,18 +308,27 @@ function gameLinesLayout() { // ゲームの帯（関数名は前のまま）
   };
   // うすいオレンジの帯を、その時間の上に重ねる（予定のカードにもかぶる）。右下に「🎮 名前 長さ」の札
   const now = Date.now(); const isToday = d === today(); let lastChip = -1e9;
+  // 就寝の目安（その日の目安の時刻。なければ「🌙 就寝の目安」の予定の始まり）。過ぎてからの部分は帯を濃く
+  const bt = getDay(d).bedtime; const bedEv = effEvents(d).find(x => !x.canceled && /^🌙\s*就寝の目安/.test(x.title || ''));
+  const target = bt && bt.time ? slotDate(d, bt.time).getTime() : bedEv ? bedEv.start : null;
   for (const g of games) {
     const y1 = yAt(g.from), y2 = Math.max(y1 + 26, yAt(g.to)); const live = isToday && now - g.to < 7 * 6e4;
     const dur = durText(g.min * 6e4);
-    const tip = `🎮 ${g.name}\n${hm(g.from)}〜${live ? 'いま' : hm(g.to)}（${dur}${live ? '・続いている' : ''}）`;
+    const lateFrom = target && g.to > target ? Math.max(g.from, target) : null;
+    const lateTxt = lateFrom ? `\nうち就寝の目安（${hm(target)}）を過ぎてから ${durText(g.to - lateFrom)}` : '';
+    const tip = `🎮 ${g.name}\n${hm(g.from)}〜${live ? 'いま' : hm(g.to)}（${dur}${live ? '・続いている' : ''}）${lateTxt}`;
     const band = document.createElement('div');
     band.className = 'gm-band' + (live ? ' live' : ''); band.setAttribute('aria-hidden', 'true');
     band.style.top = y1 + 'px'; band.style.height = (y2 - y1) + 'px';
     ul.appendChild(band);
+    if (lateFrom) { // 目安を過ぎてからの部分：同じ帯の上に、もう一段濃い帯を重ねる
+      const ly = Math.max(y1, Math.min(y2, yAt(lateFrom)));
+      if (y2 - ly >= 2) { const late = document.createElement('div'); late.className = 'gm-band late'; late.setAttribute('aria-hidden', 'true'); late.style.top = ly + 'px'; late.style.height = (y2 - ly) + 'px'; ul.appendChild(late); }
+    }
     // 札は帯の右下（行の「⋯」は右上にあるので、かぶりにくい）。前の札と重なるときは少し下へ
     const chipTop = Math.max(y2 - 26, lastChip + 26); lastChip = chipTop;
     const chip = document.createElement('button');
-    chip.type = 'button'; chip.className = 'gm-chip' + (live ? ' live' : '');
+    chip.type = 'button'; chip.className = 'gm-chip' + (live ? ' live' : '') + (lateFrom ? ' late' : '');
     chip.style.top = chipTop + 'px'; chip.dataset.tip = tip; chip.setAttribute('aria-label', tip.replace('\n', ' '));
     chip.innerHTML = `<span class="gm-ic" aria-hidden="true">🎮</span><span class="gm-n">${esc(g.name)}</span><b>${live ? 'プレイ中 ' : ''}${dur}</b>`;
     ul.appendChild(chip);
