@@ -152,16 +152,22 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 .flow button.more{float:right;background:none;border:0;color:var(--fg-3);padding:0 2px;font-size:13px;line-height:20px}
 /* 起きた・就寝：控えめな1行 */
 .fl-wake,.fl-bed,.fl-slept{--c:var(--gold)}
-/* ゲームをした時間：今日の流れの右はしの線（予定と重なっていても、その横に重ねて出す）。触れると名前と時間 */
-.flow.has-games{padding-right:28px}
-.gm-line{position:absolute;right:calc(3px + var(--lane,0) * 21px);width:18px;border:0;padding:0;margin:0;border-radius:6px;background:color-mix(in oklab,var(--game) 88%,transparent);box-shadow:0 0 10px color-mix(in oklab,var(--game) 30%,transparent);z-index:3;cursor:pointer;color:#2a1208;overflow:visible}
-.gm-line::before{content:"";position:absolute;top:-4px;bottom:-4px;left:-4px;right:-4px}
-.gm-line .gm-i{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:10px;line-height:1;pointer-events:none}
-.gm-line .gm-t{position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;font-size:10px;font-weight:700;pointer-events:none}
-.gm-line .gm-t i{display:block;font-style:normal;line-height:11px;height:11px;font-variant-numeric:tabular-nums}
-.gm-line .gm-t.out{top:calc(100% + 3px);left:50%;right:auto;transform:translateX(-50%);display:block;white-space:nowrap;color:var(--game);font-size:9.5px}
-.gm-line.live{background:repeating-linear-gradient(180deg,var(--game) 0 8px,color-mix(in oklab,var(--game) 55%,transparent) 8px 11px)}
-.gm-line:focus-visible{outline:2px solid var(--game);outline-offset:2px}
+/* ゲームをした時間：その時間の上に重ねるうすいオレンジの帯（予定のカードにもかぶる）。左は流れの線の上にオレンジの縁、右下に札 */
+.gm-band{position:absolute;left:calc(var(--rx) - 1.5px);right:-4px;border-radius:2px 14px 14px 2px;pointer-events:none;z-index:2;
+  background:linear-gradient(90deg,color-mix(in oklab,var(--game) 15%,transparent),color-mix(in oklab,var(--game) 7%,transparent) 45%,color-mix(in oklab,var(--game) 4%,transparent));
+  box-shadow:inset 3px 0 0 var(--game),inset 0 0 0 1px color-mix(in oklab,var(--game) 14%,transparent)}
+.gm-band.live{box-shadow:inset 3px 0 0 var(--game),inset 0 0 0 1px color-mix(in oklab,var(--game) 14%,transparent);animation:gm-live 2.4s ease-in-out infinite}
+@keyframes gm-live{50%{background-color:color-mix(in oklab,var(--game) 5%,transparent)}}
+.gm-chip{position:absolute;right:4px;z-index:4;display:inline-flex;align-items:center;gap:6px;max-width:72%;height:22px;padding:0 10px 0 7px;margin:0;border-radius:999px;font:inherit;font-size:11.5px;line-height:1;cursor:pointer;
+  color:color-mix(in oklab,var(--game) 55%,var(--fg));background:color-mix(in oklab,var(--game) 16%,var(--ink));border:1px solid color-mix(in oklab,var(--game) 38%,transparent);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.gm-chip .gm-ic{font-size:11px}
+.gm-chip .gm-n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85}
+.gm-chip b{flex:none;font-weight:700;color:color-mix(in oklab,var(--game) 80%,#fff);font-variant-numeric:tabular-nums}
+.gm-chip.live b{color:#fff}
+@media (hover:hover){.gm-chip:hover{background:color-mix(in oklab,var(--game) 24%,var(--ink))}}
+.gm-chip:focus-visible{outline:2px solid var(--game);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.gm-band.live{animation:none}}
+html[data-motion="calm"] .gm-band.live{animation:none}
 .wk-game{position:absolute;right:0;width:4px;border-radius:2px 0 0 2px;background:color-mix(in oklab,var(--game) 80%,transparent);z-index:3}
 .fl-slept time{font-size:11.5px;opacity:.8}
 .fl-slept .c2{display:flex;flex-wrap:wrap;align-items:center;gap:0 2px;font-size:12px;color:var(--fg-3)}

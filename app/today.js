@@ -194,7 +194,7 @@ function timelineHTML(d) {
     if (host) { const k = host.cal + '|' + host.id; if (!kids.has(k)) kids.set(k, []); kids.get(k).push(e); } else loose.push(e);
   }
   const rng = dayRange(d, timed, loose);
-  const games = gameSessions(d); // ゲームをした時間（右はしの線）
+  const games = gameSessions(d); // ゲームをした時間（重ねる帯）
   const ongoing = timed.filter(isOn);
   // 行：起きた／予定／記録／いま（予定の最中なら、そのカードの中に出す）
   const rows = [];
@@ -228,7 +228,7 @@ function timelineHTML(d) {
     const ms = to - from; const fut = isToday && from >= now - 6e4;
     if (ms < (fut ? GAP_MIN : 2 * GAP_MIN)) return ''; // 過ぎた時間は30分以上あいたときだけ
     const mins = ms / 6e4;
-    // 過ぎた空きでも、ゲームをしていた時間を含むときは、線が見えるように長さに合わせて伸ばす
+    // 過ぎた空きでも、ゲームをしていた時間を含むときは、帯と札が見えるように長さに合わせて伸ばす
     const gameIn = !fut && games.some(g => Math.min(g.to, to) - Math.max(g.from, from) >= GAP_MIN);
     const px = gameIn ? Math.round(Math.min(140, Math.max(44, 22 + mins * 0.5))) : fut ? Math.round(Math.min(96, Math.max(30, 22 + mins * 0.3))) : Math.round(Math.min(26, Math.max(14, 8 + mins * 0.06)));
     if (!fut) return `<li class="gap past" style="--h:${px}px" data-ts="${from}" data-te="${to}" aria-label="${durText(ms)}、予定も記録もない時間"><span class="g-t">${durText(ms)}</span></li>`;
@@ -277,14 +277,14 @@ function timelineHTML(d) {
       if (bt && bt.time && Math.abs(slotDate(d, bt.time).getTime() - rng.to) < 6e4) lis.push(`<li class="fl fl-bed"><time>${bt.time}</time><div class="c2"><span class="bl-t">🌙 就寝の目安</span></div></li>`);
     }
   }
-  // ゲームをした時間は、右はしの線（予定と重なっていても重ねて出す）。線の位置は描いたあとに gameLinesLayout() が決める
+  // ゲームをした時間は、その時間の上に重ねるうすいオレンジの帯（予定にもかぶる）。位置は描いたあとに gameLinesLayout() が決める
   h += `<ul class="flow${games.length ? ' has-games' : ''}" data-day="${d}">${lis.join('')}</ul>`;
   return h;
 }
-// ゲームの線：今日の流れは時間に比例していないので、行の「時刻→高さ」を並べて、その間を按分して線の上下を決める
-function gameLinesLayout() {
+// ゲームの帯：今日の流れは時間に比例していないので、行の「時刻→高さ」を並べて、その間を按分して線の上下を決める
+function gameLinesLayout() { // ゲームの帯（関数名は前のまま）
   const ul = document.querySelector('ul.flow[data-day]'); if (!ul) return;
-  ul.querySelectorAll('.gm-line').forEach(el => el.remove());
+  ul.querySelectorAll('.gm-band, .gm-chip').forEach(el => el.remove());
   const d = ul.dataset.day; const games = gameSessions(d); if (!games.length) return;
   const base = ul.getBoundingClientRect().top;
   const pts = [];
@@ -305,23 +305,23 @@ function gameLinesLayout() {
     }
     return pts[pts.length - 1][1];
   };
-  const now = Date.now(); const isToday = d === today(); const lanes = [];
+  // うすいオレンジの帯を、その時間の上に重ねる（予定のカードにもかぶる）。右下に「🎮 名前 長さ」の札
+  const now = Date.now(); const isToday = d === today(); let lastChip = -1e9;
   for (const g of games) {
-    let lane = lanes.findIndex(end => end <= g.from); if (lane < 0) { lane = lanes.length; lanes.push(0); } lanes[lane] = g.to;
-    const y1 = yAt(g.from), y2 = Math.max(y1 + 14, yAt(g.to)); const live = isToday && now - g.to < 7 * 6e4;
-    const tip = `🎮 ${g.name}\n${hm(g.from)}〜${live ? 'いま' : hm(g.to)}（${durText(g.min * 6e4)}${live ? '・続いている' : ''}）`;
-    const el = document.createElement('button');
-    el.className = 'gm-line' + (live ? ' live' : ''); el.type = 'button';
-    el.style.top = y1 + 'px'; el.style.height = (y2 - y1) + 'px'; el.style.setProperty('--lane', lane);
-    el.dataset.tip = tip; el.setAttribute('aria-label', tip.replace('\n', ' '));
-    // 長さ（何時間やったか）を線の中に縦書きで。入りきらなければ「75分」、それも無理なら線の上に小さく
-    // 縦書き。1文字分の高さ 11px で数えて入るか決める
-    const hpx = y2 - y1; const full = durText(g.min * 6e4), short = `${g.min}分`;
-    const cells = t => [...t].length;
-    const tate = t => [...t].map(c => `<i>${c}</i>`).join(''); // 1文字ずつ縦に積む（縦書きの指定より、どの端末でも同じ高さになる）
-    const label = cells(full) * 11 + 8 <= hpx ? full : cells(short) * 11 + 8 <= hpx ? short : '';
-    el.innerHTML = `<span class="gm-i" aria-hidden="true">🎮</span>${label ? `<span class="gm-t" aria-hidden="true">${tate(label)}</span>` : `<span class="gm-t out" aria-hidden="true">${short}</span>`}`;
-    ul.appendChild(el);
+    const y1 = yAt(g.from), y2 = Math.max(y1 + 26, yAt(g.to)); const live = isToday && now - g.to < 7 * 6e4;
+    const dur = durText(g.min * 6e4);
+    const tip = `🎮 ${g.name}\n${hm(g.from)}〜${live ? 'いま' : hm(g.to)}（${dur}${live ? '・続いている' : ''}）`;
+    const band = document.createElement('div');
+    band.className = 'gm-band' + (live ? ' live' : ''); band.setAttribute('aria-hidden', 'true');
+    band.style.top = y1 + 'px'; band.style.height = (y2 - y1) + 'px';
+    ul.appendChild(band);
+    // 札は帯の右下（行の「⋯」は右上にあるので、かぶりにくい）。前の札と重なるときは少し下へ
+    const chipTop = Math.max(y2 - 26, lastChip + 26); lastChip = chipTop;
+    const chip = document.createElement('button');
+    chip.type = 'button'; chip.className = 'gm-chip' + (live ? ' live' : '');
+    chip.style.top = chipTop + 'px'; chip.dataset.tip = tip; chip.setAttribute('aria-label', tip.replace('\n', ' '));
+    chip.innerHTML = `<span class="gm-ic" aria-hidden="true">🎮</span><span class="gm-n">${esc(g.name)}</span><b>${live ? 'プレイ中 ' : ''}${dur}</b>`;
+    ul.appendChild(chip);
   }
 }
 let gameLinesT = 0;
