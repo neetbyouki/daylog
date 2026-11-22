@@ -203,6 +203,8 @@ function timelineHTML(d) {
   if (rng && rng.wake) rows.push({ kind: 'wake', t: rng.wake, o: 0 });
   for (const x of timed) rows.push({ kind: isBedEv(x) && !x.canceled ? 'bed' : 'ev', t: x.start, o: 1, x, busy: !x.canceled && !isBedEv(x) ? x.end : 0 });
   for (const e of loose) rows.push({ kind: 'en', t: e.t, o: 2, e });
+  // ゲームをした時間（PCの見張り役の記録から。ゲームごとに、10分以上あかずに続いた分を1つにまとめてある）
+  for (const g of gameSessions(d)) rows.push({ kind: 'game', t: g.from, o: 1.5, g, busy: g.to });
   if (isToday && !ongoing.length) rows.push({ kind: 'now', t: now, o: 3 });
   rows.sort((a, b) => a.t - b.t || a.o - b.o);
   let h = `<h2 class="sec"><span>今日の流れ</span><span class="r">${st.loading ? '<span class="thinking">予定を読み込み中</span>' : S.mcp ? `<button class="iconbtn plusbtn" data-act="todayPlan" aria-label="今日の予定を足す" title="今日の予定を足す">＋</button><button class="iconbtn" data-act="reloadEvents" aria-label="予定を読み込み直す" title="読み込み直す">${ICON.reload}</button>` : ''}</span></h2>`;
@@ -245,6 +247,9 @@ function timelineHTML(d) {
       lis.push(`<li class="fl fl-now"><time>${hm(now)}</time><div class="c2"><span>いま</span></div></li>`);
     } else if (r.kind === 'en') {
       lis.push(`<li class="fl fl-en${fxc('ent' + r.e.id, 'new')}"><time>${hm(r.e.t)}</time><div class="c2">${entryBody(r.e)}</div></li>`);
+    } else if (r.kind === 'game') {
+      const g = r.g; const live = isToday && now - g.to < 7 * 6e4;
+      lis.push(`<li class="fl fl-game${live ? ' live' : ''}" data-tip="${esc(`${g.name}\n${hm(g.from)}〜${live ? 'いま' : hm(g.to)}（${durText(g.min * 6e4)}）${g.raw !== g.name ? `\n${g.raw}` : ''}`)}"><time aria-label="${hm(g.from)}から${live ? 'いままで' : hm(g.to) + 'まで'}">${hm(g.from)}<span class="te">${live ? 'いま' : hm(g.to)}</span></time><div class="c2"><span class="gm-t">🎮 ${esc(g.name)}</span><span class="dur">${durText(g.min * 6e4)}${live ? '・続いている' : ''}</span></div></li>`);
     } else if (r.kind === 'bed') {
       const x = r.x; const c = calOf(x.cal); const key = x.cal + '|' + x.id; const done = !/目安/.test(x.title);
       lis.push(`<li class="fl fl-bed ${done ? 'done' : ''}" style="--c:${c.color}"><time>${hm(x.start)}</time><div class="c2"><span class="bl-t" ${x.ghost ? '' : `data-act="calOpen" data-arg="${esc(key)}"`}>${done ? '🌙 就寝' : '🌙 就寝の目安'}</span></div></li>`);
@@ -252,17 +257,17 @@ function timelineHTML(d) {
       const x = r.x; const c = calOf(x.cal); const key = x.cal + '|' + x.id; const on = isOn(x);
       const list = (kids.get(key) || []).sort((a, b) => a.t - b.t);
       const state = x.canceled ? '<span class="evstate">キャンセルした</span>' : x.endedAt ? `<span class="evstate">早めに終えた（予定は${hm(x.plannedEnd)}まで）</span>` : '';
-      const dg = !x.ghost && !x.canceled && calEditable(x.cal) ? ` data-drag="${esc(key)}" data-s="${x.start}" data-e="${x.plannedEnd || x.end}"` : '';
       const meta = state + (x.canceled ? '' : bellHTML(x));
       // 中に記録がない予定は1行：左に「始まり／終わり」を縦に並べる。記録があるときは終わりをカードの一番下に
       const solo = !list.length && !on && S.evMenu !== key;
       const endT = x.canceled ? '' : hm(x.end);
-      lis.push(`<li class="ev ${on ? 'is-now' : ''} ${x.canceled ? 'canceled' : ''} ${x.endedAt ? 'ended' : ''}${dg ? ' can-drag' : ''}${fxc('moved' + key, 'moved')}" style="--c:${c.color}" data-t="${x.start}"${dg}>${dg ? '<i class="rz rz-t" aria-hidden="true"></i>' : ''}`
+      // 今日の流れでは予定をドラッグで動かさない（動かすのはカレンダーの週の画面だけ）
+      lis.push(`<li class="ev ${on ? 'is-now' : ''} ${x.canceled ? 'canceled' : ''} ${x.endedAt ? 'ended' : ''}${fxc('moved' + key, 'moved')}" style="--c:${c.color}" data-t="${x.start}">`
         + `<div class="fr fr-h"><time${solo && endT ? ` aria-label="${hm(x.start)}から${endT}"` : ''}>${hm(x.start)}${solo && endT ? `<span class="te">${endT}</span>` : ''}</time><div class="c2 ev-head" ${x.ghost ? '' : `data-act="calOpen" data-arg="${esc(key)}"`}>${isToday ? `<button class="evmore" data-act="evMenu" data-arg="${esc(key)}" aria-label="この予定を終える・キャンセルする" aria-expanded="${S.evMenu === key}">⋯</button>` : ''}<div class="t">${esc(x.title)}</div>${solo ? `<div class="m">${endT ? `<span class="dur">${durText(x.end - x.start)}</span>` : ''}${meta}</div>` : ''}</div></div>`
         + (S.evMenu === key ? `<div class="fr"><span></span><div class="c2">${evMenuHTML(d, x, key)}</div></div>` : '')
         + kidRows(list, on)
         + (solo ? '' : `<div class="fr fr-e"><time${endT ? ` aria-label="終わり ${endT}"` : ''}>${endT}</time><div class="c2 m">${meta}</div></div>`)
-        + `${dg ? '<i class="rz rz-b" aria-hidden="true"></i>' : ''}</li>`);
+        + `</li>`);
     }
     mark = Math.max(mark, r.t, r.busy || 0);
   }

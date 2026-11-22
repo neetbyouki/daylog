@@ -23,7 +23,7 @@
   --ink:#0b0e1b; --sky:#10142a; --panel:#151a31; --panel-2:#1b2140; --line:#252c4c; --line-2:#323a62;
   --fg:#e4e6f2; --fg-2:#a8adca; --fg-3:#6e7494;
   --star:#f3efe2; --lav:#b8a7ff; --blue:#86b6ff; --gold:#e9c873; --mint:#7cc9b0; --rose:#e3928f;
-  --mood:#9580ec; --body:#2ea692; --game:#5b8fd9;
+  --mood:#9580ec; --body:#2ea692; --game:#f4845f;
   --warn:#e6b363; --good:#7fd1a5; --main:#d79ac4;
   --m0:#1a1f37; --m1:#2b2d55; --m2:#3f3f80; --m3:#5b55ad; --m4:#7f74d6; --m5:#b3a6ff;
   --f-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP","Yu Gothic UI","Meiryo",sans-serif;
@@ -152,6 +152,18 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 .flow button.more{float:right;background:none;border:0;color:var(--fg-3);padding:0 2px;font-size:13px;line-height:20px}
 /* 起きた・就寝：控えめな1行 */
 .fl-wake,.fl-bed,.fl-slept{--c:var(--gold)}
+/* ゲームをした時間：オレンジの細い枠と、線の太い帯（埋まっていた時間） */
+.flow > li.fl-game{--c:var(--game);margin:3px 0;padding:6px 0}
+.flow > li.fl-game::before{width:2px;left:calc(var(--rx) - .5px);top:9px;bottom:9px;background:color-mix(in oklab,var(--game) 80%,transparent)}
+.flow > li.fl-game::after{content:"";position:absolute;left:calc(var(--tc) + var(--g));right:0;top:0;bottom:0;border-radius:12px;background:color-mix(in oklab,var(--game) 7%,transparent);border:1px solid color-mix(in oklab,var(--game) 30%,transparent);z-index:0}
+.fl-game time{font-size:12px;color:var(--fg-2)}
+.fl-game time .te{display:block;font-size:11px;line-height:15px;color:var(--fg-3)}
+.fl-game > time::after{background:var(--game)!important;border-color:var(--game)!important;width:8px!important;height:8px!important;border-radius:2px!important;right:calc(var(--g) / -2 - 4px)!important;top:6px!important}
+.fl-game .c2{padding:0 12px 0 14px;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.fl-game .gm-t{font-size:13.5px;color:color-mix(in oklab,var(--game) 70%,var(--fg))}
+.fl-game .dur{font-size:11.5px;color:var(--fg-3)}
+.fl-game.live::after{border-style:dashed}
+.wk-game{position:absolute;left:0;width:4px;border-radius:0 2px 2px 0;background:color-mix(in oklab,var(--game) 80%,transparent);z-index:1}
 .fl-slept time{font-size:11.5px;opacity:.8}
 .fl-slept .c2{display:flex;flex-wrap:wrap;align-items:center;gap:0 2px;font-size:12px;color:var(--fg-3)}
 .fl-slept > time::after{width:7px!important;height:7px!important;top:6.5px!important;right:calc(var(--g) / -2 - 3.5px)!important;border:1px solid color-mix(in oklab,var(--lav) 70%,transparent)!important}
@@ -918,7 +930,7 @@ body{padding-top:env(safe-area-inset-top,0px)}
 html:not(.classic){--ink:#000; --sky:#0d0e11; --panel:#121316; --panel-2:#1a1c20; --line:#1e2025; --line-2:#2b2e35;
   --fg:#f2f4f8; --fg-2:#a4aab6; --fg-3:#6a707c;
   --lav:#4d8dff; --blue:#8ec5ff; --gold:#f2c46d; --mint:#62dcbc; --rose:#ff8f8f;
-  --mood:#5b9cff; --body:#3fd0b0; --game:#5b8fd9; --warn:#ffb35c; --good:#62dcbc; --main:#e39ad0;
+  --mood:#5b9cff; --body:#3fd0b0; --game:#f4845f; --warn:#ffb35c; --good:#62dcbc; --main:#e39ad0;
   --m0:#0f1218; --m1:#132241; --m2:#193468; --m3:#2350a8; --m4:#3b78ec; --m5:#9bcbff;
   --f-body:"Google Sans Flex","Figtree","Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif;
   --f-disp:"Google Sans Flex","Figtree","Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif;

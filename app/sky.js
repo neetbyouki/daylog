@@ -106,20 +106,33 @@ function sleepChart(days) {
 /* ゲームの名前と時間 */
 const GAME_NAMES = { 'valorant-win64-shipping': 'Valorant', 'valorant': 'Valorant' };
 const GAME_JUNK = ['crashpad_handler', 'crashreportclient', 'unrealcefsubprocess', 'cefsharp.browsersubprocess', 'unitycrashhandler64', 'unitycrashhandler32', 'easyanticheat', 'easyanticheat_eos', 'start_protected_game'];
+// ゲームではないのに見張り役に拾われるもの（数えない）
+const NOT_GAME = ['wallpaperui', 'wallpaper32', 'wallpaper64', 'wallpaperengine'];
+const notGame = raw => NOT_GAME.includes(String(raw || '').toLowerCase());
 function gameName(raw) {
   const k = String(raw || '').toLowerCase();
+  if (NOT_GAME.includes(k)) return null;
   if (GAME_NAMES[k]) return GAME_NAMES[k];
   if (GAME_JUNK.includes(k)) return null; // ゲームに付いてくる裏方のプログラム
   const base = String(raw).replace(/-(Win64|Win32|WinGDK)-Shipping$/i, '').replace(/[_-]+/g, ' ');
   return base.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').trim() || String(raw);
 }
 const BLANK = '~blank';
+// ゲームをした時間帯（pc/<日付> の sessions：{ g: プロセス名, from, to, min }）。裏方のプログラムは除く。同じゲームで5分以内につながるものは1つに
+function gameSessions(d) {
+  const list = ((S.pc[d] && S.pc[d].sessions) || []).map(x => ({ raw: x.g, name: gameName(x.g), from: Number(x.from), to: Number(x.to), min: Number(x.min) || Math.round((x.to - x.from) / 6e4) }))
+    .filter(x => x.name && x.to > x.from).sort((a, b) => a.from - b.from);
+  const out = [];
+  for (const x of list) { const p = out.find(o => o.name === x.name && x.from - o.to <= 5 * 6e4 && x.from >= o.from); if (p) { p.to = Math.max(p.to, x.to); p.min += x.min; } else out.push({ ...x }); }
+  return out.sort((a, b) => a.from - b.from);
+}
 const pcBlank = d => (S.pc[d] && S.pc[d].games && S.pc[d].games[BLANK]) || 0;
-const pcGame = d => S.pc[d] ? Math.max(0, (S.pc[d].gameMinutes || 0) - pcBlank(d)) : 0;
+const pcNotGame = d => Object.entries((S.pc[d] && S.pc[d].games) || {}).reduce((a, [k, v]) => a + (notGame(k) ? v : 0), 0);
+const pcGame = d => S.pc[d] ? Math.max(0, (S.pc[d].gameMinutes || 0) - pcBlank(d) - pcNotGame(d)) : 0;
 const fmtMin = m => { m = Math.round(m || 0); return m >= 60 ? `${Math.floor(m / 60)}時間${m % 60 ? (m % 60) + '分' : ''}` : `${m}分`; };
 function gameBreakdown(d) {
   const g = (S.pc[d] && S.pc[d].games) || {}; const sum = {}; let junk = 0;
-  for (const [raw, min] of Object.entries(g)) { if (raw === BLANK) continue; const n = gameName(raw); if (n) sum[n] = (sum[n] || 0) + min; else junk += min; }
+  for (const [raw, min] of Object.entries(g)) { if (raw === BLANK || notGame(raw)) continue; const n = gameName(raw); if (n) sum[n] = (sum[n] || 0) + min; else junk += min; }
   const list = Object.entries(sum).sort((a, b) => b[1] - a[1]);
   if (junk) { // 裏方の分はSteamのゲームのものなので、いちばん長いSteamのゲームに足す
     const steam = list.find(([n]) => !Object.values(GAME_NAMES).includes(n));

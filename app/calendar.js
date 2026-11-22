@@ -151,7 +151,9 @@ function weekGrid(r, list) {
       return `<button class="wk-ev${dg ? ' can-drag' : ''}${hh < 30 ? ' short' : ''}${fxc('moved' + x.e.cal + '|' + x.e.id, 'moved')}" style="--c:${c.color};top:${top}px;height:${hh}px;left:calc(${x.lane / x.lanes * 100}% + 1px);width:calc(${100 / x.lanes}% - 2px)" data-act="calOpen" data-arg="${x.e.cal}|${esc(x.e.id)}"${dg} title="${esc(x.e.title)}">${dg ? '<i class="rz rz-t" aria-hidden="true"></i>' : ''}<span class="t">${esc(x.e.title)}</span><span class="m">${hh >= 34 ? hm(x.e.start) : ''}</span>${dg ? '<i class="rz rz-b" aria-hidden="true"></i>' : ''}</button>`;
     }).join('');
     const nowLine = d === t ? `<div class="wk-now" style="top:${minFromDayStart(d, now) / 60 * H_PX}px"></div>` : '';
-    return `<div class="wk-col ${d === t ? 'is-today' : ''}" data-day="${d}">${blocks}${nowLine}</div>`;
+    // ゲームをした時間：列の左はしに細い帯（触れると名前と時間）
+    const games = gameSessions(d).map(g => { const top = Math.max(0, minFromDayStart(d, g.from) / 60 * H_PX); return `<i class="wk-game" style="top:${top}px;height:${Math.max(3, (g.to - g.from) / 36e5 * H_PX)}px" data-tip="${esc(`🎮 ${g.name}\n${hm(g.from)}〜${hm(g.to)}（${fmtMin(g.min)}）`)}"></i>`; }).join('');
+    return `<div class="wk-col ${d === t ? 'is-today' : ''}" data-day="${d}">${games}${blocks}${nowLine}</div>`;
   }).join('');
   return `<div class="wk"><div class="wk-row wk-head"><div class="wk-g"></div>${head}</div>
     <div class="wk-row wk-all"><div class="wk-g">終日</div>${allRow}</div>

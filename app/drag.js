@@ -61,8 +61,6 @@ function dragBegin(st) {
   }
   st.auto = setInterval(() => dragAuto(st), 16);
 }
-const TL_PX_PER_H = 72;
-const snapT = t => Math.round(t / (SNAP * 6e4)) * SNAP * 6e4;
 function dragBadge(st) { if (st.badge) st.badge.textContent = `${hm(st.ns)}–${hm(st.ne)}`; }
 function dragAuto(st) { // 端に近づいたら、ゆっくりスクロールする
   if (!st.sc) return; const r = st.sc === $('#wk-scroll') ? st.sc.getBoundingClientRect() : { top: 0, bottom: innerHeight - 90 };
@@ -93,12 +91,7 @@ function dragMove(st) {
     if (st.kind === 'move') { el.style.left = '1px'; el.style.width = 'calc(100% - 2px)'; }
     dragBadge(st); return;
   }
-  // 今日の流れ
-  const off = snapT(dy / TL_PX_PER_H * 3600e3);
-  if (st.kind === 'move') { st.ns = st.s0 + off; st.ne = st.e0 + off; el.style.transform = `translateY(${dy}px)`; }
-  else if (st.kind === 'start') st.ns = Math.min(st.e0 - SNAP * 6e4, st.s0 + off);
-  else st.ne = Math.max(st.s0 + SNAP * 6e4, st.e0 + off);
-  dragBadge(st);
+  // 予定を動かせるのはカレンダーの週の画面だけ（今日の流れには data-drag を付けない）
 }
 function dragFinish(st, cancel) {
   clearInterval(st.auto); dragNoClick = Date.now();

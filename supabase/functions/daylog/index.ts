@@ -122,7 +122,18 @@ async function pcSummary(uid: string, from: string, to: string) {
     const games: Record<string, number> = {}; let gameMinutes = 0;
     for (const s of inWin) if (s.game) { gameMinutes++; games[s.game] = (games[s.game] || 0) + 1; }
     const naps = gaps.filter((x) => x.len < SLEEP_GAP && x.start >= (first || ws) && x.start < (last || now) && x.start >= ws && x.start < we).map((x) => ({ from: x.start, to: x.end }));
-    days.push({ date: d, first, last, activeMinutes: act.length, gameMinutes, games, naps });
+    // ゲームをした時間帯：ゲームごとに、10分以上あかずに続いた分を1つに（3分未満は捨てる）。データベースの pc_summarize と同じ計算
+    const byGame: Record<string, number[]> = {};
+    for (const s of inWin) if (s.game && !s.game.startsWith("~")) (byGame[s.game] ||= []).push(s.t);
+    const sessions: { g: string; from: number; to: number; min: number }[] = [];
+    for (const [g, ts] of Object.entries(byGame)) {
+      let st = ts[0], prev = ts[0], n = 1;
+      const flush = () => { if (n >= 3) sessions.push({ g, from: st, to: prev + 60000, min: n }); };
+      for (let i = 1; i < ts.length; i++) { if (ts[i] - prev > 10 * 60000) { flush(); st = ts[i]; n = 0; } prev = ts[i]; n++; }
+      flush();
+    }
+    sessions.sort((x, y) => x.from - y.from);
+    days.push({ date: d, first, last, activeMinutes: act.length, gameMinutes, games, naps, sessions });
   }
   const { data: dev } = await admin.from("device_tokens").select("last_seen").eq("user_id", uid).order("last_seen", { ascending: false, nullsFirst: false }).limit(1);
   const lastSeen = dev && dev[0] && dev[0].last_seen ? Date.parse(dev[0].last_seen) : 0;
