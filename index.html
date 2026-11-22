@@ -153,11 +153,14 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 /* 起きた・就寝：控えめな1行 */
 .fl-wake,.fl-bed,.fl-slept{--c:var(--gold)}
 /* ゲームをした時間：今日の流れの右はしの線（予定と重なっていても、その横に重ねて出す）。触れると名前と時間 */
-.flow.has-games{padding-right:14px}
-.gm-line{position:absolute;right:calc(3px + var(--lane,0) * 7px);width:4px;border:0;padding:0;margin:0;border-radius:3px;background:color-mix(in oklab,var(--game) 85%,transparent);box-shadow:0 0 8px color-mix(in oklab,var(--game) 35%,transparent);z-index:3;cursor:pointer}
-.gm-line::before{content:"";position:absolute;top:-4px;bottom:-4px;left:-6px;right:-6px}
-.gm-line .gm-i{position:absolute;top:-13px;left:50%;transform:translateX(-50%);font-size:9px;line-height:1;pointer-events:none}
-.gm-line.live{background:repeating-linear-gradient(180deg,var(--game) 0 6px,transparent 6px 9px)}
+.flow.has-games{padding-right:28px}
+.gm-line{position:absolute;right:calc(3px + var(--lane,0) * 21px);width:18px;border:0;padding:0;margin:0;border-radius:6px;background:color-mix(in oklab,var(--game) 88%,transparent);box-shadow:0 0 10px color-mix(in oklab,var(--game) 30%,transparent);z-index:3;cursor:pointer;color:#2a1208;overflow:visible}
+.gm-line::before{content:"";position:absolute;top:-4px;bottom:-4px;left:-4px;right:-4px}
+.gm-line .gm-i{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:10px;line-height:1;pointer-events:none}
+.gm-line .gm-t{position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;font-size:10px;font-weight:700;pointer-events:none}
+.gm-line .gm-t i{display:block;font-style:normal;line-height:11px;height:11px;font-variant-numeric:tabular-nums}
+.gm-line .gm-t.out{top:calc(100% + 3px);left:50%;right:auto;transform:translateX(-50%);display:block;white-space:nowrap;color:var(--game);font-size:9.5px}
+.gm-line.live{background:repeating-linear-gradient(180deg,var(--game) 0 8px,color-mix(in oklab,var(--game) 55%,transparent) 8px 11px)}
 .gm-line:focus-visible{outline:2px solid var(--game);outline-offset:2px}
 .wk-game{position:absolute;right:0;width:4px;border-radius:2px 0 0 2px;background:color-mix(in oklab,var(--game) 80%,transparent);z-index:3}
 .fl-slept time{font-size:11.5px;opacity:.8}

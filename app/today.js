@@ -230,7 +230,7 @@ function timelineHTML(d) {
     const mins = ms / 6e4;
     // 過ぎた空きでも、ゲームをしていた時間を含むときは、線が見えるように長さに合わせて伸ばす
     const gameIn = !fut && games.some(g => Math.min(g.to, to) - Math.max(g.from, from) >= GAP_MIN);
-    const px = fut || gameIn ? Math.round(Math.min(96, Math.max(30, 22 + mins * 0.3))) : Math.round(Math.min(26, Math.max(14, 8 + mins * 0.06)));
+    const px = gameIn ? Math.round(Math.min(140, Math.max(44, 22 + mins * 0.5))) : fut ? Math.round(Math.min(96, Math.max(30, 22 + mins * 0.3))) : Math.round(Math.min(26, Math.max(14, 8 + mins * 0.06)));
     if (!fut) return `<li class="gap past" style="--h:${px}px" data-ts="${from}" data-te="${to}" aria-label="${durText(ms)}、予定も記録もない時間"><span class="g-t">${durText(ms)}</span></li>`;
     const m = Math.ceil((from - dayStart(d).getTime()) / (15 * 6e4)) * 15;
     return `<li class="gap fut" style="--h:${px}px" data-ts="${from}" data-te="${to}">${S.mcp ? `<button class="g-pill" data-act="calNew" data-arg="${d}@${m}" aria-label="${hm(from)}から${durText(ms)}空いている。この時間に予定を入れる">` : '<span class="g-pill">'}<b>空き</b> ${durText(ms)}${S.mcp ? '<i aria-hidden="true">＋</i></button>' : '</span>'}</li>`;
@@ -314,7 +314,13 @@ function gameLinesLayout() {
     el.className = 'gm-line' + (live ? ' live' : ''); el.type = 'button';
     el.style.top = y1 + 'px'; el.style.height = (y2 - y1) + 'px'; el.style.setProperty('--lane', lane);
     el.dataset.tip = tip; el.setAttribute('aria-label', tip.replace('\n', ' '));
-    el.innerHTML = `<span class="gm-i" aria-hidden="true">🎮</span>`;
+    // 長さ（何時間やったか）を線の中に縦書きで。入りきらなければ「75分」、それも無理なら線の上に小さく
+    // 縦書き。1文字分の高さ 11px で数えて入るか決める
+    const hpx = y2 - y1; const full = durText(g.min * 6e4), short = `${g.min}分`;
+    const cells = t => [...t].length;
+    const tate = t => [...t].map(c => `<i>${c}</i>`).join(''); // 1文字ずつ縦に積む（縦書きの指定より、どの端末でも同じ高さになる）
+    const label = cells(full) * 11 + 8 <= hpx ? full : cells(short) * 11 + 8 <= hpx ? short : '';
+    el.innerHTML = `<span class="gm-i" aria-hidden="true">🎮</span>${label ? `<span class="gm-t" aria-hidden="true">${tate(label)}</span>` : `<span class="gm-t out" aria-hidden="true">${short}</span>`}`;
     ul.appendChild(el);
   }
 }
