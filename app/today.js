@@ -194,6 +194,7 @@ function timelineHTML(d) {
     if (host) { const k = host.cal + '|' + host.id; if (!kids.has(k)) kids.set(k, []); kids.get(k).push(e); } else loose.push(e);
   }
   const rng = dayRange(d, timed, loose);
+  const games = gameSessions(d); // ゲームをした時間（右はしの線）
   const ongoing = timed.filter(isOn);
   // 行：起きた／予定／記録／いま（予定の最中なら、そのカードの中に出す）
   const rows = [];
@@ -203,8 +204,6 @@ function timelineHTML(d) {
   if (rng && rng.wake) rows.push({ kind: 'wake', t: rng.wake, o: 0 });
   for (const x of timed) rows.push({ kind: isBedEv(x) && !x.canceled ? 'bed' : 'ev', t: x.start, o: 1, x, busy: !x.canceled && !isBedEv(x) ? x.end : 0 });
   for (const e of loose) rows.push({ kind: 'en', t: e.t, o: 2, e });
-  // ゲームをした時間（PCの見張り役の記録から。ゲームごとに、10分以上あかずに続いた分を1つにまとめてある）
-  for (const g of gameSessions(d)) rows.push({ kind: 'game', t: g.from, o: 1.5, g, busy: g.to });
   if (isToday && !ongoing.length) rows.push({ kind: 'now', t: now, o: 3 });
   rows.sort((a, b) => a.t - b.t || a.o - b.o);
   let h = `<h2 class="sec"><span>今日の流れ</span><span class="r">${st.loading ? '<span class="thinking">予定を読み込み中</span>' : S.mcp ? `<button class="iconbtn plusbtn" data-act="todayPlan" aria-label="今日の予定を足す" title="今日の予定を足す">＋</button><button class="iconbtn" data-act="reloadEvents" aria-label="予定を読み込み直す" title="読み込み直す">${ICON.reload}</button>` : ''}</span></h2>`;
@@ -214,12 +213,12 @@ function timelineHTML(d) {
     h += `<div class="empty">まだ何もない一日。下の欄から、今の気分を1行で残せる。スコアだけでもいい。</div>`;
     return h;
   }
-  const nowFr = () => `<div class="fr fr-now"><time>${hm(now)}</time><div class="c2"><span>いま</span></div></div>`;
+  const nowFr = () => `<div class="fr fr-now" data-ts="${now}"><time>${hm(now)}</time><div class="c2"><span>いま</span></div></div>`;
   const kidRows = (list, withNow) => {
     let out = ''; let placed = !withNow;
     for (const e of list) {
       if (!placed && e.t > now) { out += nowFr(); placed = true; }
-      out += `<div class="fr fr-k${fxc('ent' + e.id, 'new')}"><time>${hm(e.t)}</time><div class="c2">${entryBody(e)}</div></div>`;
+      out += `<div class="fr fr-k${fxc('ent' + e.id, 'new')}" data-ts="${e.t}"><time>${hm(e.t)}</time><div class="c2">${entryBody(e)}</div></div>`;
     }
     if (!placed) out += nowFr();
     return out;
@@ -229,30 +228,29 @@ function timelineHTML(d) {
     const ms = to - from; const fut = isToday && from >= now - 6e4;
     if (ms < (fut ? GAP_MIN : 2 * GAP_MIN)) return ''; // 過ぎた時間は30分以上あいたときだけ
     const mins = ms / 6e4;
-    const px = fut ? Math.round(Math.min(96, Math.max(30, 22 + mins * 0.3))) : Math.round(Math.min(26, Math.max(14, 8 + mins * 0.06)));
-    if (!fut) return `<li class="gap past" style="--h:${px}px" aria-label="${durText(ms)}、予定も記録もない時間"><span class="g-t">${durText(ms)}</span></li>`;
+    // 過ぎた空きでも、ゲームをしていた時間を含むときは、線が見えるように長さに合わせて伸ばす
+    const gameIn = !fut && games.some(g => Math.min(g.to, to) - Math.max(g.from, from) >= GAP_MIN);
+    const px = fut || gameIn ? Math.round(Math.min(96, Math.max(30, 22 + mins * 0.3))) : Math.round(Math.min(26, Math.max(14, 8 + mins * 0.06)));
+    if (!fut) return `<li class="gap past" style="--h:${px}px" data-ts="${from}" data-te="${to}" aria-label="${durText(ms)}、予定も記録もない時間"><span class="g-t">${durText(ms)}</span></li>`;
     const m = Math.ceil((from - dayStart(d).getTime()) / (15 * 6e4)) * 15;
-    return `<li class="gap fut" style="--h:${px}px">${S.mcp ? `<button class="g-pill" data-act="calNew" data-arg="${d}@${m}" aria-label="${hm(from)}から${durText(ms)}空いている。この時間に予定を入れる">` : '<span class="g-pill">'}<b>空き</b> ${durText(ms)}${S.mcp ? '<i aria-hidden="true">＋</i></button>' : '</span>'}</li>`;
+    return `<li class="gap fut" style="--h:${px}px" data-ts="${from}" data-te="${to}">${S.mcp ? `<button class="g-pill" data-act="calNew" data-arg="${d}@${m}" aria-label="${hm(from)}から${durText(ms)}空いている。この時間に予定を入れる">` : '<span class="g-pill">'}<b>空き</b> ${durText(ms)}${S.mcp ? '<i aria-hidden="true">＋</i></button>' : '</span>'}</li>`;
   };
   const lis = []; let mark = rng ? Math.min(rng.from, rows[0].t) : rows[0].t;
   const y = addDays(d, -1);
   for (const r of rows) {
-    if (r.kind === 'wake' && prevSleep && prevSleep < r.t) lis.push(`<li class="gap sleep" style="--h:${Math.round(Math.min(34, Math.max(20, 6 + (r.t - prevSleep) / 36e5 * 3)))}px"><span class="g-t">睡眠 ${durText(r.t - prevSleep)}</span></li>`);
+    if (r.kind === 'wake' && prevSleep && prevSleep < r.t) lis.push(`<li class="gap sleep" data-ts="${prevSleep}" data-te="${r.t}" style="--h:${Math.round(Math.min(34, Math.max(20, 6 + (r.t - prevSleep) / 36e5 * 3)))}px"><span class="g-t">睡眠 ${durText(r.t - prevSleep)}</span></li>`);
     else lis.push(gapLI(mark, r.t));
     if (r.kind === 'slept') {
-      lis.push(`<li class="fl fl-slept"><time>${hm(r.t)}</time><div class="c2">${S.timeFix && S.timeFix.key === 'sleep:' + y ? timeFixHTML() : `<span>🌙 前の晩に寝た</span>${fixBtn('sleep:' + y, '前の晩に寝た時刻を直す')}`}</div></li>`);
+      lis.push(`<li class="fl fl-slept" data-ts="${r.t}"><time>${hm(r.t)}</time><div class="c2">${S.timeFix && S.timeFix.key === 'sleep:' + y ? timeFixHTML() : `<span>🌙 前の晩に寝た</span>${fixBtn('sleep:' + y, '前の晩に寝た時刻を直す')}`}</div></li>`);
     } else if (r.kind === 'wake') {
-      lis.push(`<li class="fl fl-wake"><time>${hm(r.t)}</time><div class="c2">${S.timeFix && S.timeFix.key === 'wake:' + d ? timeFixHTML() : `<span>☀ 起きた</span>${fixBtn('wake:' + d, '起きた時刻を直す')}`}${prevSleep ? '' : S.timeFix && S.timeFix.key === 'sleep:' + y ? timeFixHTML() : `<span class="wk-prev">前の晩の就寝 —${fixBtn('sleep:' + y, '前の晩に寝た時刻を直す')}</span>`}</div></li>`);
+      lis.push(`<li class="fl fl-wake" data-ts="${r.t}"><time>${hm(r.t)}</time><div class="c2">${S.timeFix && S.timeFix.key === 'wake:' + d ? timeFixHTML() : `<span>☀ 起きた</span>${fixBtn('wake:' + d, '起きた時刻を直す')}`}${prevSleep ? '' : S.timeFix && S.timeFix.key === 'sleep:' + y ? timeFixHTML() : `<span class="wk-prev">前の晩の就寝 —${fixBtn('sleep:' + y, '前の晩に寝た時刻を直す')}</span>`}</div></li>`);
     } else if (r.kind === 'now') {
-      lis.push(`<li class="fl fl-now"><time>${hm(now)}</time><div class="c2"><span>いま</span></div></li>`);
+      lis.push(`<li class="fl fl-now" data-ts="${now}"><time>${hm(now)}</time><div class="c2"><span>いま</span></div></li>`);
     } else if (r.kind === 'en') {
-      lis.push(`<li class="fl fl-en${fxc('ent' + r.e.id, 'new')}"><time>${hm(r.e.t)}</time><div class="c2">${entryBody(r.e)}</div></li>`);
-    } else if (r.kind === 'game') {
-      const g = r.g; const live = isToday && now - g.to < 7 * 6e4;
-      lis.push(`<li class="fl fl-game${live ? ' live' : ''}" data-tip="${esc(`${g.name}\n${hm(g.from)}〜${live ? 'いま' : hm(g.to)}（${durText(g.min * 6e4)}）${g.raw !== g.name ? `\n${g.raw}` : ''}`)}"><time aria-label="${hm(g.from)}から${live ? 'いままで' : hm(g.to) + 'まで'}">${hm(g.from)}<span class="te">${live ? 'いま' : hm(g.to)}</span></time><div class="c2"><span class="gm-t">🎮 ${esc(g.name)}</span><span class="dur">${durText(g.min * 6e4)}${live ? '・続いている' : ''}</span></div></li>`);
+      lis.push(`<li class="fl fl-en${fxc('ent' + r.e.id, 'new')}" data-ts="${r.e.t}"><time>${hm(r.e.t)}</time><div class="c2">${entryBody(r.e)}</div></li>`);
     } else if (r.kind === 'bed') {
       const x = r.x; const c = calOf(x.cal); const key = x.cal + '|' + x.id; const done = !/目安/.test(x.title);
-      lis.push(`<li class="fl fl-bed ${done ? 'done' : ''}" style="--c:${c.color}"><time>${hm(x.start)}</time><div class="c2"><span class="bl-t" ${x.ghost ? '' : `data-act="calOpen" data-arg="${esc(key)}"`}>${done ? '🌙 就寝' : '🌙 就寝の目安'}</span></div></li>`);
+      lis.push(`<li class="fl fl-bed ${done ? 'done' : ''}" style="--c:${c.color}" data-ts="${x.start}"><time>${hm(x.start)}</time><div class="c2"><span class="bl-t" ${x.ghost ? '' : `data-act="calOpen" data-arg="${esc(key)}"`}>${done ? '🌙 就寝' : '🌙 就寝の目安'}</span></div></li>`);
     } else {
       const x = r.x; const c = calOf(x.cal); const key = x.cal + '|' + x.id; const on = isOn(x);
       const list = (kids.get(key) || []).sort((a, b) => a.t - b.t);
@@ -262,7 +260,7 @@ function timelineHTML(d) {
       const solo = !list.length && !on && S.evMenu !== key;
       const endT = x.canceled ? '' : hm(x.end);
       // 今日の流れでは予定をドラッグで動かさない（動かすのはカレンダーの週の画面だけ）
-      lis.push(`<li class="ev ${on ? 'is-now' : ''} ${x.canceled ? 'canceled' : ''} ${x.endedAt ? 'ended' : ''}${fxc('moved' + key, 'moved')}" style="--c:${c.color}" data-t="${x.start}">`
+      lis.push(`<li class="ev ${on ? 'is-now' : ''} ${x.canceled ? 'canceled' : ''} ${x.endedAt ? 'ended' : ''}${fxc('moved' + key, 'moved')}" style="--c:${c.color}" data-t="${x.start}" data-ts="${x.start}" data-te="${x.canceled ? x.start : x.end}">`
         + `<div class="fr fr-h"><time${solo && endT ? ` aria-label="${hm(x.start)}から${endT}"` : ''}>${hm(x.start)}${solo && endT ? `<span class="te">${endT}</span>` : ''}</time><div class="c2 ev-head" ${x.ghost ? '' : `data-act="calOpen" data-arg="${esc(key)}"`}>${isToday ? `<button class="evmore" data-act="evMenu" data-arg="${esc(key)}" aria-label="この予定を終える・キャンセルする" aria-expanded="${S.evMenu === key}">⋯</button>` : ''}<div class="t">${esc(x.title)}</div>${solo ? `<div class="m">${endT ? `<span class="dur">${durText(x.end - x.start)}</span>` : ''}${meta}</div>` : ''}</div></div>`
         + (S.evMenu === key ? `<div class="fr"><span></span><div class="c2">${evMenuHTML(d, x, key)}</div></div>` : '')
         + kidRows(list, on)
@@ -279,9 +277,51 @@ function timelineHTML(d) {
       if (bt && bt.time && Math.abs(slotDate(d, bt.time).getTime() - rng.to) < 6e4) lis.push(`<li class="fl fl-bed"><time>${bt.time}</time><div class="c2"><span class="bl-t">🌙 就寝の目安</span></div></li>`);
     }
   }
-  h += `<ul class="flow">${lis.join('')}</ul>`;
+  // ゲームをした時間は、右はしの線（予定と重なっていても重ねて出す）。線の位置は描いたあとに gameLinesLayout() が決める
+  h += `<ul class="flow${games.length ? ' has-games' : ''}" data-day="${d}">${lis.join('')}</ul>`;
   return h;
 }
+// ゲームの線：今日の流れは時間に比例していないので、行の「時刻→高さ」を並べて、その間を按分して線の上下を決める
+function gameLinesLayout() {
+  const ul = document.querySelector('ul.flow[data-day]'); if (!ul) return;
+  ul.querySelectorAll('.gm-line').forEach(el => el.remove());
+  const d = ul.dataset.day; const games = gameSessions(d); if (!games.length) return;
+  const base = ul.getBoundingClientRect().top;
+  const pts = [];
+  ul.querySelectorAll('[data-ts]').forEach(el => {
+    const r = el.getBoundingClientRect(); const ts = Number(el.dataset.ts), te = Number(el.dataset.te);
+    if (!ts) return;
+    if (te && te > ts) { pts.push([ts, r.top - base]); pts.push([te, r.bottom - base]); }
+    else pts.push([ts, r.top - base + Math.min(11, r.height / 2)]);
+  });
+  if (!pts.length) return;
+  pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  for (let i = 1; i < pts.length; i++) if (pts[i][1] < pts[i - 1][1]) pts[i][1] = pts[i - 1][1]; // 下へ向かうだけ（重なる予定があっても逆戻りしない）
+  const yAt = t => {
+    if (t <= pts[0][0]) return pts[0][1];
+    for (let i = 1; i < pts.length; i++) {
+      const [t1, y1] = pts[i]; const [t0, y0] = pts[i - 1];
+      if (t <= t1) return t1 === t0 ? y1 : y0 + (y1 - y0) * (t - t0) / (t1 - t0);
+    }
+    return pts[pts.length - 1][1];
+  };
+  const now = Date.now(); const isToday = d === today(); const lanes = [];
+  for (const g of games) {
+    let lane = lanes.findIndex(end => end <= g.from); if (lane < 0) { lane = lanes.length; lanes.push(0); } lanes[lane] = g.to;
+    const y1 = yAt(g.from), y2 = Math.max(y1 + 14, yAt(g.to)); const live = isToday && now - g.to < 7 * 6e4;
+    const tip = `🎮 ${g.name}\n${hm(g.from)}〜${live ? 'いま' : hm(g.to)}（${durText(g.min * 6e4)}${live ? '・続いている' : ''}）`;
+    const el = document.createElement('button');
+    el.className = 'gm-line' + (live ? ' live' : ''); el.type = 'button';
+    el.style.top = y1 + 'px'; el.style.height = (y2 - y1) + 'px'; el.style.setProperty('--lane', lane);
+    el.dataset.tip = tip; el.setAttribute('aria-label', tip.replace('\n', ' '));
+    el.innerHTML = `<span class="gm-i" aria-hidden="true">🎮</span>`;
+    ul.appendChild(el);
+  }
+}
+let gameLinesT = 0;
+window.addEventListener('resize', () => { clearTimeout(gameLinesT); gameLinesT = setTimeout(gameLinesLayout, 120); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (S.view === 'today') gameLinesLayout(); });
+
 /* ── 予定の終了・キャンセル（Daylogの記録。.｡oOの予定はカレンダーにも反映） ── */
 const evKey = x => x.cal + '|' + x.id;
 function effEvents(d) {

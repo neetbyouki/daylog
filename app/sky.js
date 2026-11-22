@@ -199,6 +199,7 @@ function skyPick(h) {
 }
 function afterMain() {
   document.querySelectorAll('.autosize').forEach(autosize);
+  if (S.view === 'today') gameLinesLayout();
   // ノートを書く画面：開いていれば差し込み、離れたら閉じる（書いた分は送る）
   const neHost = $('#ne-host');
   if (neHost && S.nOpen && S.notes[S.nOpen]) NE.mount(neHost, S.nOpen); else if (NE.id) NE.unmount();
