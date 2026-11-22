@@ -199,7 +199,11 @@ function skyPick(h) {
 }
 function afterMain() {
   document.querySelectorAll('.autosize').forEach(autosize);
-  if (S.view === 'today') gameLinesLayout();
+  if (S.view === 'today' || S.view === 'cal') gameLinesLayout();
+  if (S.view === 'cal' && S.cal.scrollSel) { // 月の画面で日を選んだら、その日の流れの見出しが見えるところまで
+    S.cal.scrollSel = false; const sec = $('#mo-day');
+    if (sec && sec.getBoundingClientRect().top > innerHeight * 0.45) sec.scrollIntoView({ block: 'start', behavior: document.documentElement.dataset.motion === 'calm' ? 'auto' : 'smooth' });
+  }
   // ノートを書く画面：開いていれば差し込み、離れたら閉じる（書いた分は送る）
   const neHost = $('#ne-host');
   if (neHost && S.nOpen && S.notes[S.nOpen]) NE.mount(neHost, S.nOpen); else if (NE.id) NE.unmount();

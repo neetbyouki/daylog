@@ -39,6 +39,7 @@ async function loadEvents(d, force) {
   st.error = err ? { code: err.code, msg: calErr(err), partial: !failedAll } : null;
   st.loading = false; st.at = Date.now(); render();
   if (!failedAll) cleanBedDupes(d, st.list);
+  if (!err) snapEvents(d, st.list);
 }
 // 同じ夜に「🌙 就寝の目安」が2つ以上あったら、記録が指している1つだけ残して消す（以前の不具合で増えた分の片付け）
 let bedCleaning = false;
@@ -167,12 +168,26 @@ function monthGrid(r, list) {
     return `<button class="mo-c ${monthKey(d) !== r.mk ? 'out' : ''} ${d === t ? 'is-today' : ''} ${d === sel ? 'sel' : ''}" data-act="calSel" data-arg="${d}" aria-label="${dayLabel(d)} 予定${evs.length}件"><span class="n ${dt.getDay() === 0 ? 'sun' : dt.getDay() === 6 ? 'sat' : ''}">${dt.getDate()}</span>${evs.slice(0, 3).map(e => `<span class="mo-e" style="--c:${calOf(e.cal).color}">${esc(e.title)}</span>`).join('')}${evs.length > 3 ? `<span class="mo-more">+${evs.length - 3}</span>` : ''}</button>`;
   }).join('');
   let h = `<div class="mo"><div class="mo-w">${['月', '火', '水', '木', '金', '土', '日'].map(w => `<span>${w}</span>`).join('')}</div><div class="mo-g">${cells}</div></div>`;
-  if (sel) {
-    const evs = calEventsFor(list, sel).sort(sortEv);
-    h += `<div class="card" style="margin-top:10px"><div class="row"><b>${dayLabel(sel)}</b><span class="spacer"></span><button class="btn sm" data-act="calWeekOf" data-arg="${sel}">この週を見る</button><button class="btn sm primary" data-act="calNew" data-arg="${sel}">＋ 予定</button></div>
-      <div class="mo-list">${evs.map(e => `<button class="mo-li" style="--c:${calOf(e.cal).color}" data-act="calOpen" data-arg="${e.cal}|${esc(e.id)}"><span class="mono faint">${e.allDay ? '終日' : `${hm(e.start)}〜${hm(e.end)}`}</span><span class="t">${esc(e.title)}</span><span class="faint">${esc(calOf(e.cal).name)}</span></button>`).join('') || '<div class="faint" style="font-size:13px;padding:6px 0">予定はない</div>'}</div></div>`;
-  }
+  if (sel) h += moDayHTML(sel);
   return h;
+}
+// 月の画面で選んだ日：今日の画面と同じ「流れ」をカレンダーの下に出す（見るだけ）
+function moDayHTML(d) {
+  const day = getDay(d); const m = MODES[day.mode]; const t = today();
+  const chips = [];
+  if (m) chips.push(`<span class="md-chip" style="--c:${m.c}"><i aria-hidden="true"></i>${m.label}</span>`);
+  if (d <= t && S.pc[d]) { const gm = pcGame(d); if (gm) chips.push(`<span class="md-chip" style="--c:var(--game)" data-tip="${esc(gameTip(d))}">🎮 ${fmtMin(gm)}</span>`); }
+  const cl = day.close || {};
+  if (cl.mood || cl.body) chips.push(`<span class="md-chip md-close" aria-label="締め：気分${cl.mood || '－'}・体調${cl.body || '－'}">締め${cl.mood ? `<span title="気分 ${cl.mood}">${dots(cl.mood, 'var(--mood)')}</span>` : ''}${cl.body ? `<span title="体調 ${cl.body}">${dots(cl.body, 'var(--body)')}</span>` : ''}</span>`);
+  const hb = habitList().filter(x => habitDone(day, x.id)).map(x => x.title);
+  if (hb.length) chips.push(`<span class="md-chip" style="--c:var(--gold)">✓ ${esc(hb.join('・'))}</span>`);
+  const when = d === t ? '今日' : d < t ? `${diffDays(d, t)}日前` : `${diffDays(t, d)}日後`;
+  return `<section class="mo-day" id="mo-day" aria-label="${dayLabel(d)}の流れ">
+    <div class="row md-head"><b>${dayLabel(d)}</b><span class="faint md-when">${when}</span><span class="spacer"></span><button class="btn sm" data-act="calWeekOf" data-arg="${d}">この週を見る</button><button class="btn sm primary" data-act="calNew" data-arg="${d}">＋ 予定</button></div>
+    ${chips.length ? `<div class="md-chips">${chips.join('')}</div>` : ''}
+    ${alldayHTML(d)}
+    ${timelineHTML(d, { ro: true, title: d === t ? '今日の流れ' : 'この日の流れ' })}
+  </section>`;
 }
 function wkDefaultScroll() {
   const r = calRange(); const t = today();
@@ -213,7 +228,10 @@ A.calToday = () => { S.cal.anchor = today(); S.cal.sel = S.cal.mode === 'month' 
 A.calMove = dir => { const c = S.cal; const n = Number(dir); if (c.mode === 'week') c.anchor = addDays(c.anchor, 7 * n); else { const [y, m] = c.anchor.split('-').map(Number); c.anchor = ymd(new Date(y, m - 1 + n, 1)); } c.sel = null; render(); loadCal(); };
 A.calReload = () => loadCal(true);
 A.calHide = k => { const h = { ...(S.settings.calHide || {}) }; h[k] = !h[k]; patchSettings({ calHide: h }); };
-A.calSel = d => { S.cal.sel = S.cal.sel === d ? null : d; render(); };
+A.calSel = d => {
+  S.cal.sel = S.cal.sel === d ? null : d; S.cal.scrollSel = !!S.cal.sel; render();
+  if (S.cal.sel && !evSnapped(d)) loadEvents(d); // 過ぎた日で控えがあるときは読みに行かない
+};
 A.calWeekOf = d => { S.cal.mode = 'week'; S.cal.anchor = d; S.cal.sel = null; render(); loadCal(); };
 A.calNew = arg => {
   let d = today(), m = null;
@@ -229,7 +247,8 @@ A.calNew = arg => {
 };
 A.calOpen = arg => {
   const i = String(arg).indexOf('|'); const cal = arg.slice(0, i), id = arg.slice(i + 1);
-  const e = findEvent(cal, id); if (!e) { toast('予定が見つからなかった。再読み込みしてみて。'); return; }
+  const e = findEvent(cal, id);
+  if (!e) { const snap = Object.values(S.days).some(x => x && x.evsnap && (x.evsnap.list || []).some(y => y.cal === cal && y.id === id)); toast(snap ? 'この予定は、いまのカレンダーでは見つからない（この日の流れには、その日の形で残している）。' : '予定が見つからなかった。再読み込みしてみて。'); return; }
   S.calSheet = { mode: 'edit', id, cal, rec: !!e.rec, editable: calEditable(cal), title: e.title, allDay: !!e.allDay, wasAllDay: !!e.allDay };
   if (e.allDay) Object.assign(S.drafts, { 'cs-title': e.title, 'cs-sd': e.sd, 'cs-ed': addDays(e.ed, -1) < e.sd ? e.sd : addDays(e.ed, -1), 'cs-st': '10:00', 'cs-et': '11:00' });
   else Object.assign(S.drafts, { 'cs-title': e.title, 'cs-sd': ymd(new Date(e.start)), 'cs-st': hm(e.start), 'cs-ed': ymd(new Date(e.end)), 'cs-et': hm(e.end) });

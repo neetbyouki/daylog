@@ -818,6 +818,16 @@ textarea.field{width:100%;resize:vertical;min-height:84px;line-height:1.6}
 .mo-list{display:flex;flex-direction:column;gap:4px;margin-top:8px}
 .mo-li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;border:0;border-left:3px solid var(--c);background:var(--sky);border-radius:6px;padding:7px 10px;text-align:left;color:var(--fg);font-size:14px}
 .mo-li .t{min-width:0;overflow-wrap:anywhere}
+.mo-day{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);scroll-margin-top:12px}
+.md-head{gap:8px}.md-head b{font-size:16px}.md-when{font-size:12px}
+.md-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.md-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;line-height:1;padding:5px 9px;border-radius:999px;border:1px solid color-mix(in oklab,var(--c,var(--fg-3)) 45%,transparent);background:color-mix(in oklab,var(--c,var(--fg-3)) 10%,transparent);color:var(--fg)}
+.md-chip > i{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.md-chip.md-close{--c:var(--fg-3)}
+.md-chip[data-tip]{cursor:help}
+.mo-day .allday-band{margin-top:10px}
+.mo-day .sec{margin-top:16px}
+.snapnote{font-size:11px;cursor:help}
 .cs-grid{display:grid;grid-template-columns:5.5em minmax(0,1fr);gap:10px 12px;align-items:center;margin-top:14px;font-size:14px}
 .cs-grid .lb{color:var(--fg-3);font-size:12px}
 .cs-grid input[type="date"]{width:150px}
