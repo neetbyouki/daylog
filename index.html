@@ -586,6 +586,22 @@ details.fold[open] summary::before{content:"▾ "}
 .goal{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
 .goal:last-child{border-bottom:0}
 .goal .title{flex:1;min-width:0;overflow-wrap:anywhere}
+/* 毎日の習慣（目標の編集のとき） */
+.goal.habit{align-items:center}
+.goal.habit .title{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.goal.habit .hb-n{font-size:11px;color:var(--fg-3);font-variant-numeric:tabular-nums}
+.goal.habit.resting .title{color:var(--fg-3)}
+.check.gold.off{opacity:.35;border-style:dashed}
+.hb-edit{font-size:12px;color:var(--fg-3);flex:none}
+.goal .link.hb-edit{color:var(--fg-3);text-decoration:none;padding:4px 2px}
+@media (hover:hover){.goal .link.hb-edit:hover{color:var(--fg)}}
+.habit-ed{display:grid;gap:8px;padding:10px 0 12px;border-bottom:1px solid var(--line)}
+.hb-l{display:grid;gap:4px;font-size:11.5px;color:var(--fg-3)}
+.hb-l .field{font-size:14px}
+.hb-c{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg-2)}
+.hb-btns{gap:8px;align-items:center}
+.hb-btns .link.danger{color:var(--rose);font-size:12.5px}
+.hb-note{font-size:11.5px;margin-top:6px}
 .goal.done .title{color:var(--gold)}
 
 /* sky */

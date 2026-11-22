@@ -185,11 +185,17 @@ function monthWroteCount(mk) { let n = 0; for (const d in S.days) if (d.startsWi
 function activeGoals(scope, key) { return Object.values(S.goals).filter(g => g.scope === scope && g.period === key).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); }
 function openTasks() { return Object.values(S.tasks).filter(t => t.status === 'open'); }
 function carryTasks(d) { return openTasks().filter(t => t.plannedDate && t.plannedDate < d); }
-function habitText(mode) {
-  if (mode === 'rest') return null;
-  if (mode === 'bad') return 'お風呂（時間は自由。シャワーでもいい）';
-  return 'お風呂：19時30分までに湯船に浸かる';
-}
+// 毎日の習慣：タスクの画面の「目標 → 編集」で、足す・直す・消すことができる（settings.habits）
+// { id, title: ふだんの形, bad: 不調の日の軽い形（空ならふだんと同じ）, rest: 休養の日もやるか }
+// その日にやったかは days の habits[id]（true）と habits[id + 'At']（時刻）。お風呂は id 'bath'（前からの記録もそのまま）
+const DEFAULT_HABITS = [{ id: 'bath', title: 'お風呂：19時30分までに湯船に浸かる', bad: 'お風呂（時間は自由。シャワーでもいい）', rest: false }];
+const HABIT_MAX = 6;
+function habitList() { return Array.isArray(S.settings.habits) ? S.settings.habits : DEFAULT_HABITS; }
+function habitFor(h, mode) { if (mode === 'rest' && !h.rest) return null; return mode === 'bad' && h.bad ? h.bad : h.title; }
+function habitsToday(mode) { return habitList().map(h => ({ ...h, text: habitFor(h, mode) })).filter(h => h.text); }
+const habitDone = (day, id) => !!(day && day.habits && day.habits[id] === true);
+const habitShort = t => String(t || '').split(/[：:（(]/)[0].trim() || String(t || '');
+function habitText(mode) { const l = habitsToday(mode); return l.length ? l.map(h => h.text).join('／') : null; }
 function starsForDay(d) {
   const day = getDay(d); const out = [];
   (day.entries || []).forEach(e => out.push({ k: 'diary', t: e.t, id: 'e' + e.id, mood: e.mood, label: (e.nap ? '💤 ' : '') + (e.text || '（スコアだけの記録）') }));
@@ -197,7 +203,11 @@ function starsForDay(d) {
     if (t.status === 'done' && t.doneAt && logicalDate(t.doneAt) === d) out.push({ k: 'task', t: t.doneAt, id: 't' + t.id, label: 'タスク完了：' + t.title });
     (t.steps || []).forEach(s => { if (s.done && s.doneAt && logicalDate(s.doneAt) === d) out.push({ k: 'task', small: true, t: s.doneAt, id: 's' + s.id, label: 'ステップ完了：' + s.title }); });
   }
-  if (day.habits && day.habits.bath) out.push({ k: 'gold', t: day.habits.bathAt || dayStart(d).getTime() + 13.5 * 3600e3, id: 'b' + d, label: 'お風呂' });
+  for (const [id, v] of Object.entries(day.habits || {})) {
+    if (v !== true || id.endsWith('At')) continue;
+    const h = habitList().find(x => x.id === id);
+    out.push({ k: 'gold', t: day.habits[id + 'At'] || dayStart(d).getTime() + 13.5 * 3600e3, id: id === 'bath' ? 'b' + d : 'h' + id + d, label: h ? habitShort(h.title) : id === 'bath' ? 'お風呂' : '習慣' });
+  }
   for (const g of Object.values(S.goals)) if (g.status === 'done' && g.doneAt && logicalDate(g.doneAt) === d) out.push({ k: 'gold', t: g.doneAt, id: 'g' + g.id, label: '目標達成：' + g.title });
   if (day.close && day.close.done) out.push({ k: 'night', t: day.close.at, id: 'n' + d, label: '夜モード完了' + (day.close.text ? '：' + day.close.text : '') });
   return out.sort((a, b) => a.t - b.t);

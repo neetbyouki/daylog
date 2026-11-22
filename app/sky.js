@@ -33,11 +33,13 @@ function reviewSection() {
   const wroteN = past.filter(wrote).length;
   const nightN = past.filter(d => getDay(d).close && getDay(d).close.done).length;
   const taskN = Object.values(S.tasks).filter(x => x.status === 'done' && x.doneAt && days.includes(logicalDate(x.doneAt))).length;
-  const bathN = past.filter(d => getDay(d).habits && getDay(d).habits.bath).length;
+  // 習慣：1つだけならその名前で、いくつかあるときは「どれかをやった日」
+  const hl = habitList(); const habitN = past.filter(d => hl.some(x => habitDone(getDay(d), x.id))).length;
+  const habitLabel = hl.length === 1 ? habitShort(hl[0].title) : '習慣をした日';
   const stat = (n, unit, l) => `<div class="stat"><div><b>${n}</b><small>${unit}</small></div><span>${l}</span></div>`;
   let h = `<section class="rev"><div class="revhead"><h2>ふりかえり</h2>
     <div class="row"><div class="seg" role="group" aria-label="期間"><button data-act="revKind" data-arg="week" aria-pressed="${r.kind === 'week'}">週</button><button data-act="revKind" data-arg="month" aria-pressed="${r.kind === 'month'}">月</button></div><span class="spacer"></span><button class="btn sm" data-act="revMove" data-arg="-1" aria-label="前の期間">‹</button><span class="revlabel">${label}</span><button class="btn sm" data-act="revMove" data-arg="1" aria-label="次の期間">›</button></div></div>`;
-  h += `<div class="stats">${stat(wroteN, ` / ${past.length}日`, '書いた日')}${stat(nightN, '日', '夜モード')}${stat(taskN, '個', '終えたタスク')}${stat(bathN, '日', 'お風呂')}</div>`;
+  h += `<div class="stats">${stat(wroteN, ` / ${past.length}日`, '書いた日')}${stat(nightN, '日', '夜モード')}${stat(taskN, '個', '終えたタスク')}${hl.length ? stat(habitN, '日', esc(habitLabel)) : ''}</div>`;
   h += colorCal(days);
   h += moodChart(days) + sleepChart(days) + gameChart(days);
   const rv = S.reviews[reviewKey()];

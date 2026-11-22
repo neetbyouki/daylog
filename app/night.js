@@ -30,7 +30,7 @@ function sheetHTML() {
     return `<div class="sheet"><div class="card"><div class="eyebrow">${dayLabel(d)}</div><h3>今日の目標</h3>
       <div class="note" style="margin-top:8px"><span class="k">今月</span><div class="v">${list(mg)}</div></div>
       <div class="note" style="margin-top:8px"><span class="k">今週</span><div class="v">${list(wg)}</div></div>
-      <div class="note" style="margin-top:8px"><span class="k">習慣</span><div class="v">${ht ? esc(ht) : day.mode === 'rest' ? '休養の日はお休み' : '<span class="muted">体調を選ぶと決まる</span>'}</div></div>
+      <div class="note" style="margin-top:8px"><span class="k">習慣</span><div class="v">${ht ? habitsToday(day.mode).map(h => `<div>${esc(h.text)}</div>`).join('') : day.mode === 'rest' ? '休養の日はお休み' : '<span class="muted">まだ置いていない</span>'}</div></div>
       <div class="eyebrow" style="margin-top:14px">今日の体調は？（あとで変えられる）</div>${modeRow}
       <div class="row" style="margin-top:14px">${!mg.length ? '<button class="btn ghost" data-act="sheetGoGoals">目標を置く</button>' : ''}<span class="spacer"></span><button class="btn primary" data-act="closeSheet">閉じる</button></div></div></div>`;
   }
@@ -61,7 +61,7 @@ function nightHTML() {
     const row = g => `<div class="goal concept ${g.status === 'done' ? 'done' : ''}"><span class="gmark" aria-hidden="true">${g.status === 'done' ? '✦' : '·'}</span><div class="title">${esc(g.title)}</div><span class="pill">${g.scope === 'month' ? '今月' : '今週'}</span></div>`;
     body = `<div class="faint" style="font-size:12px;margin-bottom:6px">今日を振り返りながら、眺めるだけでいい。</div><div class="card">${[...mg, ...wg].map(row).join('') || '<div class="faint" style="font-size:13px">今月・今週の目標はまだない。タスクの画面の上から置ける。</div>'}</div>
       <div class="eyebrow" style="margin-top:14px">毎日の習慣</div>
-      ${ht ? `<button class="bigcheck" data-act="bathToggle" aria-pressed="${!!(day.habits && day.habits.bath)}" style="margin-top:6px"><span class="box">${day.habits && day.habits.bath ? CHECK : ''}</span><span>${esc(ht)}</span></button>` : `<div class="muted" style="font-size:14px;margin-top:6px">${day.mode === 'rest' ? '休養の日なので今日の習慣はお休み。' : '体調を選んでいないので、習慣はつけなくていい。'}</div>`}`;
+      ${ht ? habitsToday(day.mode).map(h => `<button class="bigcheck" data-act="habitToggle" data-arg="${esc(h.id)}" aria-pressed="${habitDone(day, h.id)}" style="margin-top:6px"><span class="box">${habitDone(day, h.id) ? CHECK : ''}</span><span>${esc(h.text)}</span></button>`).join('') : `<div class="muted" style="font-size:14px;margin-top:6px">${day.mode === 'rest' ? '休養の日なので今日の習慣はお休み。' : '習慣はまだ置いていない。タスクの画面の「目標 → 編集」から置ける。'}</div>`}`;
     foot = `${back}<span class="spacer"></span><button class="btn primary" data-act="nightNext">次へ</button>`;
   } else if (n.step === 2) {
     const tm = addDays(d, 1); const st = S.events[tm] || {};

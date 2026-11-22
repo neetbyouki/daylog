@@ -498,7 +498,8 @@ A.replan = async () => {
   finally { S.busy.replan = false; render(); }
 };
 A.dismissReplan = () => { const d = today(); patchDay(d, { replan: { ...(getDay(d).replan || {}), dismissed: true } }); };
-A.bathToggle = () => { fx('bath'); const d = S.night ? S.night.date : today(); const day = getDay(d); const on = !(day.habits && day.habits.bath); patchDay(d, { habits: { ...(day.habits || {}), bath: on, bathAt: on ? Date.now() : null } }); };
+A.habitToggle = id => { if (!id) return; fx('habit' + id); const d = S.night ? S.night.date : today(); const day = getDay(d); const on = !habitDone(day, id); patchDay(d, { habits: { ...(day.habits || {}), [id]: on, [id + 'At']: on ? Date.now() : null } }); };
+A.bathToggle = () => A.habitToggle('bath');
 // 昨夜、今日の予定を入れていない（夜モードで送っていない）か
 function needsMorningPlan(d) {
   const y = addDays(d, -1); const yd = getDay(y); const day = getDay(d);
