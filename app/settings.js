@@ -199,9 +199,18 @@ A.setMotion = v => { try { if (v === 'calm') localStorage.setItem(MOTION_KEY, 'c
 A.setLook = v => { patchSettings({ look: v === 'classic' ? 'classic' : 'nova' }); applyLook(); };
 /* ── Daylogから直接通知（ホーム画面のDaylog・アプリ版） ── */
 S.push = { state: null, busy: false, msg: '' };
+// スマホに Daylog の通知が届くときだけ、Daylog が入れる予定から Googleカレンダーの通知を外す（2回鳴らないように）。
+// スマホがまだなら、Googleカレンダーの通知（15分前）を付けたままにする（スマホで何も鳴らない、を防ぐ）
+const isPhoneUA = ua => /Android|iPhone|iPad|iPod|Mobile/i.test(String(ua || ''));
+function pushCoversPhone() { return !!(S.settings.pushOn && S.settings.pushMobile); }
+const devName = ua => { ua = String(ua || ''); const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'Mac' : 'この端末'; const br = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : /Firefox\//.test(ua) ? 'Firefox' : ''; return os + (br && !/iPhone|iPad/.test(os) ? `（${br}）` : ''); };
 async function refreshPush() {
   if (!window.daylogPush) { S.push.state = 'elsewhere'; render(); return; }
   try { S.push.state = await window.daylogPush.state(); } catch (_) { S.push.state = 'unsupported'; }
+  try {
+    S.push.devs = window.daylogPush.list ? await window.daylogPush.list() : null;
+    if (S.push.devs) { const mob = S.push.devs.some(x => isPhoneUA(x.ua)); if (!!S.settings.pushMobile !== mob) patchSettings({ pushMobile: mob }); }
+  } catch (_) {}
   render();
 }
 const PUSH_MSG = {
@@ -215,20 +224,24 @@ function pushItemHTML() {
   const btn = p.busy ? '<span class="thinking" style="font-size:12px">設定中</span>'
     : on ? '<button class="btn sm" data-act="pushTest">テスト</button><button class="btn ghost sm" data-act="pushOff">オフ</button>'
     : (st === 'off' ? '<button class="btn primary sm" data-act="pushOn">オンにする</button>' : '');
-  const small = on ? 'この端末に、予定の15分前・就寝目安の45分前に通知が来る（Googleカレンダーの通知が無くても届く）。'
-    : st === 'off' ? '予定の15分前・就寝目安の45分前に、Googleカレンダーを通さずDaylogから通知を出す。'
+  const small = on ? 'この端末に、予定の15分前・就寝目安の45分前・タイマーの終わりに通知が来る（アプリを閉じていても届く）。'
+    : st === 'off' ? '予定の15分前・就寝目安の45分前・タイマーの終わりに、アプリを閉じていてもDaylogから通知を出す。'
     : PUSH_MSG[st] || '確認中…';
-  return `<div class="item"><div class="l">Daylogからの通知${on ? ' <span class="pill">オン</span>' : ''}<small>${esc(small)}${p.msg ? `<br>${esc(p.msg)}` : ''}</small></div><div class="row" style="gap:6px">${btn}</div></div>`;
+  // 通知が届く端末。スマホがまだなら、スマホでオンにする手順
+  const devs = p.devs || null; const mob = devs && devs.some(x => isPhoneUA(x.ua));
+  const devTxt = devs ? (devs.length ? `<br>届く端末：${devs.map(x => esc(devName(x.ua))).join('、')}` : '<br>届く端末：まだない') : '';
+  const phoneTip = devs && !mob ? `<br><span class="bk-err">スマホにはまだ届かない。</span>スマホでホーム画面のDaylogを開き、ここで「オンにする」を押すと届く。それまでは、Daylogが入れる予定にGoogleカレンダーの通知（15分前）も付ける。` : '';
+  return `<div class="item"><div class="l">Daylogからの通知${on ? ' <span class="pill">オン</span>' : ''}<small>${esc(small)}${devTxt}${phoneTip}${p.msg ? `<br>${esc(p.msg)}` : ''}</small></div><div class="row" style="gap:6px">${btn}</div></div>`;
 }
 A.pushOn = async () => {
   S.push.busy = true; S.push.msg = ''; render();
-  try { await window.daylogPush.enable(); S.push.state = 'on'; if (!S.settings.pushOn) patchSettings({ pushOn: true }); toast('この端末に通知が来るようにした。「テスト」で確かめられる。'); }
+  try { await window.daylogPush.enable(); S.push.state = 'on'; refreshPush(); if (!S.settings.pushOn) patchSettings({ pushOn: true }); toast('この端末に通知が来るようにした。「テスト」で確かめられる。'); }
   catch (e) { const c = e && e.code; S.push.msg = PUSH_MSG[c] || '通知をオンにできなかった。' + (e && e.message ? '（' + e.message + '）' : ''); await refreshPush(); }
   finally { S.push.busy = false; render(); }
 };
 A.pushOff = async () => {
   S.push.busy = true; render();
-  try { await window.daylogPush.disable(); S.push.state = 'off'; const n = await window.daylogPush.devices().catch(() => 1); if (!n) patchSettings({ pushOn: false }); toast('この端末の通知を止めた。'); }
+  try { await window.daylogPush.disable(); S.push.state = 'off'; refreshPush(); const n = await window.daylogPush.devices().catch(() => 1); if (!n) patchSettings({ pushOn: false }); toast('この端末の通知を止めた。'); }
   catch (_) { toast('通知を止められなかった。'); }
   finally { S.push.busy = false; render(); }
 };

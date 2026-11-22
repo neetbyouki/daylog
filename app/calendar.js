@@ -53,7 +53,7 @@ async function cleanBedDupes(d, list) {
 async function createEvent({ summary, start, end, reminder = 15, description }) {
   const r = await S.mcp.callTool(CFG.GCAL, 'create_event', {
     calendarId: CFG.APP_CAL, summary, startTime: isoLocal(start), endTime: isoLocal(end),
-    overrideReminders: reminder == null || S.settings.pushOn ? [] : [{ method: 'popup', minutes: reminder }], useDefaultReminders: false, description: description || 'Daylogから追加',
+    overrideReminders: reminder == null || pushCoversPhone() ? [] : [{ method: 'popup', minutes: reminder }], useDefaultReminders: false, description: description || 'Daylogから追加',
   });
   const p = (r && r.payload) || {};
   return p.id || (p.event && p.event.id) || null;

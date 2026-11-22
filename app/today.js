@@ -537,7 +537,7 @@ A.bedEvent = async quiet => {
       if (keep !== bt.eventId) await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventId: keep, eventTime: null } });
     } else if ((!bt.eventId || bt.eventId === 'unknown') && quiet) return; // カレンダーを確かめられないときは、重複を作らないよう自動では入れない
     const evId = getDay(d).bedtime.eventId;
-    if (evId && evId !== 'unknown') { await updateEvent(evId, { startTime: isoLocal(start), endTime: isoLocal(end), summary: BED_TITLE, overrideReminders: S.settings.pushOn ? [] : [{ method: 'popup', minutes: 45 }] }); await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventTime: bt.time } }); if (!quiet) toast(`通知を${bt.time}に合わせた。`); }
+    if (evId && evId !== 'unknown') { await updateEvent(evId, { startTime: isoLocal(start), endTime: isoLocal(end), summary: BED_TITLE, overrideReminders: pushCoversPhone() ? [] : [{ method: 'popup', minutes: 45 }] }); await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventTime: bt.time } }); if (!quiet) toast(`通知を${bt.time}に合わせた。`); }
     else { const id = await createEvent({ summary: BED_TITLE, start, end, reminder: 45, description: 'Daylogの就寝目安' }); await patchDay(d, { bedtime: { ...getDay(d).bedtime, eventId: id || 'unknown', eventTime: bt.time } }); if (!quiet) toast(`${bt.time}の就寝目安をカレンダーに入れた。45分前に通知が来る。`); }
     pushPCConfig();
   } catch (e) { if (!quiet) toast(calErr(e)); }

@@ -60,7 +60,10 @@ let rzT = 0; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = 
 
 /* ───────── 起動 ───────── */
 function markLoaded(k) { S.loaded[k] = true; if (S.loadFailed) return; if (!S.ready && S.loaded.settings && S.loaded.days && S.loaded.tasks && S.loaded.goals) { S.ready = true; onReady(); } render(); }
-function onReady() { runDaily(); loadEvents(today()); syncPC(); }
+function onReady() {
+  tmSync(); // 動いているタイマーがあれば、閉じていても終わりを知らせられるようにサーバーへ
+  runDaily(); loadEvents(today()); syncPC();
+}
 function runDaily() {
   const d = today(); if (S.dailyDone === d) return; S.dailyDone = d;
   // 3日たった予定のタスクを保留箱へ

@@ -1,7 +1,7 @@
 // Daylog のサービスワーカー
 // ・画面のファイルを覚えておき、電波がなくても開けるようにする（記録は store.js が端末に覚えている）
 // ・Daylogからの通知（Web Push）を受け取って出す
-const CACHE = 'daylog-shell-v36';
+const CACHE = 'daylog-shell-v37';
 const SHELL = ['./', './index.html', './boot.js', './store.js', './galaxy.js', './app/parts.json', './manifest.webmanifest', './icons/icon-192.png'];
 const LIB = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 self.addEventListener('install', e => {
@@ -31,10 +31,13 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data ? e.data.text() : '' }; }
-  e.waitUntil(self.registration.showNotification(d.title || 'Daylog', {
-    body: d.body || '', tag: d.tag || undefined, renotify: !!d.tag,
-    icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', data: { url: d.url || './' },
-  }));
+  const show = () => self.registration.showNotification(d.title || 'Daylog', {
+    body: d.body || '', tag: d.tag || undefined, renotify: !!d.tag, requireInteraction: !!d.sticky,
+    icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', data: { url: d.url || './' }, vibrate: d.vibrate || undefined,
+  });
+  // タイマーの終わりは、Daylogを開いて見ている端末では画面の方が知らせるので、通知は出さない
+  if (d.kind === 'timer') e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(ws => (ws.some(w => w.visibilityState === 'visible') ? null : show())));
+  else e.waitUntil(show());
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();

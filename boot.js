@@ -5,7 +5,7 @@ import './store.js?v=2026-11-22b';
 const SUPABASE_URL = 'https://etsuxjcrnyoevrasdhde.supabase.co';
 // 公開してよい鍵（データは行ごとの権限で本人だけが読み書きできる）
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0c3V4amNybnlvZXZyYXNkaGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNDM5OTQsImV4cCI6MjEwOTkxOTk5NH0.ae7iJE6mtN0-wEbiEAaPS5A7j7n3Y_zd-qRVREoBJ9o';
-const VERSION = '2026-11-22i';
+const VERSION = '2026-11-23a';
 const GCAL = 'Google Calendar', HOST = 'host:Daylog_PC';
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
 
@@ -216,6 +216,8 @@ window.daylogPush = {
     return 'off';
   },
   async devices() { const { data } = await sb.from('push_subs').select('id'); return (data || []).length; },
+  // 通知が届く端末の一覧（ua から PC／スマホを見分ける）
+  async list() { const { data } = await sb.from('push_subs').select('id,ua,created_at,last_ok').order('created_at'); return data || []; },
   async test() {
     const { data, error } = await sb.functions.invoke('daylog-push', { body: { action: 'test' } });
     if (error) throw { code: 'test_failed', message: error.message };

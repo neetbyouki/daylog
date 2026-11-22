@@ -141,7 +141,17 @@ function goalRow(g) {
 /* ── タイマー（タスクの画面の右上から開く。全画面。端末ごとに覚え、閉じても・開き直しても進み続ける） ── */
 const TM_KEY = 'daylog-timer';
 const TM = Object.assign({ state: 'idle', dur: 900, purpose: '', endAt: 0, left: 0, spent: 0, early: false, sound: true, logged: false }, (() => { try { return JSON.parse(localStorage.getItem(TM_KEY)) || {}; } catch (_) { return {}; } })());
-const tmSave = () => { try { localStorage.setItem(TM_KEY, JSON.stringify(TM)); } catch (_) {} };
+// 閉じていても終わりを知らせるため、動いているタイマーの終わりの時刻を timer/<この端末> に置く（サーバーの daylog-push が通知を送る）
+const TM_DEV = (() => { try { let v = localStorage.getItem('daylog-dev'); if (!v) { v = 'd' + Math.random().toString(36).slice(2, 10); localStorage.setItem('daylog-dev', v); } return v; } catch (_) { return 'd0'; } })();
+let tmSynced = '';
+function tmSync() {
+  if (!S.db || !S.ready) return;
+  const run = TM.state === 'run';
+  const doc = { state: TM.state, endAt: run ? Math.round(TM.endAt) : 0, purpose: String(TM.purpose || '').slice(0, 80), dur: TM.dur, sound: TM.sound !== false };
+  const key = JSON.stringify(doc); if (key === tmSynced) return; tmSynced = key;
+  putDoc('timer/' + TM_DEV, { ...doc, at: Date.now() });
+}
+const tmSave = () => { try { localStorage.setItem(TM_KEY, JSON.stringify(TM)); } catch (_) {} tmSync(); };
 const tmLeft = () => (TM.state === 'run' ? Math.max(0, (TM.endAt - Date.now()) / 1000) : TM.state === 'pause' ? TM.left : TM.state === 'done' ? 0 : TM.dur);
 const tmFmt = sec => { const t = Math.ceil(sec - 0.001), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), ss = t % 60; return h ? `${h}:${pad(m)}:${pad(ss)}` : `${pad(m)}:${pad(ss)}`; };
 const tmMin = sec => (sec < 60 ? `${Math.max(1, Math.round(sec))}秒` : sec >= 3600 && sec % 3600 === 0 ? `${sec / 3600}時間` : sec >= 3600 ? `${Math.floor(sec / 3600)}時間${Math.round(sec % 3600 / 60)}分` : `${Math.round(sec / 60)}分`);

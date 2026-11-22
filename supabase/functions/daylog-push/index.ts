@@ -1,4 +1,5 @@
-// Daylog の通知係：毎分呼ばれ、予定の15分前・就寝目安の45分前に、ホーム画面のDaylogへ直接通知（Web Push）を送る
+// Daylog の通知係：毎分呼ばれ、予定の15分前・就寝目安の45分前・タイマーの終わりに、ホーム画面のDaylogへ直接通知（Web Push）を送る
+// ・タイマー：画面が timer/<端末> に終わりの時刻を置く。次の1分以内に終わるものは、その秒に合わせて送る（EdgeRuntime.waitUntil）
 // ・毎分の呼び出しは データベースの pg_cron から（合言葉 x-cron-secret 付き。合言葉と通知の鍵は push_keys 表）
 // ・ログインした本人からの { action: "test" } は、テストの通知を送る
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -95,6 +96,31 @@ async function once(uid: string, key: string) {
   return !error;
 }
 
+const durJa = (sec: number) => { const m = Math.round(sec / 60); const h = Math.floor(m / 60), r = m % 60; return h ? `${h}時間${r ? r + "分" : ""}` : `${r}分`; };
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// タイマーの終わり（端末ごと）
+async function timersFor(uid: string, now: number, dry: boolean, out: any[]) {
+  const { data: rows } = await admin.from("docs").select("id,data").eq("user_id", uid).eq("collection", "timer");
+  for (const r of rows || []) {
+    const t = r.data || {}; const end = Number(t.endAt) || 0;
+    if (t.state !== "run" || !end) continue;
+    if (end < now - LATE_OK * M || end > now + 65e3) continue; // 10分より前に終わったもの・まだ先のものは見送る
+    const msg = { title: "⏱ タイマーが終わった", body: `${t.purpose ? t.purpose + "（" + durJa(Number(t.dur) || 0) + "）" : durJa(Number(t.dur) || 0)}。おつかれさま。`, tag: `timer-${r.id}`, url: "./", kind: "timer", sticky: true, vibrate: [200, 100, 200, 100, 300] };
+    out.push({ ...msg, at: end });
+    if (dry) continue;
+    if (!(await once(uid, `tm:${r.id}:${end}`))) continue;
+    const send = async () => {
+      if (end > Date.now()) await sleep(end - Date.now());
+      // 待っている間に止めた・延ばした・やり直したときは送らない
+      const { data: cur } = await admin.from("docs").select("data").eq("user_id", uid).eq("collection", "timer").eq("id", r.id).maybeSingle();
+      if (!cur || cur.data?.state !== "run" || Number(cur.data?.endAt) !== end) return;
+      await sendTo(uid, msg);
+    };
+    // @ts-ignore EdgeRuntime はサーバーの実行環境にある
+    if (end > now && typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(send()); else await send();
+  }
+}
+
 async function runFor(uid: string, now: number, dry: boolean) {
   const out: any[] = [];
   const d = logicalDate(now);
@@ -124,6 +150,8 @@ async function runFor(uid: string, now: number, dry: boolean) {
       if (!dry && await once(uid, `bed:${d}:${bt.time}`)) await sendTo(uid, msg);
     }
   }
+  // タイマーの終わり
+  await timersFor(uid, now, dry, out);
   return out;
 }
 
