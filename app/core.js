@@ -320,7 +320,15 @@ function paintOver(over) {
     overLeave = setTimeout(() => { if (!last.over) { host.innerHTML = ''; afterOver(); } }, 170);
     return;
   }
+  // 描き直しても、同じ重なる画面ならスクロールの位置を保つ（data-keep-scroll の欄は、いちばん下にいたら下のまま）
+  const prev = host.firstElementChild, base = el => String(el.className).replace(/\b(entering|leaving)\b/g, '').trim();
+  const keep = over && prev ? { cls: base(prev), top: prev.scrollTop, logs: [...prev.querySelectorAll('[data-keep-scroll][id]')].map(e => ({ id: e.id, top: e.scrollTop, bottom: e.scrollHeight - e.scrollTop - e.clientHeight < 32 })) } : null;
   host.innerHTML = over; last.over = over;
+  const now = host.firstElementChild;
+  if (keep && now && base(now) === keep.cls) {
+    now.scrollTop = keep.top;
+    for (const k of keep.logs) { const e = document.getElementById(k.id); if (e) e.scrollTop = k.bottom ? e.scrollHeight : k.top; }
+  }
   if (over && (!wasOpen || host.dataset.leaving) && !calm && host.firstElementChild) host.firstElementChild.classList.add('entering');
   afterOver();
 }

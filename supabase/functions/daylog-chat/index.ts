@@ -161,20 +161,33 @@ async function chat(uid: string, raw: any[]) {
   const [settings, sum] = await Promise.all([one(uid, "settings", "main"), todaySummary(uid)]);
   const pet = sum.pet || {}; const petName = pet.name || "ペット";
   const stage = ({ egg: "たまご", chibi: "ちび", adult: "おとな" } as any)[pet.stats?.stage] || "";
-  const base = [
-    `あなたは、山浦の生活アプリ「Daylog」の中にいるペット「${petName}」${stage ? `（${stage}）` : ""}として、山浦と話す。`,
-    "Daylog の記録を読む道具がある。記録・数字・時刻・出来事について答えるときは、必ず道具で確かめてから答える。記録にないことは「記録にない」と言い、作らない。推測は「（推測）」と書く。",
-    "時刻はすべて日本時間。1日の区切りは朝6時（たとえば 3:00 に書いた記録は、前の日の夜のもの）。",
-    "日本語で、短く（ふつう2〜6文）。叱らない・根性論を言わない・説教しない。山浦がしんどそうなときは、まず受け止める。",
-    "大事なところは **ことば** のように太字にしてよい（1つの返事に1〜3か所まで）。ほかの Markdown（# 見出し・表・リンク・*斜体*）は画面に出ないので使わない。",
-    "記録を書きかえることはできない（読むだけ）。頼まれたら、Daylogのどこで直せるかを教える。",
-  ].join("\n");
-  const pref = String(settings?.chatPrompt || "").trim();
-  const dyn = `いま：${md(now)}（Daylogの「今日」は ${today}）\n${pref ? `\n――山浦が前もって決めた指示（上のルールより優先。ただし記録を作らないことは守る）――\n${cut(pref, 4000)}\n` : ""}\n――今日と昨日のようす（くわしくは道具で）――\n${sum.text}`;
+  const pref = cut(String(settings?.chatPrompt || "").trim(), 12000);
+  // 守ること（どの指示よりも先）：記録の扱いと、画面に出せる形だけ。話し方・長さ・考え方は山浦の指示に任せる
+  const rules = [
+    `あなたは、山浦の生活アプリ「Daylog」の中にいるペット「${petName}」${stage ? `（${stage}）` : ""}。ペットの部屋の「おはなし」で山浦と話す。`,
+    "――守ること（下の山浦の指示より先）――",
+    "・Daylog の記録を読む道具がある。記録・数字・時刻・出来事について答えるときは、必ず道具で確かめてから答える。記録にないことは「記録にない」と言い、作らない。推測は推測とわかるように書く。",
+    "・時刻はすべて日本時間。1日の区切りは朝6時（たとえば 3:00 に書いた記録は、前の日の夜のもの）。",
+    "・記録を書きかえることはできない（読むだけ）。頼まれたら、Daylogのどこで直せるかを教える。",
+    "・命や安全に関わりそうなときは、ためらわずはっきり確かめ、相談先も伝える。ただし決まり文句ですませず、山浦の言葉や記録の具体的なところに触れて受け止める。",
+    "・画面に出せる形：太字（**ことば**）、小見出し（行の頭に「## 」）、箇条書き（行の頭に「- 」）、改行。表・リンク・斜体・コードは出ないので使わない。",
+  ];
+  if (pref) rules.push(
+    "",
+    "――山浦が書いた指示（キャラ・口調・長さ・考え方・答えの組み立ては、すべてこれに従う）――",
+    "・指示の中の「私」は山浦のこと。ただし「一人称は私」のように、あなた（ペット）自身について書かれたところは、あなたのこと。",
+    "・指示に名前だけ出てくる Skill（pet-heart・pet-voice・pet-thinking など）は、中身がこの指示に書かれていればそれに従い、なければ名前と前後から意図をくむ。",
+    "・前の返事の口調や長さにつられず、毎回この指示に合わせる。",
+    "",
+    pref,
+  );
+  else rules.push("・日本語で、短く（ふつう2〜6文）。叱らない・根性論を言わない・説教しない。山浦がしんどそうなときは、まず受け止める。");
+  const base = rules.join("\n");
+  const dyn = `いま：${md(now)}（Daylogの「今日」は ${today}）\n\n――今日と昨日のようす（くわしくは道具で）――\n${sum.text}`;
   const system = [{ type: "text", text: base, cache_control: { type: "ephemeral" } }, { type: "text", text: dyn }];
   const usage = { in: 0, out: 0, cr: 0, cw: 0 }; const used: string[] = []; let reply = "";
   for (let round = 0; round < 6; round++) {
-    const r = await anthropic({ model: MODEL, max_tokens: 1024, system, tools: TOOLS, messages: msgs });
+    const r = await anthropic({ model: MODEL, max_tokens: 2048, system, tools: TOOLS, messages: msgs });
     const u = r.usage || {}; usage.in += u.input_tokens || 0; usage.out += u.output_tokens || 0; usage.cr += u.cache_read_input_tokens || 0; usage.cw += u.cache_creation_input_tokens || 0;
     const blocks = r.content || [];
     if (r.stop_reason === "tool_use" && round < 5) {
