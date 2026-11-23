@@ -226,7 +226,7 @@ function petRoomHTML() {
   if (S.petRenaming && p.name) cards.push(`<div class="pr-card"><b>名前を変える</b><div class="row" style="gap:8px;margin-top:8px"><input class="field grow" id="pet-name" data-draft maxlength="12" value="${esc(draft('pet-name', p.name))}" data-enter="petName"><button class="btn ghost" data-act="petRenameCancel">やめる</button><button class="btn primary" data-act="petName">決める</button></div></div>`);
   if (form && p.evoSeen === false) cards.push(`<div class="pr-card gold"><b>おとなになった：${form.name}</b><p>${form.theme}。${form.why}から、この姿になった。どの姿も良い・悪いはない。</p><button class="link" data-act="petEvoSeen">わかった</button></div>`);
   if (p.trip && !p.trip.seen) cards.push(`<div class="pr-card post"><b>おかえり</b><p>${diffDays(p.trip.from, p.trip.to)}日のあいだ、${esc(p.trip.place)}のほうまで旅をしていた。おみやげに絵はがきを持って帰ってきた。</p><div class="pr-postcard" aria-hidden="true">${petPostcardSVG(p.trip.place)}</div><button class="link" data-act="petTripSeen">しまっておく</button></div>`);
-  for (const m of petUnread().slice(0, 1)) cards.push(`<div class="pr-card mail"><b>✉ 手紙が届いた</b><p class="pr-letter">${esc(m.text)}</p><button class="link" data-act="petLetterRead" data-arg="${esc(m.id)}">読んだ</button></div>`);
+  for (const m of petUnread().slice(0, 1)) cards.push(`<div class="pr-card mail"><b>✉ 手紙が届いた</b><p class="pr-letter">${petRich(m.text)}</p><button class="link" data-act="petLetterRead" data-arg="${esc(m.id)}">読んだ</button></div>`);
   const name = p.name || (st.stage === 'egg' ? 'たまご' : '名前はまだ');
   const stageTxt = st.stage === 'adult' && form ? `${form.name}（${form.theme}）` : PET_STAGE_LABEL[st.stage];
   const asleep = petAsleep(); const full = st.extraToday >= PET_EXTRA_MAX;
@@ -268,10 +268,13 @@ function petPostcardSVG(place) {
 /* ── おはなし（Claude API・Haiku 5.5。サーバーの daylog-chat が Daylog を読んで答える） ──
    会話は petchat に1つずつ（{ role: user|assistant, text, at }）。両方の版で同じ会話が見える。前もっての指示は settings.chatPrompt */
 const PET_CHAT_SEND = 16; // サーバーに渡す、これまでの会話の数
+// ペットの文：**ことば** だけ太字にする（ほかは文字のまま）
+const petRich = t => esc(t).replace(/\*\*([^*\n][^\n]*?)\*\*/g, '<b>$1</b>');
 const petChatList = () => Object.entries(S.petchat || {}).map(([id, m]) => ({ id, ...m })).filter(m => m && m.text && (m.role === 'user' || m.role === 'assistant')).sort((a, b) => (a.at || 0) - (b.at || 0));
 const PET_CHAT_ERR = {
   no_key: 'まだ話せない：サーバーに Claude の APIキーが入っていない。入れ方はチャットの Claude に聞いてね。',
-  bad_key: 'APIキーが使えなかった。Claude Console でキーを作り直して、入れ直してほしい。',
+  bad_key: 'APIキーが使えなかった（違うキー・消されたキー・期限切れ）。Claude Console でキーを作り直して、入れ直してほしい。',
+  key_scope: 'APIキーにワークスペースが選ばれていない。Claude Console で「Default Workspace」を選んでキーを作り直して、入れ直してほしい。',
   no_credit: '前払いのクレジットがなくなった。Claude Console で足すと、また話せる（自動では引き落とされない）。',
   day_limit: '今日はたくさん話したので、また明日（使いすぎ防止の上限）。',
   busy: 'Claude が混んでいるみたい。少し待ってもう一度。',
@@ -285,7 +288,7 @@ function petChatUseText() {
 }
 function petChatHTML(st, name) {
   const list = petChatList().slice(-40);
-  const msgs = list.map(m => `<div class="pc-m ${m.role === 'user' ? 'me' : 'pet'}"><div class="pc-b">${esc(m.text)}</div><time>${hm(m.at)}</time></div>`).join('');
+  const msgs = list.map(m => `<div class="pc-m ${m.role === 'user' ? 'me' : 'pet'}"><div class="pc-b">${m.role === 'user' ? esc(m.text) : petRich(m.text)}</div><time>${hm(m.at)}</time></div>`).join('');
   const empty = !list.length ? `<div class="pc-empty">${esc(name)}に話しかけてみて。Daylog の記録を読んで答える。<br>例：「今週どうだった？」「最近ゲームしすぎ？」「先週のメモでいいアイデアあった？」</div>` : '';
   return `<div class="pr-chat">
     <div class="pc-log" id="pc-log" aria-live="polite">${empty}${msgs}${S.petChatBusy ? `<div class="pc-m pet"><div class="pc-b pc-wait"><span class="thinking">記録を見ながら考えている</span></div></div>` : ''}${S.petChatErr ? `<div class="pc-err" role="alert">${S.petChatErr}</div>` : ''}</div>

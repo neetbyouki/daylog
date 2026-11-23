@@ -133,7 +133,8 @@ async function anthropic(body: unknown) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
     const msg = String(j?.error?.message || r.status);
-    if (r.status === 401 || r.status === 403) throw new Fail("bad_key", "APIキーが使えない（違うキーか、消されたキー）");
+    if (r.status === 401 || r.status === 403) throw new Fail("bad_key", "APIキーが使えない（違うキー・消されたキー・期限切れ）");
+    if (/workspace/i.test(msg)) throw new Fail("key_scope", "APIキーにワークスペースが選ばれていない（Default Workspace を選んで作り直す）");
     if (/credit balance/i.test(msg)) throw new Fail("no_credit", "前払いのクレジットがなくなった");
     if (r.status === 429 || r.status === 529 || r.status >= 500) throw new Fail("busy", "Claude が混んでいる");
     throw new Fail("api", msg.slice(0, 200));
@@ -165,6 +166,7 @@ async function chat(uid: string, raw: any[]) {
     "Daylog の記録を読む道具がある。記録・数字・時刻・出来事について答えるときは、必ず道具で確かめてから答える。記録にないことは「記録にない」と言い、作らない。推測は「（推測）」と書く。",
     "時刻はすべて日本時間。1日の区切りは朝6時（たとえば 3:00 に書いた記録は、前の日の夜のもの）。",
     "日本語で、短く（ふつう2〜6文）。叱らない・根性論を言わない・説教しない。山浦がしんどそうなときは、まず受け止める。",
+    "大事なところは **ことば** のように太字にしてよい（1つの返事に1〜3か所まで）。ほかの Markdown（# 見出し・表・リンク・*斜体*）は画面に出ないので使わない。",
     "記録を書きかえることはできない（読むだけ）。頼まれたら、Daylogのどこで直せるかを教える。",
   ].join("\n");
   const pref = String(settings?.chatPrompt || "").trim();
