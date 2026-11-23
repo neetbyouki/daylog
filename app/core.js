@@ -166,6 +166,14 @@ function wakeAt(d) {
 }
 // 夜モードを終えた時刻（その日の「寝た」の記録）
 const closedAt = d => { const c = getDay(d).close; return c && c.done && c.at ? c.at : null; };
+// 手で直す寝た時刻（時:分）→ その日の夜の時刻。0〜6時は次の日の深夜。起きた時刻より前（その日の朝）になるときは、次の日の朝として扱う
+// （例：12:40に起きた日に「09:08」→ 次の日の朝 9:08。前は同じ日の朝 9:08 になり、睡眠が27時間になっていた）
+function sleepSlot(d, v) {
+  let t = slotDate(d, v).getTime();
+  const floor = wakeAt(d) || dayStart(d).getTime() + 6 * 3600e3; // 起きた時刻がわからない日は昼12時より前を次の日の朝に
+  if (t <= floor) t += 864e5;
+  return t;
+}
 function sleepAt(d) { const day = getDay(d); return day.sleepAt || (S.pc[d] && S.pc[d].last) || null; }
 function moodOf(d) {
   const day = getDay(d);

@@ -241,7 +241,7 @@ function timelineHTML(d, o = {}) {
   const lis = []; let mark = rng ? Math.min(rng.from, rows[0].t) : rows[0].t;
   const y = addDays(d, -1);
   for (const r of rows) {
-    if (r.kind === 'wake' && prevSleep && prevSleep < r.t) lis.push(`<li class="gap sleep" data-ts="${prevSleep}" data-te="${r.t}" style="--h:${Math.round(Math.min(34, Math.max(20, 6 + (r.t - prevSleep) / 36e5 * 3)))}px"><span class="g-t">睡眠 ${durText(r.t - prevSleep)}</span></li>`);
+    if (r.kind === 'wake' && prevSleep && prevSleep < r.t) lis.push(`<li class="gap sleep" data-ts="${prevSleep}" data-te="${r.t}" style="--h:${Math.round(Math.min(34, Math.max(20, 6 + (r.t - prevSleep) / 36e5 * 3)))}px"><span class="g-t">${r.t - prevSleep > 20 * 3600e3 ? `睡眠 ${durText(r.t - prevSleep)}？（前の晩に寝た時刻が違うかも）` : `睡眠 ${durText(r.t - prevSleep)}`}</span></li>`);
     else lis.push(gapLI(mark, r.t));
     if (r.kind === 'slept') {
       lis.push(`<li class="fl fl-slept" data-ts="${r.t}"><time>${hm(r.t)}</time><div class="c2">${ro ? '<span>🌙 前の晩に寝た</span>' : S.timeFix && S.timeFix.key === 'sleep:' + y ? timeFixHTML() : `<span>🌙 前の晩に寝た</span>${fixBtn('sleep:' + y, '前の晩に寝た時刻を直す')}`}</div></li>`);
@@ -456,8 +456,8 @@ A.timeFixSave = async () => {
     await patchDay(f.d, { wakeAt: t.getTime(), wakeFix: true });
     toast(`起きた時刻を${v}にした。`);
   } else {
-    // 寝た時刻：その日の夜（0〜6時は次の日の深夜）
-    const t = slotDate(f.d, v).getTime(); const day = getDay(f.d); const bt = day.bedtime;
+    // 寝た時刻：その日の夜（0〜6時は次の日の深夜、起きた時刻より前の朝は次の日の朝）
+    const t = sleepSlot(f.d, v); const day = getDay(f.d); const bt = day.bedtime;
     const patch = { sleepAt: t, sleepFix: true };
     if (bt && (bt.actual || closedAt(f.d))) patch.bedtime = { ...bt, actual: t, eventTime: bt.recorded ? v : bt.eventTime };
     await patchDay(f.d, patch);
