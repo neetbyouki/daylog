@@ -1,6 +1,8 @@
 /* ═══ ペット：Daylog の星空に住む小さな子 ═══
    ・たまご → ちび → おとな（ほしドラ／よるコウモリ／ゆきうさ／ひだまりオン）。白1色のドット絵（20×20）
-   ・記録・タスク・習慣・夜モード・起きた で「ほし」がたまり、その場で自動でごはんになる。ためたほしで、部屋でおやつもあげられる
+   ・ごはんは3種類：おにく（タスク・タイマー）→ ちから、やさい（記録・日記・夜モード・習慣）→ かしこさ、おやつ（早起き・早寝）→ ひかり
+     その場で自動で食べる。食べた分は部屋の棚にもたまり、3つで1回「おかわり」をあげられる（1日3回まで）
+   ・おとなの姿は能力で決まる：ちから→ほしドラ／かしこさ→ゆきうさ／ひかり→ひだまりオン／ひかりが低く夜ふかしが多い→よるコウモリ
    ・夜モードを終えると寝て、次の日は起きている。就寝の目安を過ぎてからのゲームは、眠そうな顔に出るだけ（叱らない）
    ・不調・休養の日は「何もしない」を肯定する。エサの催促はしない。連続記録は数えない（数えるのは会いに来た日）
    ・3日以上あいたら、旅に出ていたことにして、おみやげ（行った星座の名前）を持って帰る
@@ -8,12 +10,24 @@
    データ：pet/main（名前・生まれた日・進化した姿・旅・ステータスの控え）、days/<日付>.pet（seen：会いに来た／snacks：おやつの数）、petmail（チャットのClaudeからの手紙） */
 const PET_SPR = {"chibi-happy":".........#........../........#o#........./.........#........../.........#........../.........#........../.........#........../.......######......./......#oooooo#....../.....#oooooooo#...../....#oooooooooo#..../...##ooooooooo#o#.../...#o#o#o#o#o#oo#.../...##ooo#o#ooo#o#.../...#oooooooooooo#.../...#oooooooooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......##....##......","dora-happy":"....#..........#..../....############..../.....##oooooo##...../.....#oooooooo#...../....#oooooooooo#..../...##ooooooooo#o#.../...#o#o#o#o#o#oo#.../.#.##ooo#o#ooo#o#.#./.###oooooooooooo###./.#o##oooooooooo##o#./.#oo##oooooooo##oo#./.#ooo##oooooo##ooo#./.####.########.####./....##ooo#oooo##..../.....#oo###ooo#...../.....#o#####oo#...../.....#oo#o#ooo#...../.....##oooooo##...../.....#o#oooo#o#...../.....##########.....","bat-happy":"..................../.....#........#...../.....##......##...../#....#o######o#....#/##...#o#oooo#o#...##/#o##.##oooooo##.##o#/.#oo##oooooooo##oo#./.#oo#ooooooooo##oo#./.#oo##o#o#o#o#o#oo#./.#oo#ooo#o#ooo##oo#./.#oo#oooooooooo#oo#./###o#oooooooooo#o###/#..##oooooooooo##..#/....##oooooooo##..../....#.#oooooo#.#..../.......#oooo#......./........####......../........#..#......../........#..#......../....................","usa-happy":"......#......#....../.....#o#....#o#...../....#ooo#..#ooo#..../....#o#o#..#o#o#..../#...#o#o#..#o#o#..../....#ooo#..#ooo#.#.#/....#oo######oo#..#./.#..#o#oooooo#o#.#.#/....##oooooooo##..../....#oooooooooo#..../...##ooooooooo#o#.../...#o#o#o#o#o#oo#.../...##ooo#o#ooo#o#.../...#oooooooooooo#.../...#oooooooooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......###..###......","lion-happy":"...#.....#.....#..../...#############..../...#############..../...#####oooo####..../...###oooooooo##..../#####oooooooooo####./#####oooooooooo####./.####ooooooooo#o##../.###o#o#o#o#o#oo##../.####ooo#o#ooo#o##../####oooooooooooo###./#####oooo##oooo####./...##oooooooooo#.##./...###oooooooo######/...#####oooo########/...#############.##./...#..#####.##.#..#./.....#oo##.#oo####../.....#oo#..#oo#...../.....####..####.....","chibi-normal":".........#........../........#o#........./.........#........../.........#........../.........#........../.........#........../.......######......./......#oooooo#....../.....#oooooooo#...../....#oooooooooo#..../...#oooooooooooo#.../...#oo#ooooo#ooo#.../...#oooooooooooo#.../...#ooo#o#o#oooo#.../...#oooo#o#ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......##....##......","dora-normal":"....#..........#..../....############..../.....##oooooo##...../.....#oooooooo#...../....#oooooooooo#..../...#oooooooooooo#.../...#oo#ooooo#ooo#.../.#.#oooooooooooo#.#./.###ooo#o#o#oooo###./.#o##ooo#o#oooo##o#./.#oo##oooooooo##oo#./.#ooo##oooooo##ooo#./.####.########.####./....##ooo#oooo##..../.....#oo###ooo#...../.....#o#####oo#...../.....#oo#o#ooo#...../.....##oooooo##...../.....#o#oooo#o#...../.....##########.....","bat-normal":"..................../.....#........#...../.....##......##...../#....#o######o#....#/##...#o#oooo#o#...##/#o##.##oooooo##.##o#/.#oo##oooooooo##oo#./.#oo#oooooooooo#oo#./.#oo#o#ooooo#oo#oo#./.#oo#oooooooooo#oo#./.#oo#oo#o#o#ooo#oo#./###o#ooo#o#oooo#o###/#..##oooooooooo##..#/....##oooooooo##..../....#.#oooooo#.#..../.......#oooo#......./........####......../........#..#......../........#..#......../....................","usa-normal":"......#......#....../.....#o#....#o#...../....#ooo#..#ooo#..../....#o#o#..#o#o#..../#...#o#o#..#o#o#..../....#ooo#..#ooo#.#.#/....#oo######oo#..#./.#..#o#oooooo#o#.#.#/....##oooooooo##..../....#oooooooooo#..../...#oooooooooooo#.../...#oo#ooooo#ooo#.../...#oooooooooooo#.../...#ooo#o#o#oooo#.../...#oooo#o#ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......###..###......","lion-normal":"...#.....#.....#..../...#############..../...#############..../...#####oooo####..../...###oooooooo##..../#####oooooooooo####./#####oooooooooo####./.###oooooooooooo##../.###oo#ooooo#ooo##../.###oooooooooooo##../####ooo#o#o#oooo###./#####ooo###oooo####./...##oooooooooo#.##./...###oooooooo######/...#####oooo########/...#############.##./...#..#####.##.#..#./.....#oo##.#oo####../.....#oo#..#oo#...../.....####..####.....","chibi-blink":".........#........../........#o#........./.........#........../.........#........../.........#........../.........#........../.......######......./......#oooooo#....../.....#oooooooo#...../....#oooooooooo#..../...#oooooooooooo#.../...#o##ooooo##oo#.../...#oooooooooooo#.../...#ooo#o#o#oooo#.../...#oooo#o#ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......##....##......","dora-blink":"....#..........#..../....############..../.....##oooooo##...../.....#oooooooo#...../....#oooooooooo#..../...#oooooooooooo#.../...#o##ooooo##oo#.../.#.#oooooooooooo#.#./.###ooo#o#o#oooo###./.#o##ooo#o#oooo##o#./.#oo##oooooooo##oo#./.#ooo##oooooo##ooo#./.####.########.####./....##ooo#oooo##..../.....#oo###ooo#...../.....#o#####oo#...../.....#oo#o#ooo#...../.....##oooooo##...../.....#o#oooo#o#...../.....##########.....","bat-blink":"..................../.....#........#...../.....##......##...../#....#o######o#....#/##...#o#oooo#o#...##/#o##.##oooooo##.##o#/.#oo##oooooooo##oo#./.#oo#oooooooooo#oo#./.#oo###ooooo##o#oo#./.#oo#oooooooooo#oo#./.#oo#oo#o#o#ooo#oo#./###o#ooo#o#oooo#o###/#..##oooooooooo##..#/....##oooooooo##..../....#.#oooooo#.#..../.......#oooo#......./........####......../........#..#......../........#..#......../....................","usa-blink":"......#......#....../.....#o#....#o#...../....#ooo#..#ooo#..../....#o#o#..#o#o#..../#...#o#o#..#o#o#..../....#ooo#..#ooo#.#.#/....#oo######oo#..#./.#..#o#oooooo#o#.#.#/....##oooooooo##..../....#oooooooooo#..../...#oooooooooooo#.../...#o##ooooo##oo#.../...#oooooooooooo#.../...#ooo#o#o#oooo#.../...#oooo#o#ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......###..###......","lion-blink":"...#.....#.....#..../...#############..../...#############..../...#####oooo####..../...###oooooooo##..../#####oooooooooo####./#####oooooooooo####./.###oooooooooooo##../.###o##ooooo##oo##../.###oooooooooooo##../####ooo#o#o#oooo###./#####ooo###oooo####./...##oooooooooo#.##./...###oooooooo######/...#####oooo########/...#############.##./...#..#####.##.#..#./.....#oo##.#oo####../.....#oo#..#oo#...../.....####..####.....","chibi-sleepy":".........#........../........#o#........./.........#........../.........#........../.........#........../.........#........../.......######......./......#oooooo#....../.....#oooooooo#...../....#oooooooooo#..../...##ooooooooo#o#.../...#o##ooooo##oo#.../...#oooooooooooo#.../...#ooo#o#o#oooo#.../...#oooo#o#ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......##....##......","dora-sleepy":"....#..........#..../....############..../.....##oooooo##...../.....#oooooooo#...../....#oooooooooo#..../...##ooooooooo#o#.../...#o##ooooo##oo#.../.#.#oooooooooooo#.#./.###ooo#o#o#oooo###./.#o##ooo#o#oooo##o#./.#oo##oooooooo##oo#./.#ooo##oooooo##ooo#./.####.########.####./....##ooo#oooo##..../.....#oo###ooo#...../.....#o#####oo#...../.....#oo#o#ooo#...../.....##oooooo##...../.....#o#oooo#o#...../.....##########.....","bat-sleepy":"..................../.....#........#...../.....##......##...../#....#o######o#....#/##...#o#oooo#o#...##/#o##.##oooooo##.##o#/.#oo##oooooooo##oo#./.#oo#ooooooooo##oo#./.#oo###ooooo##o#oo#./.#oo#oooooooooo#oo#./.#oo#oo#o#o#ooo#oo#./###o#ooo#o#oooo#o###/#..##oooooooooo##..#/....##oooooooo##..../....#.#oooooo#.#..../.......#oooo#......./........####......../........#..#......../........#..#......../....................","usa-sleepy":"......#......#....../.....#o#....#o#...../....#ooo#..#ooo#..../....#o#o#..#o#o#..../#...#o#o#..#o#o#..../....#ooo#..#ooo#.#.#/....#oo######oo#..#./.#..#o#oooooo#o#.#.#/....##oooooooo##..../....#oooooooooo#..../...##ooooooooo#o#.../...#o##ooooo##oo#.../...#oooooooooooo#.../...#ooo#o#o#oooo#.../...#oooo#o#ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......###..###......","lion-sleepy":"...#.....#.....#..../...#############..../...#############..../...#####oooo####..../...###oooooooo##..../#####oooooooooo####./#####oooooooooo####./.####ooooooooo#o##../.###o##ooooo##oo##../.###oooooooooooo##../####ooo#o#o#oooo###./#####ooo###oooo####./...##oooooooooo#.##./...###oooooooo######/...#####oooo########/...#############.##./...#..#####.##.#..#./.....#oo##.#oo####../.....#oo#..#oo#...../.....####..####.....","chibi-sleep":".........#......####/........#o#.......#./.........#.......#../.........#......####/.........#........../.........#........../.......######......./......#oooooo#....../.....#oooooooo#...../....#oooooooooo#..../...#oooooooooooo#.../...#oooooooooooo#.../...#o##ooooo##oo#.../...#oooooooooooo#.../...#oooo###ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......##....##......","dora-sleep":"....#..........#####/....############..#./.....##oooooo##..#../.....#oooooooo#.####/....#oooooooooo#..../...#oooooooooooo#.../...#oooooooooooo#.../.#.#o##ooooo##oo#.#./.###oooooooooooo###./.#o##ooo###oooo##o#./.#oo##oooooooo##oo#./.#ooo##oooooo##ooo#./.####.########.####./....##ooo#oooo##..../.....#oo###ooo#...../.....#o#####oo#...../.....#oo#o#ooo#...../.....##oooooo##...../.....#o#oooo#o#...../.....##########.....","bat-sleep":"................####/.....#........#...#./.....##......##..#../#....#o######o#.###o/##...#o#oooo#o#...##/#o##.##oooooo##.##o#/.#oo##oooooooo##oo#./.#oo#oooooooooo#oo#./.#oo#oooooooooo#oo#./.#oo###ooooo##o#oo#./.#oo#oooooooooo#oo#./###o#ooo###oooo#o###/#..##oooooooooo##..#/....##oooooooo##..../....#.#oooooo#.#..../.......#oooo#......./........####......../........#..#......../........#..#......../....................","usa-sleep":"......#......#..####/.....#o#....#o#...#./....#ooo#..#ooo#.#../....#o#o#..#o#o#####/#...#o#o#..#o#o#..../....#ooo#..#ooo#.#.#/....#oo######oo#..#./.#..#o#oooooo#o#.#.#/....##oooooooo##..../....#oooooooooo#..../...#oooooooooooo#.../...#oooooooooooo#.../...#o##ooooo##oo#.../...#oooooooooooo#.../...#oooo###ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......###..###......","lion-sleep":"...#.....#.....#####/...#############..#./...#############.#../...#####oooo########/...###oooooooo##..../#####oooooooooo####./#####oooooooooo####./.###oooooooooooo##../.###oooooooooooo##../.###o##ooooo##oo##../####oooooooooooo###./#####ooo###oooo####./...##oooooooooo#.##./...###oooooooo######/...#####oooo########/...#############.##./...#..#####.##.#..#./.....#oo##.#oo####../.....#oo#..#oo#...../.....####..####.....","egg":"..................../........####......../.......#oooo#......./......#oooooo#....../......#oooooo#....../.....#oooooo#o#...../.....#oooooooo#...../.....#oooooooo#...../.....#ooo#oooo#...../....#ooo#o#oooo#..../....#oooo#ooooo#..../....#oooooooooo#..../....#oooooooooo#..../....#oooooooooo#..../....#ooooooo#oo#..../.....#o#oooooo#...../.....#oooooooo#...../......#oooooo#....../.......#oooo#......./........####........","egg-crack":"..................../........####......../.......#oooo#......./......#oooooo#....../......#oooooo#....../.....#oooooo#o#...../.....#oooooooo#...../.....#oooooooo#...../.....#ooo#oooo#...../....#ooo#o#oooo#..../....##o#o#o#o#o#..../....#o#o#o#o#o##..../....#oooooooooo#..../....#oooooooooo#..../....#ooooooo#oo#..../.....#o#oooooo#...../.....#oooooooo#...../......#oooooo#....../.......#oooo#......./........####........","plant-0":"..................../..................../..................../..................../..................../..................../..................../..................../..................../..................../...........##......./.....##...#oo#....../....#oo#.#.##......./.....##..#........../.........#........../.....##########...../.....##########...../......#oooooo#....../......#oooooo#....../......########......","plant-1":"..................../..................../..................../..................../..................../..................../..................../..................../.....##....##......./....#oo#.##oo#....../.....##..#.##......./.....##..##oo#....../....#oo#.#.##......./.....##..#........../.........#........../.....##########...../.....##########...../......#oooooo#....../......#oooooo#....../......########......","plant-2":"..................../..................../..................../..................../..................../.....##....##......./....#oo#.##oo#....../.....##..#.##......./.....##..##oo#....../....#oo#.#.##......./.....##..#.##......./.....##..##oo#....../....#oo#.#.##......./.....##..#........../.........#........../.....##########...../.....##########...../......#oooooo#....../......#oooooo#....../......########......","plant-3":".........#........../........#o#........./.......#ooo#......../........#o#........./.........#........../.....##..#.##......./....#oo#.##oo#....../.....##..#.##......./.....##..##oo#....../....#oo#.#.##......./.....##..#.##......./.....##..##oo#....../....#oo#.#.##......./.....##..#........../.........#........../.....##########...../.....##########...../......#oooooo#....../......#oooooo#....../......########......"};
 const PET_FORMS = {
-  dora: { name: 'ほしドラ', theme: '星 × ドラゴン', why: 'タスクやタイマーをよく使った' },
-  bat: { name: 'よるコウモリ', theme: '闇 × コウモリ', why: '夜ふかしが多かった' },
-  usa: { name: 'ゆきうさ', theme: '氷 × ウサギ', why: '記録をたくさん書いた' },
-  lion: { name: 'ひだまりオン', theme: '太陽 × ライオン', why: '10〜12時に起きた日が多かった' },
+  dora: { name: 'ほしドラ', theme: '星 × ドラゴン', why: 'ちから（おにく：タスク・タイマー）がいちばん高かった' },
+  bat: { name: 'よるコウモリ', theme: '闇 × コウモリ', why: 'ひかり（おやつ：早起き・早寝）が低く、夜ふかしの日が多かった' },
+  usa: { name: 'ゆきうさ', theme: '氷 × ウサギ', why: 'かしこさ（やさい：記録・日記）がいちばん高かった' },
+  lion: { name: 'ひだまりオン', theme: '太陽 × ライオン', why: 'ひかり（おやつ：早起き・早寝）がいちばん高かった' },
 };
-const PET_HATCH = 20, PET_ADULT = 300, PET_SNACK = 3, PET_SNACK_MAX = 3;
+const PET_HATCH = 20, PET_ADULT = 300, PET_EXTRA = 3, PET_EXTRA_MAX = 3;
+const PET_FOODS = {
+  meat: { name: 'おにく', stat: 'ちから', from: 'タスク・タイマー', c: 'var(--rose)', form: 'dora' },
+  veg: { name: 'やさい', stat: 'かしこさ', from: '記録・日記・夜モード・習慣', c: 'var(--mint)', form: 'usa' },
+  snack: { name: 'おやつ', stat: 'ひかり', from: '早起き・早寝', c: 'var(--gold)', form: 'lion' },
+};
+const PET_FOOD_KEYS = ['meat', 'veg', 'snack'];
+const PET_FOOD_SPR = {"meat":"...####...../..#oooo#..../.#o#oooo#.../.#oo#ooo#.../.#ooo#oo#.../..#oooo##.../...####.##../........##../.......#oo#./......#ooo#./.......###../............","veg":"....#.#.#.../.....###..../....#####.../...#ooooo#../...#oo#oo#../....#ooo#.../....#o#o#.../.....#oo#.../.....#o#..../......#...../............/............","snack":"............/.#........#./.##.####.##./.#o#oooo#o#./.#oo#oo#oo#./.#o#oooo#o#./.##.####.##./.#........#./............/............/............/............"};
+function petFoodSVG(k, px) {
+  const rows = PET_FOOD_SPR[k].split('/'); let ink = '', pap = '';
+  rows.forEach((r, y) => { let x = 0; while (x < r.length) { const ch = r[x]; let n = 1; while (x + n < r.length && r[x + n] === ch) n++; const seg = `M${x} ${y}h${n}v1h-${n}z`; if (ch === '#') ink += seg; else if (ch === 'o') pap += seg; x += n; } });
+  return `<svg class="pet-food" viewBox="0 0 12 12" width="${px}" height="${px}" shape-rendering="crispEdges" aria-hidden="true"><path d="${pap}" fill="color-mix(in oklab, currentColor 22%, transparent)"/><path d="${ink}" fill="currentColor"/></svg>`;
+}
 const PET_PLACES = ['こぐまのランプ座', 'ねむれる時計塔座', '石積みの竪琴座', 'ほうき星の小道', '月うらの図書館', 'しずくの灯台座', 'ゆきどけの丘', 'ひだまりの屋根座', 'みずがめの井戸', '銀のつりばし座', 'あくびの雲海', 'そらいろの郵便局', 'ねこじゃらし星団', 'わたあめの入り江'];
 const PET_STAGE_LABEL = { egg: 'たまご', chibi: 'ちび', adult: 'おとな' };
 if (S.petSlot == null) S.petSlot = Math.random() < 0.5 ? 'sec' : 'gap'; // 今日のタブの置き場所（開くたびにランダム）
@@ -35,14 +49,21 @@ const petDoc = () => (S.pet && S.pet.main) || null;
 const petOn = () => S.ready && !S.fatal && !S.settings.petHide && !!petDoc();
 const petSoft = d => ['bad', 'rest'].includes(getDay(d).mode);
 function petDoneByDay() { const m = {}; for (const t of Object.values(S.tasks)) if (t.status === 'done' && t.doneAt) (m[logicalDate(t.doneAt)] ||= []).push(t); return m; }
-// その日にたまったほし（＝自動のごはん）。あとから数え直すので、端末が2つあっても二重にならない
+// その日のごはん（ほし）を3種類に分けて数える。あとから数え直すので、端末が2つあっても二重にならない
+//  おにく：終えたタスク（軽2・ふつう4・重6）、タイマーの記録（⏱、1つ2・5つまで）
+//  やさい：記録・日記（1つ2・5つまで）、夜モード（5）、習慣（1つ3）
+//  おやつ：早起き（10時までに起きた5／12時まで3）、早寝（就寝の目安までに寝た4）
 function petEarned(d, doneBy) {
-  const day = getDay(d); let n = Math.min(5, (day.entries || []).length) * 2;
-  for (const t of (doneBy[d] || [])) n += ({ light: 2, mid: 4, heavy: 6 })[t.weight] || 3;
-  for (const h of habitList()) if (habitDone(day, h.id)) n += 3;
-  if (closedAt(d)) n += 5;
-  if (day.wakeAt || (S.pc[d] && S.pc[d].first)) n += 2;
-  return n;
+  const day = getDay(d); const ents = day.entries || [];
+  const timer = ents.filter(e => /^⏱/.test(e.text || '')).length, diary = ents.length - timer;
+  let meat = Math.min(5, timer) * 2, veg = Math.min(5, diary) * 2, snack = 0;
+  for (const t of (doneBy[d] || [])) meat += ({ light: 2, mid: 4, heavy: 6 })[t.weight] || 3;
+  for (const h of habitList()) if (habitDone(day, h.id)) veg += 3;
+  if (closedAt(d)) veg += 5;
+  const w = wakeAt(d); if (w) { const h = (w - dayStart(d).getTime()) / 36e5; snack += h <= 4 ? 5 : h <= 6 ? 3 : 0; }
+  const slept = closedAt(d) || getDay(d).sleepAt; const target = petBedTarget(d);
+  if (slept && target && slept <= target) snack += 4;
+  return { meat, veg, snack };
 }
 function petBedTarget(d) {
   const bt = getDay(d).bedtime; const ev = effEvents(d).find(x => !x.canceled && /^🌙\s*就寝の目安/.test(x.title || ''));
@@ -55,36 +76,45 @@ function petLate(d) {
   for (const g of gameSessions(d)) { if (g.to > target) min += (g.to - Math.max(g.from, target)) / 6e4; if (t > target && t - g.to < 12 * 6e4 && g.to > target) now = true; }
   return { min: Math.round(min), now };
 }
-// この2週間の過ごしかたで、おとなの姿を決める
-function petLean() {
-  const t = today(); const doneBy = petDoneByDay(); const sc = { dora: 0, usa: 0, lion: 0, bat: 0 };
-  for (let i = 0; i < 14; i++) {
-    const d = addDays(t, -i); const day = getDay(d); const ents = day.entries || [];
-    if (ents.length >= 4) sc.usa++;
-    if ((doneBy[d] || []).length || ents.some(e => /^⏱/.test(e.text || ''))) sc.dora++;
-    const w = wakeAt(d); if (w) { const h = (w - dayStart(d).getTime()) / 36e5; if (h >= 4 && h <= 6) sc.lion++; }
-    const s = sleepAt(d); if ((s && s - dayStart(d).getTime() > 21.5 * 36e5) || petLate(d).min >= 30) sc.bat++;
-  }
-  const order = ['dora', 'usa', 'lion', 'bat'];
+// この2週間で夜ふかしだった日（3:30より後に寝た・就寝の目安を過ぎてゲーム30分以上）
+function petNightDays() {
+  const t = today(); let n = 0;
+  for (let i = 0; i < 14; i++) { const d = addDays(t, -i); const s = closedAt(d) || sleepAt(d); if ((s && s - dayStart(d).getTime() > 21.5 * 36e5) || petLate(d).min >= 30) n++; }
+  return n;
+}
+// おとなの姿：能力でいちばん高いもの。ひかりが低く（いちばん高い能力の1/3未満）夜ふかしが5日以上なら、よるコウモリ
+function petFormOf(st) {
+  const sc = { dora: st.power, usa: st.wisdom, lion: st.light }; const top = Math.max(sc.dora, sc.usa, sc.lion);
+  if (top > 0 && st.light < top / 3 && petNightDays() >= 5) return 'bat';
+  const order = ['dora', 'usa', 'lion'];
   return order.slice().sort((a, b) => sc[b] - sc[a] || order.indexOf(a) - order.indexOf(b))[0];
 }
+const petLean = () => petFormOf(petStats());
 function petStats() {
   const p = petDoc(); if (!p) return null;
   const t = today(); const doneBy = petDoneByDay();
-  let earned = 0, snacks = 0, seen = 0, earnedToday = 0, snacksToday = 0;
+  const eat = { meat: 0, veg: 0, snack: 0 }, extra = { meat: 0, veg: 0, snack: 0 }; let seen = 0, earnedToday = { meat: 0, veg: 0, snack: 0 }, extraToday = 0;
   for (let d = p.bornDay || t, i = 0; d <= t && i < 800; d = addDays(d, 1), i++) {
     const e = petEarned(d, doneBy); const x = getDay(d).pet || {};
-    earned += e; snacks += x.snacks || 0; if (x.seen) seen++;
-    if (d === t) { earnedToday = e; snacksToday = x.snacks || 0; }
+    const ex = { meat: 0, veg: 0, snack: 0, ...(x.extra || {}) }; if (x.snacks) ex.snack += x.snacks; // 前の形（おやつの数）も読む
+    for (const k of PET_FOOD_KEYS) { eat[k] += e[k]; extra[k] += ex[k] || 0; }
+    if (x.seen) seen++;
+    if (d === t) { earnedToday = e; extraToday = PET_FOOD_KEYS.reduce((a, k) => a + (ex[k] || 0), 0); }
   }
-  const xp = earned + snacks * 2;
+  const extraN = PET_FOOD_KEYS.reduce((a, k) => a + extra[k], 0);
+  const xp = eat.meat + eat.veg + eat.snack + extraN * 2;
   const stage = xp < PET_HATCH ? 'egg' : xp < PET_ADULT ? 'chibi' : 'adult';
-  // 元気：昨夜の睡眠で決まり、目安を過ぎたゲームで少し減り、おやつで少し戻る
+  // 能力：食べたごはんの種類で育つ（おかわりは1回で3）
+  const power = eat.meat + extra.meat * PET_EXTRA, wisdom = eat.veg + extra.veg * PET_EXTRA, light = eat.snack + extra.snack * PET_EXTRA;
+  // 棚：食べた分がたまり、3つで1回おかわり
+  const stock = {}; for (const k of PET_FOOD_KEYS) stock[k] = Math.max(0, Math.floor((eat[k] - extra[k] * PET_EXTRA) / PET_EXTRA));
+  // 元気：昨夜の睡眠で決まり、目安を過ぎたゲームで少し減り、おかわりで少し戻る
   const w = wakeAt(t), s = sleepAt(addDays(t, -1)); let energy = 70, sleepH = null;
   if (w && s && w > s && w - s < 20 * 36e5) { sleepH = (w - s) / 36e5; energy = sleepH >= 7 ? 100 : sleepH >= 5 ? 70 + (sleepH - 5) * 15 : sleepH >= 3 ? 40 + (sleepH - 3) * 15 : Math.max(15, sleepH * 13); }
-  const late = petLate(t); energy = Math.round(clamp(energy - Math.floor(late.min / 30) * 10 + snacksToday * 3, 5, 100));
+  const late = petLate(t); energy = Math.round(clamp(energy - Math.floor(late.min / 30) * 10 + extraToday * 3, 5, 100));
   const next = stage === 'egg' ? PET_HATCH : PET_ADULT; const prev = stage === 'egg' ? 0 : PET_HATCH;
-  return { xp, stage, form: p.form || null, stars: Math.max(0, earned - snacks * PET_SNACK), bond: seen + snacks, energy, sleepH, late, earnedToday, snacksToday, grow: stage === 'adult' ? 1 : clamp((xp - prev) / (next - prev), 0, 1) };
+  const todaySum = earnedToday.meat + earnedToday.veg + earnedToday.snack;
+  return { xp, stage, form: p.form || null, power, wisdom, light, stock, bond: seen + extraN, energy, sleepH, late, earnedToday, todaySum, extraToday, grow: stage === 'adult' ? 1 : clamp((xp - prev) / (next - prev), 0, 1) };
 }
 const petAsleep = () => { const c = closedAt(today()); return !!(c && Date.now() >= c); };
 function petFace(st) {
@@ -107,7 +137,8 @@ function petBodyHTML(st, px, opts = {}) {
   const blink = face === 'normal' && st.stage !== 'egg' ? petSVG(key.replace(/-normal$/, '-blink'), px, 'pet-blink') : '';
   const delay = `animation-delay:-${(Date.now() % 9000) / 1000}s`;
   const cls = ['pet-body', st.stage === 'egg' ? 'is-egg' : '', face ? 'f-' + face : '', S.petFx && S.petFx.until > Date.now() ? 'is-fx' : ''].join(' ');
-  return `<span class="${cls}" data-k="${key}" style="${delay}">${petSVG(key, px, blink ? 'pet-main' : '')}${blink}${S.petFx && S.petFx.until > Date.now() && S.petFx.gain ? `<i class="pet-gain" aria-hidden="true">＋${S.petFx.gain}</i>` : ''}</span>`;
+  const fx = S.petFx && S.petFx.until > Date.now() && S.petFx.gains ? Object.entries(S.petFx.gains).filter(([, v]) => v > 0) : [];
+  return `<span class="${cls}" data-k="${key}" style="${delay}">${petSVG(key, px, blink ? 'pet-main' : '')}${blink}${fx.length ? `<i class="pet-gain" aria-hidden="true">${fx.map(([k, v]) => `<span class="pg-${k}">${petFoodSVG(k, 12)}＋${v}</span>`).join('')}</i>` : ''}</span>`;
 }
 // 今日・星空のタブに置く小さなペット。walk＝左右に動く幅を持つ
 function petMiniHTML(where) {
@@ -122,9 +153,12 @@ function petMiniHTML(where) {
 // ごはんを食べた瞬間（ほしが増えた）に、うれしい顔
 function petKick() { if (!S.petSyncQ) { S.petSyncQ = true; setTimeout(() => { S.petSyncQ = false; petSync(); }, 50); } }
 function petWatch(st) {
-  const k = st.earnedToday + st.snacksToday * 100;
-  if (S.petPrev != null && S.petPrevDay === today() && st.earnedToday > S.petPrevEarn) { S.petFx = { until: Date.now() + 2600, gain: st.earnedToday - S.petPrevEarn }; setTimeout(render, 2700); }
-  S.petPrev = k; S.petPrevEarn = st.earnedToday; S.petPrevDay = today();
+  const cur = st.earnedToday; const prev = S.petPrevEat;
+  if (prev && S.petPrevDay === today()) {
+    const gains = {}; for (const k of PET_FOOD_KEYS) if (cur[k] > prev[k]) gains[k] = cur[k] - prev[k];
+    if (Object.keys(gains).length) { S.petFx = { until: Date.now() + 2600, gains }; S.petTalkN = 0; setTimeout(render, 2700); }
+  }
+  S.petPrevEat = { ...cur }; S.petPrevDay = today();
   petKick();
 }
 const petUnread = () => Object.values(S.petmail || {}).filter(m => m && !m.read && m.text).sort((a, b) => (a.at || 0) - (b.at || 0));
@@ -151,9 +185,9 @@ function petSync() {
   }
   const st = petStats();
   if (st.stage !== 'egg' && !p.hatchedAt) patch.hatchedAt = Date.now();
-  if (st.stage === 'adult' && !p.form) { patch.form = petLean(); patch.evolvedAt = Date.now(); patch.evoSeen = false; }
+  if (st.stage === 'adult' && !p.form) { patch.form = petFormOf(st); patch.evolvedAt = Date.now(); patch.evoSeen = false; patch.evoStats = { power: st.power, wisdom: st.wisdom, light: st.light }; }
   // チャットのClaudeが読めるように、今の様子を控えておく（変わったときだけ・30秒に1回まで）
-  const stats = { stage: st.stage, form: patch.form || p.form || null, xp: st.xp, bond: st.bond, stars: st.stars, energy: st.energy };
+  const stats = { stage: st.stage, form: patch.form || p.form || null, xp: st.xp, bond: st.bond, energy: st.energy, power: st.power, wisdom: st.wisdom, light: st.light, meat: st.stock.meat, veg: st.stock.veg, snack: st.stock.snack };
   const old = p.stats || {}; const changed = Object.keys(stats).some(k => stats[k] !== old[k]);
   if (changed && (Object.keys(patch).length || stats.stage !== old.stage || !S.petStatsAt || Date.now() - S.petStatsAt > 30000)) { patch.stats = { ...stats, at: Date.now() }; S.petStatsAt = Date.now(); }
   if (Object.keys(patch).length) { S.pet.main = { ...p, ...patch }; updDoc('pet/main', patch); render(); }
@@ -165,7 +199,10 @@ function petLines(st) {
   const pick = (...a) => a;
   if (st.stage === 'egg') return pick('（ことこと……たまごが少しゆれた）', '（あったかい）', `（あと少しで生まれそう。${Math.max(0, PET_HATCH - st.xp)}ほしぶん）`, '（記録を書くと、たまごが育つ）');
   if (petAsleep()) return pick('すう……すう……', '（いい夢を見ているみたい）', '（むにゃ……また明日）');
-  if (S.petFx && S.petFx.until > Date.now() && S.petFx.gain) return pick('もぐもぐ。ありがと！', 'ほしがおいしい！', 'おなかがぽかぽかする。');
+  if (S.petFx && S.petFx.until > Date.now() && S.petFx.gains) {
+    const k = PET_FOOD_KEYS.find(x => S.petFx.gains[x]); const f = PET_FOODS[k];
+    return pick({ meat: 'おにく！もぐもぐ。ちからがついた。', veg: 'やさい、しゃきしゃき。かしこくなった気がする。', snack: 'おやつだ！ひかりがぽかぽかする。' }[k], `${f.name}、ありがと！`);
+  }
   const out = [];
   if (petSoft(t)) out.push('今日は、ここにいるだけでいいよ。', 'なにもしない日も、ちゃんと一日。', 'ぼくもとなりでごろごろする。', '書かなくても、ちゃんとここにいるよ。', 'ごはんは気にしないで。今日はやすむ日。');
   else {
@@ -191,18 +228,23 @@ function petRoomHTML() {
   const soft = petSoft(today());
   const plant = st.stage === 'egg' ? 0 : st.stage === 'chibi' ? (st.grow < 0.5 ? 1 : 2) : 3;
   const form = st.stage === 'adult' && (p.form || st.form) ? PET_FORMS[p.form || st.form] : null;
-  const lean = st.stage === 'chibi' ? PET_FORMS[petLean()] : null;
+  const lean = st.stage === 'chibi' ? PET_FORMS[petFormOf(st)] : null;
   const meter = (lb, v, txt, c) => `<div class="pr-m"><div class="pr-ml"><span>${lb}</span><b>${txt}</b></div><div class="pr-bar"><i style="width:${Math.round(clamp(v, 0, 1) * 100)}%;--c:${c}"></i></div></div>`;
   const cards = [];
   if (st.stage !== 'egg' && !p.name) cards.push(`<div class="pr-card"><b>生まれた！</b><p>名前を付けてあげて。あとで変えられる。</p><div class="row" style="gap:8px;margin-top:8px"><input class="field grow" id="pet-name" data-draft maxlength="12" placeholder="名前（12文字まで）" value="${esc(draft('pet-name'))}" data-enter="petName"><button class="btn primary" data-act="petName">決める</button></div></div>`);
   if (S.petRenaming && p.name) cards.push(`<div class="pr-card"><b>名前を変える</b><div class="row" style="gap:8px;margin-top:8px"><input class="field grow" id="pet-name" data-draft maxlength="12" value="${esc(draft('pet-name', p.name))}" data-enter="petName"><button class="btn ghost" data-act="petRenameCancel">やめる</button><button class="btn primary" data-act="petName">決める</button></div></div>`);
-  if (form && p.evoSeen === false) cards.push(`<div class="pr-card gold"><b>おとなになった：${form.name}</b><p>${form.theme}。この2週間、${form.why}から、この姿になった。どの姿も良い・悪いはない。</p><button class="link" data-act="petEvoSeen">わかった</button></div>`);
+  if (form && p.evoSeen === false) cards.push(`<div class="pr-card gold"><b>おとなになった：${form.name}</b><p>${form.theme}。${form.why}から、この姿になった。どの姿も良い・悪いはない。</p><button class="link" data-act="petEvoSeen">わかった</button></div>`);
   if (p.trip && !p.trip.seen) cards.push(`<div class="pr-card post"><b>おかえり</b><p>${diffDays(p.trip.from, p.trip.to)}日のあいだ、${esc(p.trip.place)}のほうまで旅をしていた。おみやげに絵はがきを持って帰ってきた。</p><div class="pr-postcard" aria-hidden="true">${petPostcardSVG(p.trip.place)}</div><button class="link" data-act="petTripSeen">しまっておく</button></div>`);
   for (const m of petUnread().slice(0, 1)) cards.push(`<div class="pr-card mail"><b>✉ 手紙が届いた</b><p class="pr-letter">${esc(m.text)}</p><button class="link" data-act="petLetterRead" data-arg="${esc(m.id)}">読んだ</button></div>`);
   const name = p.name || (st.stage === 'egg' ? 'たまご' : '名前はまだ');
   const stageTxt = st.stage === 'adult' && form ? `${form.name}（${form.theme}）` : PET_STAGE_LABEL[st.stage];
-  const canSnack = st.stage !== 'egg' && !petAsleep() && st.stars >= PET_SNACK && st.snacksToday < PET_SNACK_MAX;
-  const snackWhy = st.stage === 'egg' ? 'たまごはまだ食べられない' : petAsleep() ? 'ねているから、また明日' : st.snacksToday >= PET_SNACK_MAX ? '今日はもうおなかいっぱい' : st.stars < PET_SNACK ? `ほしがあと${PET_SNACK - st.stars}こ` : '';
+  const asleep = petAsleep(); const full = st.extraToday >= PET_EXTRA_MAX;
+  const feedWhy = st.stage === 'egg' ? 'たまごはまだ食べられない（ごはんは育つ力になっている）' : asleep ? 'ねているから、また明日' : full ? '今日はもうおなかいっぱい' : '';
+  const statMax = Math.max(30, st.power, st.wisdom, st.light);
+  const statRow = k => { const f = PET_FOODS[k]; const v = { meat: st.power, veg: st.wisdom, snack: st.light }[k];
+    return `<div class="ps-row" style="--c:${f.c}"><span class="ps-ic">${petFoodSVG(k, 18)}</span><span class="ps-n">${f.stat}</span><span class="ps-bar"><i style="width:${Math.round(v / statMax * 100)}%"></i></span><b class="ps-v">${v}</b></div>`; };
+  const feedBtn = k => { const f = PET_FOODS[k]; const n = st.stock[k]; const ok = !feedWhy && n > 0;
+    return `<button class="pf-btn" style="--c:${f.c}" data-act="petFeed" data-arg="${k}" ${ok ? '' : 'disabled'} aria-label="${f.name}のおかわりをあげる（棚に${n}回分）"><span class="pf-ic">${petFoodSVG(k, 26)}</span><span class="pf-t">${f.name}</span><span class="pf-n">×${n}</span></button>`; };
   return `<div class="overlay pet-over" role="dialog" aria-modal="true" aria-label="ペットの部屋"><div class="pet-room">
     <div class="pr-top"><button class="iconbtn pr-back" data-act="petClose" aria-label="戻る">‹</button><div class="pr-title"><b>${esc(name)}</b><span>${esc(stageTxt)}</span></div>${p.name && !S.petRenaming ? '<button class="iconbtn" data-act="petRename" aria-label="名前を変える" title="名前を変える">✎</button>' : '<span style="width:36px"></span>'}</div>
     <div class="pr-scene${night ? ' night' : ''}${soft ? ' soft' : ''}">
@@ -217,8 +259,10 @@ function petRoomHTML() {
       ${meter('なつき', Math.min(1, st.bond / 60), String(st.bond), 'var(--rose)')}
       ${meter('成長', st.grow, stageTxt.split('（')[0], 'var(--gold)')}
     </div>
-    <div class="pr-act"><span class="pr-stars" title="たまったほし">★ ${st.stars}</span><button class="btn primary" data-act="petSnack" ${canSnack ? '' : 'disabled'}>おやつ（ほし${PET_SNACK}）</button>${snackWhy ? `<span class="faint pr-why">${snackWhy}</span>` : ''}</div>
-    <p class="pr-note">記録・タスク・習慣・夜モード・起きた時刻で ほし がたまり、その場でごはんになる（今日 ＋${st.earnedToday}）。${lean ? `いまの過ごしかたなら、おとなになると「${lean.name}」になりそう。` : ''}${st.stage === 'adult' ? '' : `${st.stage === 'egg' ? '生まれる' : 'おとなになる'}まで、あと ${Math.max(0, (st.stage === 'egg' ? PET_HATCH : PET_ADULT) - st.xp)} ほし。`}なつきは会いに来た日とおやつで増え、減らない。続けた日数は数えない。</p>
+    <div class="pr-stats"><div class="pr-h">能力</div>${PET_FOOD_KEYS.map(statRow).join('')}${lean ? `<div class="ps-lean">いまの能力なら、おとなになると<b>${lean.name}</b>になりそう</div>` : ''}</div>
+    <div class="pr-feed"><div class="pr-h">棚のごはん<span>3つで1回おかわり・1日${PET_EXTRA_MAX}回まで</span></div><div class="pf-row">${PET_FOOD_KEYS.map(feedBtn).join('')}</div>${feedWhy ? `<div class="faint pr-why">${feedWhy}</div>` : ''}</div>
+    <div class="pr-legend">${PET_FOOD_KEYS.map(k => `<span style="--c:${PET_FOODS[k].c}">${petFoodSVG(k, 14)}${PET_FOODS[k].name}＝${PET_FOODS[k].from} → ${PET_FOODS[k].stat}${st.earnedToday[k] ? `（今日＋${st.earnedToday[k]}）` : ''}</span>`).join('')}</div>
+    <p class="pr-note">ごはんはその場で自動で食べて、能力と成長になる。${st.stage === 'adult' ? '' : `${st.stage === 'egg' ? '生まれる' : 'おとなになる'}まで、あと ${Math.max(0, (st.stage === 'egg' ? PET_HATCH : PET_ADULT) - st.xp)}。`}おとなの姿は能力で決まる：ちから→ほしドラ、かしこさ→ゆきうさ、ひかり→ひだまりオン、ひかりが低くて夜ふかしが多い→よるコウモリ。なつきは会いに来た日とおかわりで増え、減らない。続けた日数は数えない。</p>
   </div></div>`;
 }
 // おみやげの絵はがき：行った先の星座（日付から決まる星の並び）
@@ -233,10 +277,12 @@ function petPostcardSVG(place) {
 A.petOpen = () => { S.petOpen = true; S.petTalkN = 0; S.petRenaming = false; render(); };
 A.petClose = () => { S.petOpen = false; S.petRenaming = false; render(); };
 A.petTalk = () => { S.petTalkN = (S.petTalkN || 0) + 1; S.petHop = Date.now(); render(); };
-A.petSnack = () => {
-  const st = petStats(); if (!st || st.stage === 'egg' || petAsleep() || st.stars < PET_SNACK || st.snacksToday >= PET_SNACK_MAX) return;
-  const t = today(); const day = getDay(t); patchDay(t, { pet: { ...(day.pet || {}), seen: true, snacks: (day.pet && day.pet.snacks || 0) + 1 } });
-  S.petFx = { until: Date.now() + 2600, gain: 0, snack: true }; S.petTalkN = 0; setTimeout(render, 2700);
+A.petFeed = k => {
+  if (!PET_FOODS[k]) return; const st = petStats();
+  if (!st || st.stage === 'egg' || petAsleep() || st.stock[k] < 1 || st.extraToday >= PET_EXTRA_MAX) return;
+  const t = today(); const day = getDay(t); const x = day.pet || {}; const ex = { ...(x.extra || {}) }; ex[k] = (ex[k] || 0) + 1;
+  patchDay(t, { pet: { ...x, seen: true, extra: ex } });
+  S.petFx = { until: Date.now() + 2600, gains: { [k]: PET_EXTRA } }; S.petTalkN = 0; S.petPrevEat = null; setTimeout(render, 2700);
 };
 A.petName = () => {
   const v = String(draft('pet-name', (petDoc() || {}).name || '')).trim().slice(0, 12); if (!v) { toast('名前を入れてね。'); return; }
