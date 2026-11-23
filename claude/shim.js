@@ -43,6 +43,8 @@ const __rt = (() => {
     // 形がおかしい・権限がない、はやり直しても通らない。それ以外（つながらない・混んでいる）は送り直す
     retryable: e => !/daylog_api: bad|bad_query|not_granted|not_in_manifest|blocked_by_policy/.test(String((e && (e.code + ' ' + e.message)) || '')),
   };
+  // ペットの部屋の会話：api_daylog.call の 'chat' → データベース → サーバーの daylog-chat → Claude API
+  window.daylogChat = body => api({ a: 'chat', messages: body.messages });
   const makeDb = () => {
     // エラーの自動報告：api_daylog.call の 'err' で client_errors に書く
     window.DaylogStore.errors.use(rows => api({ a: 'err', rows }), { ver: window.__daylogVersion || '', src: 'claude' });

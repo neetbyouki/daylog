@@ -5,7 +5,7 @@ import './store.js?v=2026-11-22b';
 const SUPABASE_URL = 'https://etsuxjcrnyoevrasdhde.supabase.co';
 // 公開してよい鍵（データは行ごとの権限で本人だけが読み書きできる）
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0c3V4amNybnlvZXZyYXNkaGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNDM5OTQsImV4cCI6MjEwOTkxOTk5NH0.ae7iJE6mtN0-wEbiEAaPS5A7j7n3Y_zd-qRVREoBJ9o';
-const VERSION = '2026-11-23g';
+const VERSION = '2026-11-23h';
 const GCAL = 'Google Calendar', HOST = 'host:Daylog_PC';
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
 
@@ -191,6 +191,12 @@ const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.p
 // サービスワーカーの用意を待つ（来ないときは4秒であきらめる）
 const swReady = () => Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(() => r(null), 4000))]);
 const standalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+// ペットの部屋の会話：サーバーの daylog-chat が Claude API（Haiku 5.5）に渡す（APIキーはサーバーにだけある）
+window.daylogChat = async body => {
+  const { data, error } = await sb.functions.invoke('daylog-chat', { body: { messages: body.messages } });
+  if (error) { let j = null; try { j = await error.context.json(); } catch (_) {} if (j && j.error) return j; throw { code: 'network', message: String(error.message || error) }; }
+  return data;
+};
 window.daylogPush = {
   // 'on' | 'off' | 'denied' | 'need-home'（iPhoneはホーム画面に追加して開く必要がある）| 'unsupported'
   async state() {

@@ -245,7 +245,8 @@ function petRoomHTML() {
       <div class="pr-bubble" aria-live="polite">${esc(petLine(st))}</div>
     </div>
     ${cards.join('')}
-    <div class="pr-meters">
+    <div class="pr-tabs" role="tablist" aria-label="ペットの部屋"><button role="tab" data-act="petTab" data-arg="room" aria-selected="${S.petTab !== 'chat'}">ようす</button><button role="tab" data-act="petTab" data-arg="chat" aria-selected="${S.petTab === 'chat'}">おはなし</button></div>
+    ${S.petTab === 'chat' ? petChatHTML(st, name) : `<div class="pr-meters">
       ${soft ? meter('元気', 1, '休む日', 'var(--rest)') : petAsleep() ? meter('元気', 1, 'ねている', 'var(--lav)') : meter('元気', st.energy / 100, String(st.energy), st.energy >= 70 ? 'var(--mint)' : st.energy >= 40 ? 'var(--blue)' : 'var(--warn)')}
       ${meter('なつき', Math.min(1, st.bond / 60), String(st.bond), 'var(--rose)')}
       ${meter('成長', st.grow, stageTxt.split('（')[0], 'var(--gold)')}
@@ -253,7 +254,7 @@ function petRoomHTML() {
     <div class="pr-stats"><div class="pr-h">能力</div>${PET_FOOD_KEYS.map(statRow).join('')}${lean ? `<div class="ps-lean">いまの能力なら、おとなになると<b>${lean.name}</b>になりそう</div>` : ''}</div>
     <div class="pr-feed"><div class="pr-h">棚のごはん<span>3つで1回おかわり・1日${PET_EXTRA_MAX}回まで</span></div><div class="pf-row">${PET_FOOD_KEYS.map(feedBtn).join('')}</div>${feedWhy ? `<div class="faint pr-why">${feedWhy}</div>` : ''}</div>
     <div class="pr-legend">${PET_FOOD_KEYS.map(k => `<span style="--c:${PET_FOODS[k].c}">${petFoodSVG(k, 14)}${PET_FOODS[k].name}＝${PET_FOODS[k].from} → ${PET_FOODS[k].stat}${st.earnedToday[k] ? `（今日＋${st.earnedToday[k]}）` : ''}</span>`).join('')}</div>
-    <p class="pr-note">ごはんはその場で自動で食べて、能力と成長になる。${st.stage === 'adult' ? '' : `${st.stage === 'egg' ? '生まれる' : 'おとなになる'}まで、あと ${Math.max(0, (st.stage === 'egg' ? PET_HATCH : PET_ADULT) - st.xp)}。`}おとなの姿は、いちばん高い能力で決まる：ちから→ほしドラ、かしこさ→ゆきうさ、ひかり→ひだまりオン。なつきは会いに来た日とおかわりで増え、減らない。続けた日数は数えない。</p>
+    <p class="pr-note">ごはんはその場で自動で食べて、能力と成長になる。${st.stage === 'adult' ? '' : `${st.stage === 'egg' ? '生まれる' : 'おとなになる'}まで、あと ${Math.max(0, (st.stage === 'egg' ? PET_HATCH : PET_ADULT) - st.xp)}。`}おとなの姿は、いちばん高い能力で決まる：ちから→ほしドラ、かしこさ→ゆきうさ、ひかり→ひだまりオン。なつきは会いに来た日とおかわりで増え、減らない。続けた日数は数えない。</p>`}
   </div></div>`;
 }
 // おみやげの絵はがき：行った先の星座（日付から決まる星の並び）
@@ -264,7 +265,70 @@ function petPostcardSVG(place) {
   return `<svg viewBox="0 0 240 130" width="100%" role="img"><rect x="1" y="1" width="238" height="128" rx="10" fill="#0b1030" stroke="currentColor" stroke-opacity=".35"/><polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="currentColor" stroke-opacity=".55" stroke-width="1.2"/>${pts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="currentColor"/>`).join('')}<text x="14" y="122" fill="currentColor" font-size="11" opacity=".75">${esc(place)}</text></svg>`;
 }
 
+/* ── おはなし（Claude API・Haiku 5.5。サーバーの daylog-chat が Daylog を読んで答える） ──
+   会話は petchat に1つずつ（{ role: user|assistant, text, at }）。両方の版で同じ会話が見える。前もっての指示は settings.chatPrompt */
+const PET_CHAT_SEND = 16; // サーバーに渡す、これまでの会話の数
+const petChatList = () => Object.entries(S.petchat || {}).map(([id, m]) => ({ id, ...m })).filter(m => m && m.text && (m.role === 'user' || m.role === 'assistant')).sort((a, b) => (a.at || 0) - (b.at || 0));
+const PET_CHAT_ERR = {
+  no_key: 'まだ話せない：サーバーに Claude の APIキーが入っていない。入れ方はチャットの Claude に聞いてね。',
+  bad_key: 'APIキーが使えなかった。Claude Console でキーを作り直して、入れ直してほしい。',
+  no_credit: '前払いのクレジットがなくなった。Claude Console で足すと、また話せる（自動では引き落とされない）。',
+  day_limit: '今日はたくさん話したので、また明日（使いすぎ防止の上限）。',
+  busy: 'Claude が混んでいるみたい。少し待ってもう一度。',
+  not_signed_in: 'ログインが切れた。開き直してほしい。',
+};
+const petChatErrMsg = e => { const c = (e && (e.code || (e.error && e.error.code))) || ''; return PET_CHAT_ERR[c] || `うまく届かなかった（${esc(String((e && (e.message || (e.error && e.error.message))) || c || 'つながらない')).slice(0, 80)}）。もう一度送ってみて。`; };
+function petChatUseText() {
+  const u = S.meta && S.meta.chatuse; const m = today().slice(0, 7);
+  if (!u || u.month !== m) return '今月はまだ話していない';
+  return `今月 ${u.calls || 0}回・約${Math.max(1, Math.round((u.usd || 0) * 150))}円（$${(u.usd || 0).toFixed(3)}、1ドル150円で計算）`;
+}
+function petChatHTML(st, name) {
+  const list = petChatList().slice(-40);
+  const msgs = list.map(m => `<div class="pc-m ${m.role === 'user' ? 'me' : 'pet'}"><div class="pc-b">${esc(m.text)}</div><time>${hm(m.at)}</time></div>`).join('');
+  const empty = !list.length ? `<div class="pc-empty">${esc(name)}に話しかけてみて。Daylog の記録を読んで答える。<br>例：「今週どうだった？」「最近ゲームしすぎ？」「先週のメモでいいアイデアあった？」</div>` : '';
+  return `<div class="pr-chat">
+    <div class="pc-log" id="pc-log" aria-live="polite">${empty}${msgs}${S.petChatBusy ? `<div class="pc-m pet"><div class="pc-b pc-wait"><span class="thinking">記録を見ながら考えている</span></div></div>` : ''}${S.petChatErr ? `<div class="pc-err" role="alert">${S.petChatErr}</div>` : ''}</div>
+    <div class="pc-in"><input class="field grow" id="pet-chat-in" data-draft data-enter="petChatSend" maxlength="1000" placeholder="${esc(name)}に話しかける" value="${esc(draft('pet-chat-in'))}" aria-label="${esc(name)}に話しかける" autocomplete="off"><button class="btn primary" data-act="petChatSend" ${S.petChatBusy ? 'disabled' : ''}>送る</button></div>
+    <div class="pc-foot"><span>${esc(petChatUseText())}</span><span class="spacer"></span>${list.length ? (S.petChatConfirm ? '<span>ぜんぶ消す？</span><button class="link" data-act="petChatClear" data-arg="yes">消す</button><button class="link" data-act="petChatClear" data-arg="no">やめる</button>' : '<button class="link" data-act="petChatClear">会話を消す</button>') : ''}</div>
+    <p class="pr-note">答えは Claude（Haiku 5.5）が Daylog を読んで考える。読むだけで、記録は書きかえない。前もって伝えておくことは、設定の「ペットとの会話」で決められる。</p>
+  </div>`;
+}
+const petChatScroll = () => requestAnimationFrame(() => { const l = $('#pc-log'); if (l) l.scrollTop = l.scrollHeight; });
+// 設定：前もって伝えておくこと
+function petChatSettingsHTML() {
+  const cur = S.settings.chatPrompt || '';
+  return `<h2 class="sec"><span>ペットとの会話</span></h2><div class="card settings"><div class="item" style="display:block"><div class="l">前もって伝えておくこと<small>ペットの部屋の「おはなし」で、毎回この指示を読んでから答える。話し方・呼び方・気をつけてほしいこと・自分のことなど。</small></div>
+    <textarea class="field autosize" id="chat-prompt" data-draft rows="4" maxlength="4000" style="width:100%;margin-top:8px" placeholder="例：結論から短く。ぼくのことは「山浦」と呼んで。しんどい日はアドバイスより先に話を聞いて。根性論は言わない。">${esc(draft('chat-prompt', cur))}</textarea>
+    <div class="row" style="margin-top:8px;gap:8px"><span class="faint" style="font-size:12px">${esc(petChatUseText())}・1日150回まで</span><span class="spacer"></span><button class="btn primary" data-act="petChatPromptSave">保存</button></div></div></div>`;
+}
+
 /* ── 操作 ── */
+A.petTab = v => { S.petTab = v === 'chat' ? 'chat' : 'room'; render(); if (S.petTab === 'chat') petChatScroll(); };
+A.petChatSend = async () => {
+  const text = String(draft('pet-chat-in')).trim(); if (!text || S.petChatBusy) return;
+  if (typeof window.daylogChat !== 'function') { S.petChatErr = 'この画面からはまだ話せない。開き直してほしい。'; render(); return; }
+  const mk = (role, t) => { const last = petChatList().slice(-1)[0]; const at = Math.max(Date.now(), last ? (last.at || 0) + 1 : 0); const id = 'c' + at.toString(36) + Math.random().toString(36).slice(2, 6); return { id, role, text: t, at }; };
+  const um = mk('user', text.slice(0, 1000)); S.petchat = { ...S.petchat, [um.id]: um }; putDoc('petchat/' + um.id, { role: um.role, text: um.text, at: um.at });
+  S.drafts['pet-chat-in'] = ''; S.petChatBusy = true; S.petChatErr = null; render(); petChatScroll();
+  try {
+    const hist = petChatList().slice(-PET_CHAT_SEND).map(m => ({ role: m.role, content: m.text }));
+    const r = await window.daylogChat({ messages: hist });
+    if (!r || r.error) throw (r && r.error) || { code: 'empty' };
+    const am = mk('assistant', String(r.reply || '').slice(0, 6000)); S.petchat = { ...S.petchat, [am.id]: am }; putDoc('petchat/' + am.id, { role: am.role, text: am.text, at: am.at });
+    if (r.used && r.used.monthUsd != null) { const m = today().slice(0, 7); const o = (S.meta && S.meta.chatuse && S.meta.chatuse.month === m) ? S.meta.chatuse : { month: m, calls: 0 }; S.meta = { ...S.meta, chatuse: { ...o, month: m, usd: r.used.monthUsd, calls: (o.calls || 0) + 1 } }; }
+    S.petHop = Date.now();
+  } catch (e) { S.petChatErr = petChatErrMsg(e); }
+  finally { S.petChatBusy = false; render(); petChatScroll(); }
+};
+A.petChatClear = v => {
+  if (v === 'no') { S.petChatConfirm = false; render(); return; }
+  if (v !== 'yes') { S.petChatConfirm = true; render(); return; }
+  S.petChatConfirm = false; const ids = Object.keys(S.petchat || {}); S.petchat = {}; S.petChatErr = null;
+  for (const id of ids) delDoc('petchat/' + id); render();
+};
+A.petChatPromptSave = () => { const v = String(draft('chat-prompt', S.settings.chatPrompt || '')).slice(0, 4000); patchSettings({ chatPrompt: v }); S.drafts['chat-prompt'] = v; toast('ペットへの指示を保存した。'); };
+
 A.petOpen = () => { S.petOpen = true; S.petTalkN = 0; S.petRenaming = false; render(); };
 A.petClose = () => { S.petOpen = false; S.petRenaming = false; render(); };
 A.petTalk = () => { S.petTalkN = (S.petTalkN || 0) + 1; S.petHop = Date.now(); render(); };

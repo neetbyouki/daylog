@@ -139,6 +139,7 @@ async function boot() {
   subscribe('meta', 'meta');
   subscribe('pet', 'pet');
   subscribe('petmail', 'petmail');
+  subscribe('petchat', 'petchat');
   if (window.DaylogStore && window.DaylogStore.errors) window.DaylogStore.errors.context({ view: () => S.view + (S.view === 'memos' && S.nOpen ? '/note' : '') });
   // 起動が落ち着いてから、銀河の部品を裏で読んでおく（星空タブを開いたときに待たせない）
   setTimeout(() => (window.requestIdleCallback || (f => setTimeout(f, 1)))(() => loadGalaxy()), 5000);
