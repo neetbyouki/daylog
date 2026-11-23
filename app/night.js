@@ -4,6 +4,7 @@
 /* ───────── 重ねる画面（夜モード・シート） ───────── */
 function overHTML() {
   if (S.timerOpen) return timerHTML();
+  if (S.petOpen) return petRoomHTML();
   if (S.night) return `<div class="overlay" role="dialog" aria-modal="true" aria-label="夜モード">${nightHTML()}</div>`;
   if (S.calSheet) return `<div class="overlay" role="dialog" aria-modal="true" aria-label="予定">${calSheetHTML()}</div>`;
   if (S.sheet) return `<div class="overlay" role="dialog" aria-modal="true">${sheetHTML()}</div>`;

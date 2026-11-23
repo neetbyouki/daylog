@@ -94,8 +94,8 @@ function rng(seed) { let a = hash(String(seed)); return () => { a |= 0; a = a + 
 const S = {
   view: 'today', ready: false, fatal: null, owner: false,
   db: null, mcp: null, sample: null, user: null,
-  loaded: { settings: false, days: false, tasks: false, goals: false, memos: false, notes: false, nfolders: false, pc: false, reviews: false, notify: false, meta: false },
-  settings: { ...DEFAULTS }, days: {}, tasks: {}, memos: {}, notes: {}, nfolders: {}, goals: {}, pc: {}, reviews: {}, notify: {}, meta: {},
+  loaded: { settings: false, days: false, tasks: false, goals: false, memos: false, notes: false, nfolders: false, pc: false, reviews: false, notify: false, meta: false, pet: false, petmail: false },
+  settings: { ...DEFAULTS }, days: {}, tasks: {}, memos: {}, notes: {}, nfolders: {}, goals: {}, pc: {}, reviews: {}, notify: {}, meta: {}, pet: {}, petmail: {},
   events: {}, drafts: {}, comp: { mood: 0, body: 0, nap: false },
   claudeOff: false, busy: {}, sheet: null, night: null, toast: null, undo: null,
   openTask: null, sky: { level: 'month', month: monthKey(logicalDate()), day: logicalDate(), year: Number(logicalDate().slice(0, 4)), sel: null },

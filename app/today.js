@@ -209,7 +209,7 @@ function timelineHTML(d, o = {}) {
   for (const e of loose) rows.push({ kind: 'en', t: e.t, o: 2, e });
   if (isToday && !ongoing.length) rows.push({ kind: 'now', t: now, o: 3 });
   rows.sort((a, b) => a.t - b.t || a.o - b.o);
-  let h = `<h2 class="sec"><span>${esc(o.title || '今日の流れ')}</span><span class="r">${st.loading ? '<span class="thinking">予定を読み込み中</span>' : ro ? (evSnapped(d) ? '<span class="faint snapnote" data-tip="その日の終わりの予定の形で残している（あとでカレンダーで動かしても変わらない）">その日の予定のまま</span>' : '') : S.mcp ? `<button class="iconbtn plusbtn" data-act="todayPlan" aria-label="今日の予定を足す" title="今日の予定を足す">＋</button><button class="iconbtn" data-act="reloadEvents" aria-label="予定を読み込み直す" title="読み込み直す">${ICON.reload}</button>` : ''}</span></h2>`;
+  let h = `<h2 class="sec"><span>${esc(o.title || '今日の流れ')}</span>${ro ? '' : '<!--pet-sec-->'}<span class="r">${st.loading ? '<span class="thinking">予定を読み込み中</span>' : ro ? (evSnapped(d) ? '<span class="faint snapnote" data-tip="その日の終わりの予定の形で残している（あとでカレンダーで動かしても変わらない）">その日の予定のまま</span>' : '') : S.mcp ? `<button class="iconbtn plusbtn" data-act="todayPlan" aria-label="今日の予定を足す" title="今日の予定を足す">＋</button><button class="iconbtn" data-act="reloadEvents" aria-label="予定を読み込み直す" title="読み込み直す">${ICON.reload}</button>` : ''}</span></h2>`;
   if (!S.mcp) h += `<div class="err">Googleカレンダーにつながっていないので、予定は表示されない（日記は使える）。</div>`;
   if (st.error) h += `<div class="err">${esc(st.error.msg)}${st.error.code === 'approval_required' ? ' <button class="btn sm" data-act="reloadEvents">許可して読み込む</button>' : ''}</div>`;
   if (!rows.some(r => r.kind !== 'now')) {
@@ -227,6 +227,7 @@ function timelineHTML(d, o = {}) {
     return out;
   };
   // 空きの帯：これから（いまより後）なら緑で押せる、過ぎた分は薄く長さだけ
+  let petPlaced = false; // ペットを「これからの空き」に置いたか
   const gapLI = (from, to) => {
     const ms = to - from; const fut = isToday && from >= now - 6e4;
     if (ms < (fut ? GAP_MIN : 2 * GAP_MIN)) return ''; // 過ぎた時間は30分以上あいたときだけ
@@ -236,7 +237,8 @@ function timelineHTML(d, o = {}) {
     const px = gameIn ? Math.round(Math.min(140, Math.max(44, 22 + mins * 0.5))) : fut ? Math.round(Math.min(96, Math.max(30, 22 + mins * 0.3))) : Math.round(Math.min(26, Math.max(14, 8 + mins * 0.06)));
     if (!fut) return `<li class="gap past" style="--h:${px}px" data-ts="${from}" data-te="${to}" aria-label="${durText(ms)}、予定も記録もない時間"><span class="g-t">${durText(ms)}</span></li>`;
     const m = Math.ceil((from - dayStart(d).getTime()) / (15 * 6e4)) * 15;
-    return `<li class="gap fut" style="--h:${px}px" data-ts="${from}" data-te="${to}">${S.mcp ? `<button class="g-pill" data-act="calNew" data-arg="${d}@${m}" aria-label="${hm(from)}から${durText(ms)}空いている。この時間に予定を入れる">` : '<span class="g-pill">'}<b>空き</b> ${durText(ms)}${S.mcp ? '<i aria-hidden="true">＋</i></button>' : '</span>'}</li>`;
+    const pet = !ro && S.petSlot === 'gap' && !petPlaced && px >= 44 ? petMiniHTML('gap') : ''; if (pet) petPlaced = true;
+    return `<li class="gap fut" style="--h:${px}px" data-ts="${from}" data-te="${to}">${pet}${S.mcp ? `<button class="g-pill" data-act="calNew" data-arg="${d}@${m}" aria-label="${hm(from)}から${durText(ms)}空いている。この時間に予定を入れる">` : '<span class="g-pill">'}<b>空き</b> ${durText(ms)}${S.mcp ? '<i aria-hidden="true">＋</i></button>' : '</span>'}</li>`;
   };
   const lis = []; let mark = rng ? Math.min(rng.from, rows[0].t) : rows[0].t;
   const y = addDays(d, -1);
@@ -282,6 +284,7 @@ function timelineHTML(d, o = {}) {
   }
   // ゲームをした時間は、その時間の上に重ねるうすいオレンジの帯（予定にもかぶる）。位置は描いたあとに gameLinesLayout() が決める
   h += `<ul class="flow${games.length ? ' has-games' : ''}${ro ? ' ro' : ''}" data-day="${d}">${lis.join('')}</ul>`;
+  if (!ro) h = h.replace('<!--pet-sec-->', petPlaced ? '' : petMiniHTML('sec'));
   return h;
 }
 // ゲームの帯：今日の流れは時間に比例していないので、行の「時刻→高さ」を並べて、その間を按分して線の上下を決める
