@@ -45,7 +45,7 @@ document.addEventListener('keydown', e => {
   if (el.id === 'memo-text' || el.id === 'memo-edit') { if (e.ctrlKey || e.metaKey) { e.preventDefault(); if (el.id === 'memo-text') A.memoAdd(); else if (S.editMemo) A.memoSave(S.editMemo); } return; }
   const k = el.dataset && el.dataset.enter; if (k && A[k]) { e.preventDefault(); A[k](el.dataset.arg, el, e); }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (S.timerOpen) A.timerClose(); else if (S.view === 'memos' && S.nOpen) A.noteClose(); else if (S.calSheet) { S.calSheet = null; render(); } else if (S.sheet) { S.sheet = null; render(); } else if (S.view === 'settings' && !S.night) A.goBack(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (S.timerOpen) A.timerClose(); else if (S.view === 'memos' && e.target && e.target.id === 'memo-q') A.memoSearchClear(); else if (S.view === 'memos' && S.nOpen) A.noteClose(); else if (S.calSheet) { S.calSheet = null; render(); } else if (S.sheet) { S.sheet = null; render(); } else if (S.view === 'settings' && !S.night) A.goBack(); } });
 document.addEventListener('toggle', e => { const el = e.target; if (el.dataset && el.dataset.fold) S[el.dataset.fold] = el.open; }, true);
 const tip = $('#tip');
 function placeTip(x0, y0) { const x = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, x0 + 12)); tip.style.left = x + 'px'; tip.style.top = Math.max(8, y0 - tip.offsetHeight - 10) + 'px'; }

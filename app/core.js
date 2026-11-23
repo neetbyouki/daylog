@@ -408,6 +408,6 @@ function toastHTML() { const t = S.toast; if (!t) return ''; return `<div class=
 const A = {};
 A.toggleSettings = () => (S.view === 'settings' ? A.goBack() : A.go('settings'));
 A.goBack = () => A.go(S.prevView && S.prevView !== 'settings' ? S.prevView : 'today');
-A.go = v => { if (v !== S.view) vt(v === 'settings' ? 'fwd' : S.view === 'settings' ? 'back' : 'tab'); if (v === 'settings' && S.view !== 'settings') { S.prevView = S.view; refreshPush(); } S.view = v; S.sky.sel = null; S.openTask = null; window.scrollTo(0, 0); render(); if (v === 'today') loadEvents(today()); if (v === 'cal') loadCal(); };
+A.go = v => { if (v !== S.view) vt(v === 'settings' ? 'fwd' : S.view === 'settings' ? 'back' : 'tab'); if (v === 'settings' && S.view !== 'settings') { S.prevView = S.view; refreshPush(); } if (v !== S.view && !String(S.drafts['memo-q'] || '').trim()) S.memoSearch = false; S.view = v; S.sky.sel = null; S.openTask = null; window.scrollTo(0, 0); render(); if (v === 'today') loadEvents(today()); if (v === 'cal') loadCal(); };
 A.undo = () => { const f = S.undo; S.undo = null; S.toast = null; if (f) f(); render(); };
 A.reloadPage = () => location.reload();

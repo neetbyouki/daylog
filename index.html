@@ -250,12 +250,18 @@ button.g-pill{cursor:pointer}
 /* ── メモ：ひとこと／ノート／★ ── */
 .mbar{display:flex;gap:8px;align-items:center;margin-top:12px}
 .msearch{position:relative;display:flex;align-items:center;flex:1;min-width:0}
-.mfav-btn{flex:none;display:inline-flex;align-items:center;gap:3px;height:40px;min-width:40px;padding:0 9px;justify-content:center;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg-3);font-size:12px;font-variant-numeric:tabular-nums}
+.mfav-btn,.msearch-btn{flex:none;display:inline-flex;align-items:center;gap:3px;height:40px;min-width:40px;padding:0 9px;justify-content:center;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg-3);font-size:12px;font-variant-numeric:tabular-nums}
 .mfav-btn svg{width:16px;height:16px}
 .mfav-btn:hover{color:var(--gold)}
 .mfav-btn.on{color:var(--gold);border-color:color-mix(in oklab,var(--gold) 45%,var(--line))}
 .mfav-head{display:flex;align-items:center;justify-content:space-between;margin-top:14px}
 .mfav-t{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--gold)}
+.mbar-closed{align-items:stretch;margin-top:10px}
+.mbar-closed .mtabs{flex:1;min-width:0;margin-top:0}
+.mbar-closed .mfav-btn,.mbar-closed .msearch-btn{height:auto;min-width:46px}
+.mbar-closed .mfav-head{flex:1;min-width:0;margin-top:0}
+.msearch-btn svg{width:17px;height:17px}
+.msearch-btn:hover{color:var(--fg)}
 .mfav-head .link{font-size:13px;color:var(--fg-2);text-decoration:none}
 .msearch > svg{position:absolute;left:12px;color:var(--fg-3);pointer-events:none}
 .msearch input{width:100%;height:40px;padding:0 36px 0 36px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);outline:none;-webkit-appearance:none;appearance:none}
@@ -418,8 +424,8 @@ html .ne-body.ne-body:focus,html .ne-body.ne-body:focus-visible{outline:none;box
 .ne-body img.reveal{animation:t-reveal 420ms var(--t-ease) both}
 @keyframes t-reveal{from{opacity:0;filter:blur(8px)}}
 /* 押した感触：押している間は少し沈み、離すと（描き直されても）ぽんと戻る */
-.btn,.tm-ic,.mstar,.mfav-btn,.check,.mode,.seg button,.mtabs button,.tm-presets button,.nav button .gi,.iconbtn,.icon-btn,.night-btn,.nfab,.gmore,.gplus,.chip,.pill[data-act]{transition:transform 120ms var(--t-ease),background-color 160ms var(--t-ease),border-color 160ms var(--t-ease),color 160ms var(--t-ease),opacity 160ms var(--t-ease)}
-.btn:active,.tm-ic:active,.mstar:active,.mfav-btn:active,.check:active,.mode:active,.seg button:active,.mtabs button:active,.tm-presets button:active,.iconbtn:active,.icon-btn:active,.night-btn:active,.nfab:active,.gmore:active,.gplus:active{transform:scale(.94);transition-duration:60ms}
+.btn,.tm-ic,.mstar,.mfav-btn,.msearch-btn,.check,.mode,.seg button,.mtabs button,.tm-presets button,.nav button .gi,.iconbtn,.icon-btn,.night-btn,.nfab,.gmore,.gplus,.chip,.pill[data-act]{transition:transform 120ms var(--t-ease),background-color 160ms var(--t-ease),border-color 160ms var(--t-ease),color 160ms var(--t-ease),opacity 160ms var(--t-ease)}
+.btn:active,.tm-ic:active,.mstar:active,.mfav-btn:active,.msearch-btn:active,.check:active,.mode:active,.seg button:active,.mtabs button:active,.tm-presets button:active,.iconbtn:active,.icon-btn:active,.night-btn:active,.nfab:active,.gmore:active,.gplus:active{transform:scale(.94);transition-duration:60ms}
 .nav button:active .gi{transform:scale(.9)}
 .tapped{animation:t-tap 280ms var(--t-spring)}
 @keyframes t-tap{from{transform:scale(.94)}}
