@@ -96,17 +96,16 @@ function goalsSection() {
     const input = canAdd && open ? `<div class="row gadd"><input class="field grow" id="goal-${scope}" data-draft placeholder="${ph}" value="${esc(draft('goal-' + scope))}" data-enter="goalAdd" data-arg="${scope}" aria-label="${ph}"><button class="btn ghost sm" data-act="goalAdd" data-arg="${scope}">置く</button></div>` : '';
     return `<div class="gblock"><div class="gk"><span>${label}</span><span class="row" style="gap:6px">${extra}${plus}</span></div>${list.map(goalRow).join('') || (open ? '' : '<div class="faint gempty">まだない</div>')}${input}</div>`;
   };
-  // 自分との約束（編集のとき）：名前・ふつう・最低ラインを直す・消す・足す（3つまで）と、まだの約束のお知らせ
+  // 自分との約束（編集のとき）：名前・半分地点を直す・消す・足す（3つまで）と、まだの約束のお知らせ
   const prEditor = p => `<div class="habit-ed" role="group" aria-label="${p ? '約束を直す' : '約束を足す'}">
-      <label class="hb-l">名前<input class="field" id="pr-title" maxlength="30" placeholder="例：外に出る" value="${esc(p ? p.title : '')}" data-enter="promiseSave" data-arg="${p ? esc(p.id) : ''}"></label>
-      <label class="hb-l">ふつう<input class="field" id="pr-full" maxlength="60" placeholder="例：いつものコースを歩く" value="${esc(p ? p.full : '')}" data-enter="promiseSave" data-arg="${p ? esc(p.id) : ''}"></label>
-      <label class="hb-l">最低ライン<input class="field" id="pr-min" maxlength="60" placeholder="しんどい日でもできる形（例：玄関の外で空を見る）" value="${esc(p ? p.min : '')}" data-enter="promiseSave" data-arg="${p ? esc(p.id) : ''}"></label>
+      <label class="hb-l">名前<input class="field" id="pr-title" maxlength="20" placeholder="例：外に出る" value="${esc(p ? p.title : '')}" data-enter="promiseSave" data-arg="${p ? esc(p.id) : ''}"></label>
+      <label class="hb-l">半分<input class="field" id="pr-min" maxlength="20" placeholder="しんどい日はここまで（例：すこし）" value="${esc(p ? p.min : '')}" data-enter="promiseSave" data-arg="${p ? esc(p.id) : ''}"></label>
       <div class="row hb-btns">${p ? `<button class="link danger" data-act="promiseDel" data-arg="${esc(p.id)}">この約束を消す</button>` : ''}<span class="spacer"></span><button class="btn ghost sm" data-act="promiseEdit" data-arg="">やめる</button><button class="btn primary sm" data-act="promiseSave" data-arg="${p ? esc(p.id) : ''}">${p ? '保存' : '足す'}</button></div></div>`;
   const pl = promiseList();
   let promise = pl.map((p, i) => {
     if (S.promiseEdit === p.id) return prEditor(p);
     const lv = promiseLv(day, p.id);
-    return `<div class="goal habit yk-row ${lv || ''}"><button class="check gold yk-ck ${lv ? 'on' : ''}" data-act="promiseTap" data-arg="${esc(p.id)}" aria-pressed="${!!lv}" aria-label="${esc(p.title)}：${promiseLvText(lv)}（タップで変える）">${promiseDot(lv)}</button><div class="title">${PROMISE_NUM[i]} ${esc(p.title)}<span class="yk-sub">ふつう：${esc(p.full)}<br>最低ライン：${esc(p.min)}</span><span class="hb-n">今月 ${prDays(p.id)} 日</span></div><button class="link hb-edit" data-act="promiseEdit" data-arg="${esc(p.id)}" aria-label="${esc(p.title)}を直す">直す</button></div>`;
+    return `<div class="goal habit yk-row ${lv || ''}"><button class="check gold yk-ck ${lv ? 'on' : ''}" data-act="promiseTap" data-arg="${esc(p.id)}" aria-pressed="${!!lv}" aria-label="${esc(p.title)}：${promiseLvText(lv)}（タップで変える）">${promiseDot(lv)}</button><div class="title">${PROMISE_NUM[i]} ${esc(p.title)}<span class="faint">（${esc(p.min)}）</span><span class="hb-n">今月 ${prDays(p.id)} 日</span></div><button class="link hb-edit" data-act="promiseEdit" data-arg="${esc(p.id)}" aria-label="${esc(p.title)}を直す">直す</button></div>`;
   }).join('') || (S.promiseEdit === 'new' ? '' : '<div class="faint gempty">まだない</div>');
   if (S.promiseEdit === 'new') promise += prEditor(null);
   const pon = S.settings.promiseNotify !== false;
@@ -115,7 +114,7 @@ function goalsSection() {
   if (!S.goalEdit) {
     // ふだんは眺めるだけのコンパクト表示。操作は「編集」ひとつ
     const line = list => list.length ? list.map(g => `<span class="gc-g ${g.status === 'done' ? 'done' : ''}"><i aria-hidden="true">${g.status === 'done' ? '✦' : '✧'}</i>${esc(g.title)}</span>`).join('') : '<span class="faint">まだない</span>';
-    const prs = !pl.length ? '<span class="faint">まだない</span>' : pl.map(p => { const lv = promiseLv(day, p.id); return `<span class="gc-g ${lv ? 'done' : ''}">${promiseDot(lv)}${esc(p.title)}${lv ? `（${promiseLvText(lv)}）` : ''}</span>`; }).join('');
+    const prs = !pl.length ? '<span class="faint">まだない</span>' : pl.map(p => { const lv = promiseLv(day, p.id); return `<span class="gc-g ${lv ? 'done' : ''}">${promiseDot(lv)}${esc(promiseName(p, lv))}</span>`; }).join('');
     return `<section class="card goals compact" aria-label="目標"><div class="gc-head"><span class="goals-title">目標</span><button class="gedit" data-act="goalEdit">編集</button></div>
       <div class="gc-row"><span class="gc-k">${Number(mk.slice(5))}月</span><div class="gc-v">${line(month)}</div></div>
       <div class="gc-row"><span class="gc-k">今週</span><div class="gc-v">${line(week)}</div></div>
@@ -124,7 +123,7 @@ function goalsSection() {
   return `<section class="card goals" aria-label="目標"><div class="gc-head"><span class="goals-title">目標</span><button class="gedit on" data-act="goalEdit">閉じる</button></div><div class="goals-sub" style="margin-bottom:4px">こなすものではなく、心に置いておく言葉</div>
     ${block(`${Number(mk.slice(5))}月の目標`, month, 'month', month.length < 3, '今月、大事にしたいこと（3つまで）', month.length ? `${month.length}/3` : '')}
     ${block('今週の目標', week, 'week', true, '今週、大事にしたいこと')}
-    <div class="gblock"><div class="gk"><span>自分との約束</span><span class="row" style="gap:6px">${pl.length ? `<span class="faint">${pl.length}/${PROMISE_MAX}</span>` : ''}${pl.length < PROMISE_MAX && !S.promiseEdit ? '<button class="gplus" data-act="promiseEdit" data-arg="new" aria-label="約束を足す">＋</button>' : ''}</span></div>${promise}<div class="faint hb-note">タップ1回で最低ライン、2回でふつう。どちらでも守れたことになる。</div>${notify}</div>
+    <div class="gblock"><div class="gk"><span>自分との約束</span><span class="row" style="gap:6px">${pl.length ? `<span class="faint">${pl.length}/${PROMISE_MAX}</span>` : ''}${pl.length < PROMISE_MAX && !S.promiseEdit ? '<button class="gplus" data-act="promiseEdit" data-arg="new" aria-label="約束を足す">＋</button>' : ''}</span></div>${promise}<div class="faint hb-note">タップ1回で半分、2回でふつう。どちらでも守れたことになる。</div>${notify}</div>
     ${past.length ? `<details class="fold"><summary>前の目標（${past.length}）</summary>${past.map(g => `<div class="goal ${g.status === 'done' ? 'done' : ''}"><span class="pill">${g.scope === 'month' ? g.period.replace('-', '年') + '月' : shortLabel(g.period) + '〜の週'}</span><div class="title">${esc(g.title)}</div>${g.status === 'done' ? '<span class="pill gold">叶った</span>' : ''}</div>`).join('')}</details>` : ''}
   </section>`;
 }
@@ -299,11 +298,11 @@ A.goalEdit = () => { S.goalEdit = !S.goalEdit; S.goalMenu = null; S.goalAddOpen 
 A.promiseEdit = id => { S.promiseEdit = id || null; render(); if (id) setTimeout(() => { const el = $('#pr-title'); if (el) el.focus(); }, 30); };
 A.promiseSave = id => {
   const v = k => String(($('#' + k) || {}).value || '').trim();
-  const title = v('pr-title'), full = v('pr-full'), min = v('pr-min');
+  const title = v('pr-title'), min = v('pr-min');
   if (!title) { toast('名前を入れてね。'); return; }
   const list = promiseList().map(p => ({ ...p }));
-  if (id) { const p = list.find(x => x.id === id); if (!p) return; Object.assign(p, { title, full: full || title, min: min || full || title }); }
-  else { if (list.length >= PROMISE_MAX) return; list.push({ id: 'p' + Date.now().toString(36), title, full: full || title, min: min || full || title }); }
+  if (id) { const p = list.find(x => x.id === id); if (!p) return; Object.assign(p, { title, full: title, min: min || title }); }
+  else { if (list.length >= PROMISE_MAX) return; list.push({ id: 'p' + Date.now().toString(36), title, full: title, min: min || title }); }
   S.promiseEdit = null; patchSettings({ promises: list }); toast(id ? '約束を直した。' : '約束を足した。');
 };
 A.promiseDel = id => {

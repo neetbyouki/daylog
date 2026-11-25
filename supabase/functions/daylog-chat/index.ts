@@ -45,10 +45,10 @@ async function col(uid: string, c: string, range?: { from?: string; to?: string 
 }
 const one = async (uid: string, c: string, id: string) => { const { data } = await admin.from("docs").select("data").eq("user_id", uid).eq("collection", c).eq("id", id).maybeSingle(); return data?.data || null; };
 
-// ── 自分との約束（settings.promises。なければ最初の3つ）。days の promises[id] = 'min'（最低ライン）|'full'（ふつう）
-const DEFAULT_PROMISES = [{ id: "p1", title: "服を着替える", full: "起きたら着替える", min: "上だけでも替える" }, { id: "p2", title: "外に出る", full: "いつものコースを歩く（気になったら写真1枚）", min: "玄関の外で空を見る" }, { id: "p3", title: "アニメを1話ちゃんと見る", full: "スマホを置いて最後まで", min: "半分まででもOK" }];
+// ── 自分との約束（settings.promises。なければ最初の3つ）。days の promises[id] = 'min'（半分）|'full'（ふつう）
+const DEFAULT_PROMISES = [{ id: "p1", title: "着替える", full: "着替える", min: "上だけ" }, { id: "p2", title: "外に出る", full: "外に出る", min: "すこし" }, { id: "p3", title: "アニメ見る", full: "アニメ見る", min: "半分" }];
 const promiseList = (settings: any) => (Array.isArray(settings?.promises) ? settings.promises.slice(0, 3) : DEFAULT_PROMISES);
-const promiseView = (day: any, plist: any[]) => plist.map((p: any) => { const v = day?.promises?.[p.id]; return { promise: p.title, kept: v === "full" ? "ふつう" : v === "min" ? "最低ライン" : "まだ", at: v ? hm(day.promises[p.id + "At"]) || undefined : undefined }; });
+const promiseView = (day: any, plist: any[]) => plist.map((p: any) => { const v = day?.promises?.[p.id]; return { promise: p.title, half: p.min, kept: v === "full" ? "ふつう" : v === "min" ? `半分（${p.min}）` : "まだ", at: v ? hm(day.promises[p.id + "At"]) || undefined : undefined }; });
 
 // ── 1日分を読みやすい形に
 function dayView(date: string, day: any, pc: any, plist: any[] = DEFAULT_PROMISES) {
@@ -73,7 +73,7 @@ function dayView(date: string, day: any, pc: any, plist: any[] = DEFAULT_PROMISE
 }
 
 const TOOLS = [
-  { name: "get_days", description: "Daylog の日ごとの記録を読む（1日は朝6時から翌朝6時まで）。体調モード・起きた/寝た時刻・就寝の目安・夜モード・自分との約束（守れたか：ふつう／最低ライン／まだ）・日記の記録（時刻・本文・気分/体調1〜5）・予定・ゲームをした時間帯・昼寝の候補。一度に31日まで。", input_schema: { type: "object", properties: { from: { type: "string", description: "YYYY-MM-DD" }, to: { type: "string", description: "YYYY-MM-DD（省くと from と同じ日）" } }, required: ["from"] } },
+  { name: "get_days", description: "Daylog の日ごとの記録を読む（1日は朝6時から翌朝6時まで）。体調モード・起きた/寝た時刻・就寝の目安・夜モード・自分との約束（守れたか：ふつう／半分（しんどい日はここまでで守れた）／まだ）・日記の記録（時刻・本文・気分/体調1〜5）・予定・ゲームをした時間帯・昼寝の候補。一度に31日まで。", input_schema: { type: "object", properties: { from: { type: "string", description: "YYYY-MM-DD" }, to: { type: "string", description: "YYYY-MM-DD（省くと from と同じ日）" } }, required: ["from"] } },
   { name: "get_tasks", description: "タスクを読む。status は open（やること）/ held（保留箱）/ done（終わった・60日以内）/ all。", input_schema: { type: "object", properties: { status: { type: "string", enum: ["open", "held", "done", "all"] } } } },
   { name: "get_goals", description: "今月・今週の目標と、その状態を読む。", input_schema: { type: "object", properties: {} } },
   { name: "get_memos", description: "ひとことメモと、ノート（題と本文の頭）を新しい順に読む。", input_schema: { type: "object", properties: { limit: { type: "integer", description: "それぞれ何件まで（ふつう20、最大60）" } } } },

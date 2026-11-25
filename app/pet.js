@@ -50,7 +50,7 @@ const petSoft = d => ['bad', 'rest'].includes(getDay(d).mode);
 function petDoneByDay() { const m = {}; for (const t of Object.values(S.tasks)) if (t.status === 'done' && t.doneAt) (m[logicalDate(t.doneAt)] ||= []).push(t); return m; }
 // その日のごはん（ほし）を3種類に分けて数える。あとから数え直すので、端末が2つあっても二重にならない
 //  おにく：終えたタスク（軽2・ふつう4・重6）、タイマーの記録（⏱、1つ2・5つまで）
-//  やさい：記録・日記（1つ2・5つまで）、夜モード（5）、自分との約束（最低ライン2・ふつう3）、前の習慣の記録（1つ3）
+//  やさい：記録・日記（1つ2・5つまで）、夜モード（5）、自分との約束（半分2・ふつう3）、前の習慣の記録（1つ3）
 //  おやつ：早起き（10時までに起きた5／12時まで3）、早寝（就寝の目安までに寝た4）
 function petEarned(d, doneBy) {
   const day = getDay(d); const ents = day.entries || [];
@@ -205,7 +205,7 @@ function petLines(st) {
     if (doneN) out.push(`今日は${doneN}こ終わったね。ほしがふってきた。`);
     const pk = promisesKept(t).length, pn = promiseList().length;
     if (pn && pk === pn) out.unshift('今日の約束、ぜんぶ守れたね。ぼく、ちょっと誇らしい。', `約束の星が${pn}つそろった。きれい。`);
-    else if (pk) out.push(`約束、${pk}つ守れてる。最低ラインでも、ちゃんと守れたうち。`);
+    else if (pk) out.push(`約束、${pk}つ守れてる。半分でも、ちゃんと守れたうち。`);
     if (ents.length) out.push(`今日は${ents.length}回書いたね。ぜんぶ星になってる。`);
     else out.push('今日はまだ静か。それもいい。');
     out.push('ここにいるよ。', `今夜は${moonName(moonAge(new Date()))}。`, '星がきれいだね。');

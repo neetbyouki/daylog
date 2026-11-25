@@ -41,7 +41,7 @@ function reviewSection() {
     <div class="row"><div class="seg" role="group" aria-label="期間"><button data-act="revKind" data-arg="week" aria-pressed="${r.kind === 'week'}">週</button><button data-act="revKind" data-arg="month" aria-pressed="${r.kind === 'month'}">月</button></div><span class="spacer"></span><button class="btn sm" data-act="revMove" data-arg="-1" aria-label="前の期間">‹</button><span class="revlabel">${label}</span><button class="btn sm" data-act="revMove" data-arg="1" aria-label="次の期間">›</button></div></div>`;
   h += `<div class="stats">${stat(wroteN, ` / ${past.length}日`, '書いた日')}${stat(nightN, '日', '夜モード')}${stat(taskN, '個', '終えたタスク')}${pl.length && prDays.length ? stat(prN, ` / ${prDays.length * pl.length}`, '守った約束') : ''}</div>`;
   h += colorCal(days);
-  h += moodChart(days) + sleepChart(days) + gameChart(days);
+  h += promiseChart(days) + moodChart(days) + sleepChart(days) + gameChart(days);
   const rv = S.reviews[reviewKey()];
   if (claudeReady()) h += `<div class="chart"><div class="ct"><span>Claudeの気づき</span></div>${S.busy.rev ? '<div class="thinking" style="margin:6px 0">記録を読んでいる</div>' : rv && rv.text ? `<div class="insight" style="margin-top:6px">${esc(rv.text)}</div>` : '<div class="faint" style="font-size:13px;margin-top:4px">この期間の記録から、傾向を3つ拾ってもらえる。</div>'}
     ${claudeReady() ? `<div class="row" style="margin:8px 0 6px"><button class="btn sm" data-act="revInsight" ${S.busy.rev ? 'disabled' : ''}>${rv && rv.text ? '作り直す' : '気づきを出してもらう'}</button></div>` : '<div class="faint" style="font-size:12px;margin:6px 0">Claudeが使えるときに出せる。</div>'}</div>`;
@@ -67,6 +67,27 @@ const chartW = () => (window.innerWidth < 560 ? 360 : 600);
 function xLabels(days, W, L, R) {
   const n = days.length; const step = n > 10 ? Math.ceil(n / (W < 500 ? 5 : 8)) : 1;
   return days.map((d, i) => i % step === 0 || i === n - 1 ? `<text x="${L + (n === 1 ? (W - L - R) / 2 : i * (W - L - R) / (n - 1))}" y="${0}" text-anchor="middle">${shortLabel(d)}</text>` : '').join('');
+}
+// 約束を守れた割合（日ごと。半分でもふつうでも守れたうち）。点線は目安の9割。約束を始める前の日と先の日は空ける
+function promiseChart(days) {
+  const pl = promiseList(); if (!pl.length) return '';
+  const t = today(); const from = Object.keys(S.days).filter(x => S.days[x] && S.days[x].promises).sort()[0];
+  const W = chartW(), H = 170, L = 40, R = 30, T = 10, B = 24; const n = days.length;
+  const x = i => L + (n === 1 ? (W - L - R) / 2 : i * (W - L - R) / (n - 1)); const y = v => T + (100 - v) / 100 * (H - T - B);
+  const pts = days.map((d, i) => { if (!from || d < from || d > t) return null; const k = promisesKept(d); return { d, i, k: k.length, full: k.filter(p => p.lv === 'full').length, v: Math.round(k.length / pl.length * 100) }; });
+  const ok = pts.filter(Boolean); const sumK = ok.reduce((a, p) => a + p.k, 0), all = ok.length * pl.length;
+  let g = '';
+  for (const v of [0, 50, 100]) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 8}" y="${y(v) + 3}" text-anchor="end">${v}%</text>`;
+  g += `<line x1="${L}" x2="${W - R}" y1="${y(90)}" y2="${y(90)}" stroke="var(--gold)" stroke-opacity=".45" stroke-dasharray="4 4"/><text x="${W - R + 4}" y="${y(90) + 3}" style="fill:var(--fg-3)">9割</text>`;
+  let marks = ''; let seg = []; const segs = [];
+  pts.forEach(p => { if (p) seg.push(p); else if (seg.length) { segs.push(seg); seg = []; } }); if (seg.length) segs.push(seg);
+  segs.forEach(sg => { if (sg.length > 1) marks += `<polyline points="${sg.map(p => x(p.i) + ',' + y(p.v)).join(' ')}" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`; });
+  ok.forEach(p => { marks += `<circle cx="${x(p.i)}" cy="${y(p.v)}" r="4" fill="${p.d === t ? 'var(--panel)' : 'var(--gold)'}" stroke="${p.d === t ? 'var(--gold)' : 'var(--panel)'}" stroke-width="2"/>`; });
+  const hits = days.map((d, i) => { const p = pts[i]; const tip = p ? `${dayLabel(d)}\n守れた ${p.k}/${pl.length}（${p.v}%）${p.full ? `・うちふつう ${p.full}` : ''}${d === t ? '\n今日はまだ途中' : ''}` : `${dayLabel(d)}\n${d > t ? 'まだ先の日' : '約束を始める前'}`; return `<rect x="${x(i) - (W - L - R) / Math.max(1, n - 1) / 2}" y="${T}" width="${(W - L - R) / Math.max(1, n - 1)}" height="${H - T - B}" fill="transparent" data-tip="${esc(tip)}"/>`; }).join('');
+  const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="約束を守れた割合の推移">${g}${marks}<g transform="translate(0 ${H - 6})">${xLabels(days, W, L, R)}</g>${hits}</svg>`;
+  const rate = all ? Math.round(sumK / all * 100) : 0;
+  const note = all ? `この期間は ${rate}%（${sumK}/${all}）。半分でも守れたうち。点線は目安の9割。下が続くなら、約束を小さくする合図。` : '約束をチェックすると線になる。';
+  return chartFrame('約束を守れた割合', `<span><i style="--c:var(--gold)"></i>${all ? `この期間 ${rate}%` : '守れた割合'}</span>`, svg, note);
 }
 function moodChart(days) {
   const W = chartW(), H = 170, L = 26, R = 30, T = 10, B = 24; const n = days.length;

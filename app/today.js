@@ -95,19 +95,15 @@ function todayView() {
   h += `<div class="stack" style="margin-top:18px">${claudeCard(d)}</div>`;
   return h;
 }
-// 自分との約束：体調ボタンの下に3つ。タップ1回で最低ライン、2回でふつう、3回で戻す
-// 休養の日は最低ラインだけを出す（ふつうも押せる）。押すたびに、次に何をすればいいかを小さく出す
-function promiseHint(p, lv, mode) {
-  if (lv === 'full') return 'ふつうで守れた';
-  if (mode === 'rest') return lv === 'min' ? '守れた' : p.min;
-  return lv === 'min' ? `もう1回でふつう：${p.full}` : `最低ライン：${p.min}`;
-}
+// 自分との約束：体調ボタンの下に3つ。タップ1回で半分、2回でふつう、3回で戻す
+// 名前の下に（半分地点）だけを小さく出す。守れたかは円（半分・全部）で見せる
+function promiseHint(p) { return `（${p.min}）`; }
 function promiseBarHTML(d) {
   const day = getDay(d); const list = promiseList(); if (!list.length) return '';
   const kept = list.filter(p => promiseLv(day, p.id)).length;
   return `<section class="yk-bar${kept === list.length ? ' all' : ''}" aria-label="自分との約束（${kept}/${list.length}）">${list.map((p, i) => {
-    const lv = promiseLv(day, p.id); const hint = promiseHint(p, lv, day.mode);
-    return `<button class="yk-b ${lv || ''}${fxc('pr' + p.id)}" data-act="promiseTap" data-arg="${esc(p.id)}" aria-label="${esc(PROMISE_NUM[i] + ' ' + p.title)}：${promiseLvText(lv)}。${esc(hint)}"><span class="yk-top">${promiseDot(lv)}<span class="yk-t">${esc(p.title)}</span></span><span class="yk-h">${esc(hint)}</span></button>`;
+    const lv = promiseLv(day, p.id); const hint = promiseHint(p);
+    return `<button class="yk-b ${lv || ''}${fxc('pr' + p.id)}" data-act="promiseTap" data-arg="${esc(p.id)}" aria-label="${esc(PROMISE_NUM[i] + ' ' + p.title + hint)}：${promiseLvText(lv)}。タップ1回で半分、2回でふつう"><span class="yk-top">${promiseDot(lv)}<span class="yk-t">${esc(p.title)}</span></span><span class="yk-h">${esc(hint)}</span></button>`;
   }).join('')}</section>`;
 }
 // 終日の予定（Googleカレンダー）：日付のすぐ下に1行。色の線＋名前で、時刻の流れとは分けて置く
@@ -180,10 +176,10 @@ function entryBody(e, ro) {
   const open = S.openEntry === e.id;
   return `<button class="more" data-act="entryMenu" data-arg="${e.id}" aria-label="この記録の操作">⋯</button>${e.nap ? '<span class="nap" title="昼寝" aria-label="昼寝">💤</span>' : ''}${esc(e.text || '')}${(e.mood || e.body) ? `<div class="meta">${e.mood ? `<span title="気分 ${e.mood}" aria-label="気分 ${e.mood}">${dots(e.mood, 'var(--mood)')}</span>` : ''}${e.body ? `<span title="体調 ${e.body}" aria-label="体調 ${e.body}">${dots(e.body, 'var(--body)')}</span>` : ''}</div>` : ''}${open ? `<div class="row" style="margin-top:6px;white-space:normal"><button class="btn sm" data-act="entryEdit" data-arg="${e.id}">直す</button><button class="btn ghost sm" data-act="entryDelete" data-arg="${e.id}">消す</button><button class="btn ghost sm" data-act="entryMenu" data-arg="">閉じる</button></div>` : ''}`;
 }
-// 今日の流れの1行：記録か、守れた約束（約束は押した時刻に「◐ ② 外に出る（最低ライン）」）
+// 今日の流れの1行：記録か、守れた約束（約束は押した時刻に「◐ ② 外に出る（すこし）」）
 function itemBody(e, ro) {
   if (!e.pr) return entryBody(e, ro);
-  const p = e.p; return `<span class="yk-line ${p.lv}">${promiseDot(p.lv)}${esc(p.n)} ${esc(p.title)}<span class="faint">（${promiseLvText(p.lv)}）</span></span>`;
+  const p = e.p; return `<span class="yk-line ${p.lv}">${promiseDot(p.lv)}${esc(p.n)} ${esc(p.title)}${p.lv === 'min' ? `<span class="faint">（${esc(p.min)}）</span>` : ''}</span>`;
 }
 function entryEditor(e) {
   const sel = (k, label) => `<label class="faint" style="font-size:12px">${label} <select class="field" id="ee-${k}" data-draft style="padding:3px 6px">${['', 1, 2, 3, 4, 5].map(v => `<option value="${v}" ${String(draft('ee-' + k, e[k] || '')) === String(v) ? 'selected' : ''}>${v || '－'}</option>`).join('')}</select></label>`;
@@ -595,7 +591,7 @@ A.replan = async () => {
 A.dismissReplan = () => { const d = today(); patchDay(d, { replan: { ...(getDay(d).replan || {}), dismissed: true } }); };
 A.habitToggle = id => { if (!id) return; fx('habit' + id); const d = S.night ? S.night.date : today(); const day = getDay(d); const on = !habitDone(day, id); patchDay(d, { habits: { ...(day.habits || {}), [id]: on, [id + 'At']: on ? Date.now() : null } }); };
 A.bathToggle = () => A.habitToggle('bath');
-// 約束：まだ → 最低ライン → ふつう → まだ。最低ラインからふつうにしても、守れた時刻は最初のまま
+// 約束：まだ → 半分 → ふつう → まだ。半分からふつうにしても、守れた時刻は最初のまま
 A.promiseTap = id => {
   if (!id) return; const d = S.night ? S.night.date : today(); const day = getDay(d);
   const cur = promiseLv(day, id); const next = cur === null ? 'min' : cur === 'min' ? 'full' : null;

@@ -31,7 +31,7 @@ function sheetHTML() {
     return `<div class="sheet"><div class="card"><div class="eyebrow">${dayLabel(d)}</div><h3>今日の目標</h3>
       <div class="note" style="margin-top:8px"><span class="k">今月</span><div class="v">${list(mg)}</div></div>
       <div class="note" style="margin-top:8px"><span class="k">今週</span><div class="v">${list(wg)}</div></div>
-      <div class="note" style="margin-top:8px"><span class="k">約束</span><div class="v">${pl.length ? pl.map((p, i) => `<div>${PROMISE_NUM[i]} ${esc(p.title)}<span class="faint">（最低ライン：${esc(p.min)}）</span></div>`).join('') : '<span class="muted">まだ置いていない</span>'}</div></div>
+      <div class="note" style="margin-top:8px"><span class="k">約束</span><div class="v">${pl.length ? pl.map((p, i) => `<div>${PROMISE_NUM[i]} ${esc(p.title)}<span class="faint">（${esc(p.min)}）</span></div>`).join('') : '<span class="muted">まだ置いていない</span>'}</div></div>
       <div class="eyebrow" style="margin-top:14px">今日の体調は？（あとで変えられる）</div>${modeRow}
       <div class="row" style="margin-top:14px">${!mg.length ? '<button class="btn ghost" data-act="sheetGoGoals">目標を置く</button>' : ''}<span class="spacer"></span><button class="btn primary" data-act="closeSheet">閉じる</button></div></div></div>`;
   }
@@ -62,7 +62,7 @@ function nightHTML() {
     const row = g => `<div class="goal concept ${g.status === 'done' ? 'done' : ''}"><span class="gmark" aria-hidden="true">${g.status === 'done' ? '✦' : '·'}</span><div class="title">${esc(g.title)}</div><span class="pill">${g.scope === 'month' ? '今月' : '今週'}</span></div>`;
     body = `<div class="faint" style="font-size:12px;margin-bottom:6px">今日を振り返りながら、眺めるだけでいい。</div><div class="card">${[...mg, ...wg].map(row).join('') || '<div class="faint" style="font-size:13px">今月・今週の目標はまだない。タスクの画面の上から置ける。</div>'}</div>
       <div class="eyebrow" style="margin-top:14px">今日の約束</div>
-      ${pl.length ? pl.map((p, i) => { const lv = promiseLv(day, p.id); return `<button class="bigcheck yk-check ${lv || ''}" data-act="promiseTap" data-arg="${esc(p.id)}" aria-pressed="${!!lv}" style="margin-top:6px"><span class="box" aria-hidden="true">${promiseDot(lv)}</span><span>${PROMISE_NUM[i]} ${esc(p.title)}<span class="faint yk-st">${lv ? promiseLvText(lv) : 'タップで最低ライン・もう1回でふつう'}</span></span></button>`; }).join('')
+      ${pl.length ? pl.map((p, i) => { const lv = promiseLv(day, p.id); return `<button class="bigcheck yk-check ${lv || ''}" data-act="promiseTap" data-arg="${esc(p.id)}" aria-pressed="${!!lv}" style="margin-top:6px"><span class="box" aria-hidden="true">${promiseDot(lv)}</span><span>${PROMISE_NUM[i]} ${esc(p.title)}<span class="faint yk-st">（${esc(p.min)}）</span></span></button>`; }).join('')
         + `<div class="faint" style="font-size:12px;margin-top:8px">${pl.every(p => promiseLv(day, p.id)) ? 'ぜんぶ守れた日。' : '守れなかった約束は、そのままでいい。明日また。'}</div>` : '<div class="muted" style="font-size:14px;margin-top:6px">約束はまだ置いていない。タスクの画面の「目標 → 編集」から置ける。</div>'}`;
     foot = `${back}<span class="spacer"></span><button class="btn primary" data-act="nightNext">次へ</button>`;
   } else if (n.step === 2) {
@@ -228,7 +228,7 @@ async function nightComment(manual) {
   const doneT = Object.values(S.tasks).filter(t => t.status === 'done' && t.doneAt && logicalDate(t.doneAt) === d).map(t => t.title).join(' / ') || 'なし';
   try {
     const r = await askJSON(`今日の締めに一言返して。2〜3文、90字以内。いいところがあれば具体的に拾う。落ち込んでいる日は、そのままでいいと伝える。\nそれと、今日の星座に、ファンタジーの物語や古い神話に出てきそうな名前を付けて。今日の出来事をそのまま書かず、魔法・伝承・遠い国の言葉に置き換える（雰囲気の例：建築をした日→石積みの竪琴座、寝坊した日→眠れる時計塔座、ゲームの日→銀の弓の狩人座。例そのものは使わない）。「〇〇座」の形で、座を含めて14字以内。ゆるさや冗談は入れず、少しだけ物語の匂いがする響きにする。\n` +
-      `データ:\n- 体調モード: ${day.mode ? MODES[day.mode].label : '未設定'}\n- 気分 ${n.mood || '-'} / 体調 ${n.body || '-'}（5段階）\n- 締めのメモ: ${n.text || 'なし'}\n- 今日の記録:\n${entriesText(d)}\n- 終えたタスク: ${doneT}\n- 自分との約束: ${promiseList().map(p => `${p.title}（${promiseLvText(promiseLv(day, p.id))}）`).join(' / ') || 'なし'}\n` +
+      `データ:\n- 体調モード: ${day.mode ? MODES[day.mode].label : '未設定'}\n- 気分 ${n.mood || '-'} / 体調 ${n.body || '-'}（5段階）\n- 締めのメモ: ${n.text || 'なし'}\n- 今日の記録:\n${entriesText(d)}\n- 終えたタスク: ${doneT}\n- 自分との約束（半分＝しんどい日はここまででいい形）: ${promiseList().map(p => `${p.title}：${promiseLvText(promiseLv(day, p.id))}`).join(' / ') || 'なし'}\n` +
       `JSONだけで返して: {"comment":"...","name":"〇〇座"}`, 'default', manual ? false : undefined);
     n.comment = String((r && r.comment) || '').slice(0, 200); n.name = String((r && r.name) || '').slice(0, 24);
     await patchDay(d, { close: { ...(getDay(d).close || {}), comment: n.comment, name: n.name } });

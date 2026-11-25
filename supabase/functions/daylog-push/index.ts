@@ -32,7 +32,7 @@ const logicalDate = (t: number) => ymd(jst(t - 6 * H));
 const hm = (t: number) => { const d = jst(t); return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; };
 // 論理日 d の "HH:MM"（0〜6時は次の日の深夜）
 const slot = (d: string, t: string) => { const [h, m] = t.split(":").map(Number); const base = Date.parse(d + "T00:00:00+09:00"); return base + ((h < 6 ? 24 : 0) + h) * H + m * M; };
-const DEFAULT_PROMISES = [{ id: "p1", title: "服を着替える", min: "上だけでも替える" }, { id: "p2", title: "外に出る", min: "玄関の外で空を見る" }, { id: "p3", title: "アニメを1話ちゃんと見る", min: "半分まででもOK" }];
+const DEFAULT_PROMISES = [{ id: "p1", title: "着替える", min: "上だけ" }, { id: "p2", title: "外に出る", min: "すこし" }, { id: "p3", title: "アニメ見る", min: "半分" }];
 const EVENT_BEFORE = 15, BED_BEFORE = 45, LATE_OK = 10; // 分。少し遅れても10分以内なら送る
 
 // ── Google のアクセストークン
@@ -152,7 +152,7 @@ async function runFor(uid: string, now: number, dry: boolean) {
     }
   }
   // 自分との約束：決めた時刻（settings.promiseAt、なければ18:00）に、まだの約束があれば1回だけ
-  // 休養の日・お知らせオフ（settings.promiseNotify === false）は出さない。最低ラインを添える
+  // 休養の日・お知らせオフ（settings.promiseNotify === false）は出さない。（半分地点）を添える
   const plist: any[] = Array.isArray(settings.promises) ? settings.promises.slice(0, 3) : DEFAULT_PROMISES;
   if (settings.promiseNotify !== false && day.mode !== "rest" && plist.length) {
     const pt = /^\d{2}:\d{2}$/.test(settings.promiseAt || "") ? settings.promiseAt : "18:00";
@@ -160,7 +160,7 @@ async function runFor(uid: string, now: number, dry: boolean) {
     if (now >= at && now < at + LATE_OK * M) {
       const left = plist.filter((p: any) => !(day.promises && (day.promises[p.id] === "min" || day.promises[p.id] === "full")));
       if (left.length) {
-        const msg = { title: left.length === plist.length ? "今日の約束" : `まだの約束（${left.length}つ）`, body: left.map((p: any) => `${p.title}（最低ライン：${p.min || p.title}）`).join("\n"), tag: `pr-${d}`, url: "./" };
+        const msg = { title: left.length === plist.length ? "今日の約束" : `まだの約束（${left.length}つ）`, body: left.map((p: any) => p.min && p.min !== p.title ? `${p.title}（${p.min}）` : p.title).join("\n"), tag: `pr-${d}`, url: "./" };
         out.push(msg);
         if (!dry && await once(uid, `pr:${d}`)) await sendTo(uid, msg);
       }

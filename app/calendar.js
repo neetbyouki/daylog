@@ -182,7 +182,7 @@ function moDayHTML(d) {
   const hb = habitList().filter(x => habitDone(day, x.id)).map(x => x.title); // 約束の前の習慣（前の日の記録）
   if (hb.length) chips.push(`<span class="md-chip" style="--c:var(--gold)">✓ ${esc(hb.join('・'))}</span>`);
   const pk = promisesKept(d);
-  if (pk.length) chips.push(`<span class="md-chip" style="--c:var(--gold)" data-tip="${esc(pk.map(p => `${p.n} ${p.title}（${promiseLvText(p.lv)}）`).join('\n'))}">約束 ${pk.map(p => promiseDot(p.lv)).join('')} ${pk.length}/${promiseList().length}</span>`);
+  if (pk.length) chips.push(`<span class="md-chip" style="--c:var(--gold)" data-tip="${esc(pk.map(p => `${p.n} ${promiseName(p, p.lv)}`).join('\n'))}">約束 ${pk.map(p => promiseDot(p.lv)).join('')} ${pk.length}/${promiseList().length}</span>`);
   const when = d === t ? '今日' : d < t ? `${diffDays(d, t)}日前` : `${diffDays(t, d)}日後`;
   return `<section class="mo-day" id="mo-day" aria-label="${dayLabel(d)}の流れ">
     <div class="row md-head"><b>${dayLabel(d)}</b><span class="faint md-when">${when}</span><span class="spacer"></span><button class="btn sm" data-act="calWeekOf" data-arg="${d}">この週を見る</button><button class="btn sm primary" data-act="calNew" data-arg="${d}">＋ 予定</button></div>
