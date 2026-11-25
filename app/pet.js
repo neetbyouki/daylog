@@ -50,14 +50,15 @@ const petSoft = d => ['bad', 'rest'].includes(getDay(d).mode);
 function petDoneByDay() { const m = {}; for (const t of Object.values(S.tasks)) if (t.status === 'done' && t.doneAt) (m[logicalDate(t.doneAt)] ||= []).push(t); return m; }
 // その日のごはん（ほし）を3種類に分けて数える。あとから数え直すので、端末が2つあっても二重にならない
 //  おにく：終えたタスク（軽2・ふつう4・重6）、タイマーの記録（⏱、1つ2・5つまで）
-//  やさい：記録・日記（1つ2・5つまで）、夜モード（5）、習慣（1つ3）
+//  やさい：記録・日記（1つ2・5つまで）、夜モード（5）、自分との約束（最低ライン2・ふつう3）、前の習慣の記録（1つ3）
 //  おやつ：早起き（10時までに起きた5／12時まで3）、早寝（就寝の目安までに寝た4）
 function petEarned(d, doneBy) {
   const day = getDay(d); const ents = day.entries || [];
   const timer = ents.filter(e => /^⏱/.test(e.text || '')).length, diary = ents.length - timer;
   let meat = Math.min(5, timer) * 2, veg = Math.min(5, diary) * 2, snack = 0;
   for (const t of (doneBy[d] || [])) meat += ({ light: 2, mid: 4, heavy: 6 })[t.weight] || 3;
-  for (const h of habitList()) if (habitDone(day, h.id)) veg += 3;
+  for (const h of habitList()) if (habitDone(day, h.id)) veg += 3; // 約束の前の習慣（前の日の記録）
+  for (const p of promisesKept(d)) veg += p.lv === 'full' ? 3 : 2;
   if (closedAt(d)) veg += 5;
   const w = wakeAt(d); if (w) { const h = (w - dayStart(d).getTime()) / 36e5; snack += h <= 4 ? 5 : h <= 6 ? 3 : 0; }
   const slept = closedAt(d) || getDay(d).sleepAt; const target = petBedTarget(d);
@@ -202,6 +203,9 @@ function petLines(st) {
     if (st.sleepH != null) out.push(st.sleepH >= 7 ? `${fmtMin(st.sleepH * 60)}ねむれたね。ぼくも元気。` : st.sleepH < 5 ? `${fmtMin(st.sleepH * 60)}だったね。ゆっくりでいいよ。` : `おはよ。${fmtMin(st.sleepH * 60)}ねむれたね。`);
     const doneN = Object.values(S.tasks).filter(k => k.status === 'done' && k.doneAt && logicalDate(k.doneAt) === t).length;
     if (doneN) out.push(`今日は${doneN}こ終わったね。ほしがふってきた。`);
+    const pk = promisesKept(t).length, pn = promiseList().length;
+    if (pn && pk === pn) out.unshift('今日の約束、ぜんぶ守れたね。ぼく、ちょっと誇らしい。', `約束の星が${pn}つそろった。きれい。`);
+    else if (pk) out.push(`約束、${pk}つ守れてる。最低ラインでも、ちゃんと守れたうち。`);
     if (ents.length) out.push(`今日は${ents.length}回書いたね。ぜんぶ星になってる。`);
     else out.push('今日はまだ静か。それもいい。');
     out.push('ここにいるよ。', `今夜は${moonName(moonAge(new Date()))}。`, '星がきれいだね。');

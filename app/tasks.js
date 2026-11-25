@@ -89,42 +89,42 @@ function goalsSection() {
   const d = today(); const mk = monthKey(d), wk = weekStart(d);
   const month = activeGoals('month', mk), week = activeGoals('week', wk);
   const day = getDay(d);
-  const habitDays = id => Object.keys(S.days).filter(x => x.startsWith(mk) && habitDone(S.days[x], id)).length;
+  const prDays = id => Object.keys(S.days).filter(x => x.startsWith(mk) && promiseLv(S.days[x], id)).length;
   const block = (label, list, scope, canAdd, ph, extra = '') => {
     const open = S.goalAddOpen === scope;
     const plus = canAdd ? `<button class="gplus" data-act="goalAddOpen" data-arg="${scope}" aria-expanded="${open}" aria-label="${ph}">${open ? '×' : '＋'}</button>` : '';
     const input = canAdd && open ? `<div class="row gadd"><input class="field grow" id="goal-${scope}" data-draft placeholder="${ph}" value="${esc(draft('goal-' + scope))}" data-enter="goalAdd" data-arg="${scope}" aria-label="${ph}"><button class="btn ghost sm" data-act="goalAdd" data-arg="${scope}">置く</button></div>` : '';
     return `<div class="gblock"><div class="gk"><span>${label}</span><span class="row" style="gap:6px">${extra}${plus}</span></div>${list.map(goalRow).join('') || (open ? '' : '<div class="faint gempty">まだない</div>')}${input}</div>`;
   };
-  // 毎日の習慣（編集のとき）：今日のチェック・直す・消す・足す
-  const habitEditor = h => `<div class="habit-ed" role="group" aria-label="${h ? '習慣を直す' : '習慣を足す'}">
-      <label class="hb-l">ふだん<input class="field" id="hb-title" maxlength="60" placeholder="例：お風呂：19時30分までに湯船に浸かる" value="${esc(h ? h.title : '')}" data-enter="habitSave" data-arg="${h ? esc(h.id) : ''}"></label>
-      <label class="hb-l">不調の日<input class="field" id="hb-bad" maxlength="60" placeholder="空ならふだんと同じ（例：シャワーだけでいい）" value="${esc(h && h.bad ? h.bad : '')}" data-enter="habitSave" data-arg="${h ? esc(h.id) : ''}"></label>
-      <label class="hb-c"><input type="checkbox" id="hb-rest" ${h && h.rest ? 'checked' : ''}>休養の日もやる</label>
-      <div class="row hb-btns">${h ? `<button class="link danger" data-act="habitDel" data-arg="${esc(h.id)}">この習慣を消す</button>` : ''}<span class="spacer"></span><button class="btn ghost sm" data-act="habitEdit" data-arg="">やめる</button><button class="btn primary sm" data-act="habitSave" data-arg="${h ? esc(h.id) : ''}">${h ? '保存' : '足す'}</button></div></div>`;
-  const hl = habitList();
-  let habit = hl.map(h => {
-    if (S.habitEdit === h.id) return habitEditor(h);
-    const tx = habitFor(h, day.mode); const done = habitDone(day, h.id);
-    const chk = tx ? `<button class="check gold ${done ? 'on' + fxc('habit' + h.id) : ''}" data-act="habitToggle" data-arg="${esc(h.id)}" aria-pressed="${done}" aria-label="${esc(habitShort(h.title))}を今日やった">${done ? CHECK : ''}</button>` : '<span class="check gold off" aria-hidden="true"></span>';
-    return `<div class="goal habit ${tx ? '' : 'resting'}">${chk}<div class="title">${esc(tx || h.title)}${!tx ? '<span class="faint">（休養の日はお休み）</span>' : ''}<span class="hb-n">今月 ${habitDays(h.id)} 日</span></div><button class="link hb-edit" data-act="habitEdit" data-arg="${esc(h.id)}" aria-label="${esc(habitShort(h.title))}を直す">直す</button></div>`;
-  }).join('') || (S.habitEdit === 'new' ? '' : '<div class="faint gempty">まだない</div>');
-  if (S.habitEdit === 'new') habit += habitEditor(null);
+  // 自分との約束（編集のとき）：名前・ふつう・最低ラインを直す・消す・足す（3つまで）と、まだの約束のお知らせ
+  const prEditor = p => `<div class="habit-ed" role="group" aria-label="${p ? '約束を直す' : '約束を足す'}">
+      <label class="hb-l">名前<input class="field" id="pr-title" maxlength="30" placeholder="例：外に出る" value="${esc(p ? p.title : '')}" data-enter="promiseSave" data-arg="${p ? esc(p.id) : ''}"></label>
+      <label class="hb-l">ふつう<input class="field" id="pr-full" maxlength="60" placeholder="例：いつものコースを歩く" value="${esc(p ? p.full : '')}" data-enter="promiseSave" data-arg="${p ? esc(p.id) : ''}"></label>
+      <label class="hb-l">最低ライン<input class="field" id="pr-min" maxlength="60" placeholder="しんどい日でもできる形（例：玄関の外で空を見る）" value="${esc(p ? p.min : '')}" data-enter="promiseSave" data-arg="${p ? esc(p.id) : ''}"></label>
+      <div class="row hb-btns">${p ? `<button class="link danger" data-act="promiseDel" data-arg="${esc(p.id)}">この約束を消す</button>` : ''}<span class="spacer"></span><button class="btn ghost sm" data-act="promiseEdit" data-arg="">やめる</button><button class="btn primary sm" data-act="promiseSave" data-arg="${p ? esc(p.id) : ''}">${p ? '保存' : '足す'}</button></div></div>`;
+  const pl = promiseList();
+  let promise = pl.map((p, i) => {
+    if (S.promiseEdit === p.id) return prEditor(p);
+    const lv = promiseLv(day, p.id);
+    return `<div class="goal habit yk-row ${lv || ''}"><button class="check gold yk-ck ${lv ? 'on' : ''}" data-act="promiseTap" data-arg="${esc(p.id)}" aria-pressed="${!!lv}" aria-label="${esc(p.title)}：${promiseLvText(lv)}（タップで変える）">${promiseDot(lv)}</button><div class="title">${PROMISE_NUM[i]} ${esc(p.title)}<span class="yk-sub">ふつう：${esc(p.full)}<br>最低ライン：${esc(p.min)}</span><span class="hb-n">今月 ${prDays(p.id)} 日</span></div><button class="link hb-edit" data-act="promiseEdit" data-arg="${esc(p.id)}" aria-label="${esc(p.title)}を直す">直す</button></div>`;
+  }).join('') || (S.promiseEdit === 'new' ? '' : '<div class="faint gempty">まだない</div>');
+  if (S.promiseEdit === 'new') promise += prEditor(null);
+  const pon = S.settings.promiseNotify !== false;
+  const notify = `<div class="row yk-notify"><span>まだの約束を知らせる</span><span class="spacer"></span><input class="field" type="time" id="pr-at" value="${esc(S.settings.promiseAt || '18:00')}" data-onchg="promiseAtSet" aria-label="知らせる時刻" ${pon ? '' : 'disabled'}><button class="btn ghost sm" data-act="promiseNotify" aria-pressed="${pon}">${pon ? 'オン' : 'オフ'}</button></div><div class="faint hb-note">約束が残っているときだけ、1日1回。休養の日は知らせない。届くのはDaylogの通知をオンにした端末。</div>`;
   const past = Object.values(S.goals).filter(g => !(g.scope === 'month' && g.period === mk) && !(g.scope === 'week' && g.period === wk)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 30);
   if (!S.goalEdit) {
     // ふだんは眺めるだけのコンパクト表示。操作は「編集」ひとつ
     const line = list => list.length ? list.map(g => `<span class="gc-g ${g.status === 'done' ? 'done' : ''}"><i aria-hidden="true">${g.status === 'done' ? '✦' : '✧'}</i>${esc(g.title)}</span>`).join('') : '<span class="faint">まだない</span>';
-    const tl = habitsToday(day.mode);
-    const bath = !habitList().length ? '<span class="faint">まだない</span>' : !tl.length ? '<span class="faint">休養の日はお休み</span>' : tl.map(h => `<span class="gc-g ${habitDone(day, h.id) ? 'done' : ''}"><i aria-hidden="true">${habitDone(day, h.id) ? '✦' : '✧'}</i>${esc(habitShort(h.text))}${habitDone(day, h.id) ? '（今日は済み）' : ''}</span>`).join('');
+    const prs = !pl.length ? '<span class="faint">まだない</span>' : pl.map(p => { const lv = promiseLv(day, p.id); return `<span class="gc-g ${lv ? 'done' : ''}">${promiseDot(lv)}${esc(p.title)}${lv ? `（${promiseLvText(lv)}）` : ''}</span>`; }).join('');
     return `<section class="card goals compact" aria-label="目標"><div class="gc-head"><span class="goals-title">目標</span><button class="gedit" data-act="goalEdit">編集</button></div>
       <div class="gc-row"><span class="gc-k">${Number(mk.slice(5))}月</span><div class="gc-v">${line(month)}</div></div>
       <div class="gc-row"><span class="gc-k">今週</span><div class="gc-v">${line(week)}</div></div>
-      <div class="gc-row"><span class="gc-k">習慣</span><div class="gc-v">${bath}</div></div></section>`;
+      <div class="gc-row"><span class="gc-k">約束</span><div class="gc-v">${prs}</div></div></section>`;
   }
   return `<section class="card goals" aria-label="目標"><div class="gc-head"><span class="goals-title">目標</span><button class="gedit on" data-act="goalEdit">閉じる</button></div><div class="goals-sub" style="margin-bottom:4px">こなすものではなく、心に置いておく言葉</div>
     ${block(`${Number(mk.slice(5))}月の目標`, month, 'month', month.length < 3, '今月、大事にしたいこと（3つまで）', month.length ? `${month.length}/3` : '')}
     ${block('今週の目標', week, 'week', true, '今週、大事にしたいこと')}
-    <div class="gblock"><div class="gk"><span>毎日の習慣</span><span class="row" style="gap:6px">${hl.length ? `<span class="faint">${hl.length}/${HABIT_MAX}</span>` : ''}${hl.length < HABIT_MAX && !S.habitEdit ? '<button class="gplus" data-act="habitEdit" data-arg="new" aria-label="習慣を足す">＋</button>' : ''}</span></div>${habit}${day.mode === 'bad' ? '<div class="faint hb-note">今日は不調の日なので、軽い形を出している。</div>' : ''}</div>
+    <div class="gblock"><div class="gk"><span>自分との約束</span><span class="row" style="gap:6px">${pl.length ? `<span class="faint">${pl.length}/${PROMISE_MAX}</span>` : ''}${pl.length < PROMISE_MAX && !S.promiseEdit ? '<button class="gplus" data-act="promiseEdit" data-arg="new" aria-label="約束を足す">＋</button>' : ''}</span></div>${promise}<div class="faint hb-note">タップ1回で最低ライン、2回でふつう。どちらでも守れたことになる。</div>${notify}</div>
     ${past.length ? `<details class="fold"><summary>前の目標（${past.length}）</summary>${past.map(g => `<div class="goal ${g.status === 'done' ? 'done' : ''}"><span class="pill">${g.scope === 'month' ? g.period.replace('-', '年') + '月' : shortLabel(g.period) + '〜の週'}</span><div class="title">${esc(g.title)}</div>${g.status === 'done' ? '<span class="pill gold">叶った</span>' : ''}</div>`).join('')}</details>` : ''}
   </section>`;
 }
@@ -294,22 +294,25 @@ A.stepDel = arg => { const [tid, sid] = arg.split(':'); const t = S.tasks[tid]; 
 // 目標
 A.taskFilter = id => { S.taskFilter = id && S.taskFilter !== id ? id : null; if (S.taskFilter) S.drafts['task-goal'] = S.taskFilter; render(); };
 A.goalAddOpen = scope => { S.goalAddOpen = S.goalAddOpen === scope ? null : scope; render(); if (S.goalAddOpen) setTimeout(() => { const el = document.getElementById('goal-' + scope); if (el) el.focus(); }, 0); };
-A.goalEdit = () => { S.goalEdit = !S.goalEdit; S.goalMenu = null; S.goalAddOpen = null; S.habitEdit = null; render(); };
-// 習慣を直す・足す・消す（settings.habits）
-A.habitEdit = id => { S.habitEdit = id || null; render(); if (id) setTimeout(() => { const el = $('#hb-title'); if (el) el.focus(); }, 30); };
-A.habitSave = id => {
-  const title = String(($('#hb-title') || {}).value || '').trim(); const bad = String(($('#hb-bad') || {}).value || '').trim(); const rest = !!($('#hb-rest') || {}).checked;
-  if (!title) { shake($('#hb-title')); return; }
-  const list = habitList().map(h => ({ ...h }));
-  if (id) { const h = list.find(x => x.id === id); if (!h) return; Object.assign(h, { title, bad: bad || null, rest }); }
-  else { if (list.length >= HABIT_MAX) { toast(`習慣は${HABIT_MAX}つまで。`); return; } list.push({ id: 'h' + Date.now().toString(36), title, bad: bad || null, rest }); }
-  S.habitEdit = null; patchSettings({ habits: list }); toast(id ? '習慣を直した。' : '習慣を足した。');
+A.goalEdit = () => { S.goalEdit = !S.goalEdit; S.goalMenu = null; S.goalAddOpen = null; S.promiseEdit = null; render(); };
+// 約束を直す・足す・消す（settings.promises。3つまで）
+A.promiseEdit = id => { S.promiseEdit = id || null; render(); if (id) setTimeout(() => { const el = $('#pr-title'); if (el) el.focus(); }, 30); };
+A.promiseSave = id => {
+  const v = k => String(($('#' + k) || {}).value || '').trim();
+  const title = v('pr-title'), full = v('pr-full'), min = v('pr-min');
+  if (!title) { toast('名前を入れてね。'); return; }
+  const list = promiseList().map(p => ({ ...p }));
+  if (id) { const p = list.find(x => x.id === id); if (!p) return; Object.assign(p, { title, full: full || title, min: min || full || title }); }
+  else { if (list.length >= PROMISE_MAX) return; list.push({ id: 'p' + Date.now().toString(36), title, full: full || title, min: min || full || title }); }
+  S.promiseEdit = null; patchSettings({ promises: list }); toast(id ? '約束を直した。' : '約束を足した。');
 };
-A.habitDel = id => {
-  const before = habitList().map(h => ({ ...h })); const h = before.find(x => x.id === id); if (!h) return;
-  S.habitEdit = null; patchSettings({ habits: before.filter(x => x.id !== id) });
-  S.undo = () => patchSettings({ habits: before }); toast(`「${habitShort(h.title)}」を消した（今までのチェックは残る）。`, true);
+A.promiseDel = id => {
+  const before = promiseList().map(p => ({ ...p })); const p = before.find(x => x.id === id); if (!p) return;
+  S.promiseEdit = null; patchSettings({ promises: before.filter(x => x.id !== id) });
+  S.undo = () => patchSettings({ promises: before }); toast(`「${p.title}」を消した（今までの記録は残る）。`, true);
 };
+A.promiseNotify = () => patchSettings({ promiseNotify: S.settings.promiseNotify === false });
+A.promiseAtSet = (v, el) => { const t = String((el && el.value) || v || ''); if (/^\d{2}:\d{2}$/.test(t)) patchSettings({ promiseAt: t }); };
 A.goalMenu = id => { S.goalMenu = S.goalMenu === id ? null : id; render(); };
 A.goalAdd = scope => {
   const k = scope === 'month' ? 'goal-month' : 'goal-week'; const title = (S.drafts[k] || '').trim(); if (!title) return;

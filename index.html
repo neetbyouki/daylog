@@ -92,6 +92,36 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 
 /* mode chips */
 .modes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
+/* 自分との約束：体調ボタンの下に3つ。1回で最低ライン（半分）、2回でふつう（全部） */
+.yk-bar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
+.yk-b{display:flex;flex-direction:column;gap:4px;min-width:0;text-align:left;padding:9px 10px 8px;border-radius:14px;background:var(--panel);border:1px solid var(--line);color:var(--fg);cursor:pointer;transition:border-color var(--t-open,.2s),background-color var(--t-open,.2s)}
+.yk-top{display:flex;align-items:center;gap:6px;min-width:0}
+.yk-dot{flex:none;display:inline-block;width:13px;height:13px;border-radius:50%;border:1.5px solid var(--gold);box-sizing:border-box;background:transparent;vertical-align:-2px}
+.yk-dot.min{background:linear-gradient(90deg,var(--gold) 50%,transparent 50%)}
+.yk-dot.full{background:var(--gold)}
+.gc-g .yk-dot{width:10px;height:10px;margin-right:4px;vertical-align:-1px}
+.md-chip .yk-dot{width:10px;height:10px;margin-right:-3px}
+.yk-t{font-size:13px;font-weight:600;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.yk-h{font-size:11px;line-height:1.35;color:var(--fg-3);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.yk-b.min{border-color:color-mix(in srgb,var(--gold) 45%,var(--line))}
+.yk-b.full{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 11%,var(--panel))}
+.yk-b.full .yk-h{color:var(--gold)}
+.yk-bar.all .yk-b{box-shadow:0 0 0 1px color-mix(in srgb,var(--gold) 30%,transparent),0 0 18px -6px color-mix(in srgb,var(--gold) 60%,transparent)}
+.fx .yk-dot{animation:t-like-pop 320ms var(--t-spring)}
+html:not(.classic) .yk-b{border-radius:18px}
+/* 今日の流れの約束の行 */
+.yk-line{font-size:13.5px;color:var(--fg-2)}
+.yk-line .yk-dot{margin-right:6px;width:11px;height:11px}
+.fl-yk > time::after,.fr-yk > time::after{border-color:var(--gold)!important}
+/* 約束の編集・夜モード */
+.yk-row .yk-sub{flex-basis:100%;font-size:11.5px;color:var(--fg-3);line-height:1.45}
+.yk-ck{background:transparent!important;border-color:transparent!important}.yk-ck .yk-dot{width:18px;height:18px}
+.yk-notify{margin-top:10px;font-size:13px;gap:8px}
+.yk-notify input[type=time]{width:auto;min-width:118px}
+.yk-check .box,.yk-check[aria-pressed="true"] .box{display:grid;place-items:center;background:transparent!important;border-color:transparent!important}.yk-check .box .yk-dot{width:20px;height:20px}
+.yk-check .yk-st{display:block;font-size:12px;margin-top:2px}
+.yk-check.full{border-color:var(--gold)}
+.yk-check.min{border-color:color-mix(in srgb,var(--gold) 45%,var(--line-2))}
 .mode{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:8px 4px;text-align:center;font-size:14px;color:var(--fg-2);line-height:1.3}
 .mode small{display:block;font-size:10px;color:var(--fg-3);letter-spacing:.05em}
 .mode[aria-pressed="true"]{border-color:var(--c);color:var(--fg);background:color-mix(in oklab,var(--c) 14%,var(--panel))}

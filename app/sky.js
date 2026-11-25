@@ -33,13 +33,13 @@ function reviewSection() {
   const wroteN = past.filter(wrote).length;
   const nightN = past.filter(d => getDay(d).close && getDay(d).close.done).length;
   const taskN = Object.values(S.tasks).filter(x => x.status === 'done' && x.doneAt && days.includes(logicalDate(x.doneAt))).length;
-  // 習慣：1つだけならその名前で、いくつかあるときは「どれかをやった日」
-  const hl = habitList(); const habitN = past.filter(d => hl.some(x => habitDone(getDay(d), x.id))).length;
-  const habitLabel = hl.length === 1 ? habitShort(hl[0].title) : '習慣をした日';
+  // 約束：守れた数／約束を始めてからの日数×約束の数（連続は数えない）
+  const pl = promiseList(); const prFrom = Object.keys(S.days).filter(x => S.days[x] && S.days[x].promises).sort()[0];
+  const prDays = prFrom ? past.filter(d => d >= prFrom) : []; const prN = prDays.reduce((a, d) => a + promisesKept(d).length, 0);
   const stat = (n, unit, l) => `<div class="stat"><div><b>${n}</b><small>${unit}</small></div><span>${l}</span></div>`;
   let h = `<section class="rev"><div class="revhead"><h2>ふりかえり</h2>
     <div class="row"><div class="seg" role="group" aria-label="期間"><button data-act="revKind" data-arg="week" aria-pressed="${r.kind === 'week'}">週</button><button data-act="revKind" data-arg="month" aria-pressed="${r.kind === 'month'}">月</button></div><span class="spacer"></span><button class="btn sm" data-act="revMove" data-arg="-1" aria-label="前の期間">‹</button><span class="revlabel">${label}</span><button class="btn sm" data-act="revMove" data-arg="1" aria-label="次の期間">›</button></div></div>`;
-  h += `<div class="stats">${stat(wroteN, ` / ${past.length}日`, '書いた日')}${stat(nightN, '日', '夜モード')}${stat(taskN, '個', '終えたタスク')}${hl.length ? stat(habitN, '日', esc(habitLabel)) : ''}</div>`;
+  h += `<div class="stats">${stat(wroteN, ` / ${past.length}日`, '書いた日')}${stat(nightN, '日', '夜モード')}${stat(taskN, '個', '終えたタスク')}${pl.length && prDays.length ? stat(prN, ` / ${prDays.length * pl.length}`, '守った約束') : ''}</div>`;
   h += colorCal(days);
   h += moodChart(days) + sleepChart(days) + gameChart(days);
   const rv = S.reviews[reviewKey()];
@@ -222,7 +222,7 @@ function fitCanvas(cv, hRatio, maxH) {
   const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w, h };
 }
 function drawStar(ctx, x, y, k, small, boost = 1) {
-  const c = STAR_C[k]; const r = (k === 'night' ? 3.6 : k === 'gold' ? 2.4 : small ? 1.4 : 2) * boost;
+  const c = STAR_C[k]; const r = (k === 'night' ? 3.6 : k === 'gold' ? (small ? 1.7 : 2.4) : small ? 1.4 : 2) * boost;
   const g = ctx.createRadialGradient(x, y, 0, x, y, r * 5);
   g.addColorStop(0, c + 'cc'); g.addColorStop(0.25, c + '44'); g.addColorStop(1, c + '00');
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 5, 0, Math.PI * 2); ctx.fill();
@@ -379,7 +379,7 @@ A.revKind = k => { S.review.kind = k; render(); };
 A.revMove = dir => { const r = S.review; if (r.kind === 'week') r.anchor = addDays(r.anchor, 7 * Number(dir)); else { const [y, m] = r.anchor.split('-').map(Number); const dt = new Date(y, m - 1 + Number(dir), 1); r.anchor = ymd(dt); } ensureOlder(periodDays()[0]); render(); };
 A.revInsight = async () => {
   const days = periodDays().filter(d => d <= today()); const key = reviewKey();
-  const rows = days.map(d => { const day = getDay(d); const s = sleepAt(d), w = wakeAt(d); return `${d}: 気分${moodOf(d) ?? '-'} 体調${bodyOf(d) ?? '-'} モード${day.mode ? MODES[day.mode].label : '-'} 起きた${w ? hm(w) : '-'} 寝た${s ? hm(s) : '-'} ゲーム${pcGame(d)}分 空白時間${pcBlank(d)}分 記録${(day.entries || []).length}件 夜モード${day.close && day.close.done ? '済' : '-'} お風呂${day.habits && day.habits.bath ? '済' : '-'}`; }).join('\n');
+  const rows = days.map(d => { const day = getDay(d); const s = sleepAt(d), w = wakeAt(d); return `${d}: 気分${moodOf(d) ?? '-'} 体調${bodyOf(d) ?? '-'} モード${day.mode ? MODES[day.mode].label : '-'} 起きた${w ? hm(w) : '-'} 寝た${s ? hm(s) : '-'} ゲーム${pcGame(d)}分 空白時間${pcBlank(d)}分 記録${(day.entries || []).length}件 夜モード${day.close && day.close.done ? '済' : '-'} 約束${promisesKept(d).length}/${promiseList().length}`; }).join('\n');
   const tasksDone = Object.values(S.tasks).filter(t => t.status === 'done' && t.doneAt && days.includes(logicalDate(t.doneAt))).map(t => t.title).slice(0, 20).join(' / ') || 'なし';
   S.busy.rev = true; render();
   try {

@@ -204,6 +204,25 @@ function habitsToday(mode) { return habitList().map(h => ({ ...h, text: habitFor
 const habitDone = (day, id) => !!(day && day.habits && day.habits[id] === true);
 const habitShort = t => String(t || '').split(/[：:（(]/)[0].trim() || String(t || '');
 function habitText(mode) { const l = habitsToday(mode); return l.length ? l.map(h => h.text).join('／') : null; }
+// 自分との約束（2026-11-25〜。毎日の習慣の代わり。習慣のチェックはもう出さないが、前の日の記録は残して読む）
+// settings.promises に3つまで：{ id, title: 名前, full: ふつう, min: しんどい日の最低ライン }
+// その日の記録は days の promises[id] = 'min'（最低ライン）|'full'（ふつう）と promises[id + 'At']（守れた時刻）
+// タップ1回で最低ライン、2回でふつう、3回で戻す。どちらでも「守れた」。連続は数えない
+const DEFAULT_PROMISES = [
+  { id: 'p1', title: '服を着替える', full: '起きたら着替える', min: '上だけでも替える' },
+  { id: 'p2', title: '外に出る', full: 'いつものコースを歩く（気になったら写真1枚）', min: '玄関の外で空を見る' },
+  { id: 'p3', title: 'アニメを1話ちゃんと見る', full: 'スマホを置いて最後まで', min: '半分まででもOK' },
+];
+const PROMISE_MAX = 3;
+const PROMISE_NUM = ['①', '②', '③'];
+function promiseList() { return Array.isArray(S.settings.promises) ? S.settings.promises.slice(0, PROMISE_MAX) : DEFAULT_PROMISES; }
+const promiseLv = (day, id) => { const v = day && day.promises && day.promises[id]; return v === 'min' || v === 'full' ? v : null; };
+const promiseAt = (day, id) => (day && day.promises && day.promises[id + 'At']) || null;
+const promiseLvText = lv => lv === 'full' ? 'ふつう' : lv === 'min' ? '最低ライン' : 'まだ';
+const promiseMark = lv => lv === 'full' ? '●' : lv === 'min' ? '◐' : '○';
+const promiseDot = lv => `<span class="yk-dot ${lv || ''}" aria-hidden="true"></span>`; // 円：まだは輪、最低ラインは半分、ふつうは全部
+// その日に守れた約束（今の約束の一覧で数える。名前は今のもの）
+function promisesKept(d) { const day = getDay(d); return promiseList().map((p, i) => ({ ...p, n: PROMISE_NUM[i] || '', lv: promiseLv(day, p.id), at: promiseAt(day, p.id) })).filter(p => p.lv); }
 function starsForDay(d) {
   const day = getDay(d); const out = [];
   (day.entries || []).forEach(e => out.push({ k: 'diary', t: e.t, id: 'e' + e.id, mood: e.mood, label: (e.nap ? '💤 ' : '') + (e.text || '（スコアだけの記録）') }));
@@ -216,6 +235,8 @@ function starsForDay(d) {
     const h = habitList().find(x => x.id === id);
     out.push({ k: 'gold', t: day.habits[id + 'At'] || dayStart(d).getTime() + 13.5 * 3600e3, id: id === 'bath' ? 'b' + d : 'h' + id + d, label: h ? habitShort(h.title) : id === 'bath' ? 'お風呂' : '習慣' });
   }
+  // 約束の星：ふつうは金色、最低ラインは小さな金色
+  for (const p of promisesKept(d)) out.push({ k: 'gold', small: p.lv === 'min', t: p.at || dayStart(d).getTime() + 13.5 * 3600e3, id: 'p' + p.id + d, label: `約束：${p.title}（${promiseLvText(p.lv)}）` });
   for (const g of Object.values(S.goals)) if (g.status === 'done' && g.doneAt && logicalDate(g.doneAt) === d) out.push({ k: 'gold', t: g.doneAt, id: 'g' + g.id, label: '目標達成：' + g.title });
   if (day.close && day.close.done) out.push({ k: 'night', t: day.close.at, id: 'n' + d, label: '夜モード完了' + (day.close.text ? '：' + day.close.text : '') });
   return out.sort((a, b) => a.t - b.t);

@@ -45,8 +45,13 @@ async function col(uid: string, c: string, range?: { from?: string; to?: string 
 }
 const one = async (uid: string, c: string, id: string) => { const { data } = await admin.from("docs").select("data").eq("user_id", uid).eq("collection", c).eq("id", id).maybeSingle(); return data?.data || null; };
 
+// ── 自分との約束（settings.promises。なければ最初の3つ）。days の promises[id] = 'min'（最低ライン）|'full'（ふつう）
+const DEFAULT_PROMISES = [{ id: "p1", title: "服を着替える", full: "起きたら着替える", min: "上だけでも替える" }, { id: "p2", title: "外に出る", full: "いつものコースを歩く（気になったら写真1枚）", min: "玄関の外で空を見る" }, { id: "p3", title: "アニメを1話ちゃんと見る", full: "スマホを置いて最後まで", min: "半分まででもOK" }];
+const promiseList = (settings: any) => (Array.isArray(settings?.promises) ? settings.promises.slice(0, 3) : DEFAULT_PROMISES);
+const promiseView = (day: any, plist: any[]) => plist.map((p: any) => { const v = day?.promises?.[p.id]; return { promise: p.title, kept: v === "full" ? "ふつう" : v === "min" ? "最低ライン" : "まだ", at: v ? hm(day.promises[p.id + "At"]) || undefined : undefined }; });
+
 // ── 1日分を読みやすい形に
-function dayView(date: string, day: any, pc: any) {
+function dayView(date: string, day: any, pc: any, plist: any[] = DEFAULT_PROMISES) {
   day = day || {}; pc = pc || {};
   const ents = (day.entries || []).filter((e: any) => e && e.t).sort((a: any, b: any) => a.t - b.t)
     .map((e: any) => ({ time: hm(e.t), text: cut(e.text, 400), mood: e.mood || undefined, body: e.body || undefined, nap: e.nap || undefined }));
@@ -61,14 +66,14 @@ function dayView(date: string, day: any, pc: any) {
     date, weekday: DOW[d.getUTCDay()], mode: day.mode || null,
     woke: isFinite(wake) ? md(wake) : null, slept: md(slept), bedtimeTarget: day.bedtime?.time || null,
     nightModeDone: !!(day.close && day.close.done), close: day.close ? { mood: day.close.mood, body: day.close.body, constellation: day.close.name || undefined } : undefined,
-    habitsDone: habits, entries: ents, plans: plans.length ? plans : undefined,
+    promises: day.promises || date >= "2026-11-25" ? promiseView(day, plist) : undefined, oldHabitsDone: habits.length ? habits : undefined, entries: ents, plans: plans.length ? plans : undefined,
     gameMinutesTotal: pc.gameMinutes ?? undefined, games: games.length ? games : undefined,
     pcNaps: (pc.naps || []).map((n: any) => `${hm(n.from)}〜${hm(n.to)}`),
   };
 }
 
 const TOOLS = [
-  { name: "get_days", description: "Daylog の日ごとの記録を読む（1日は朝6時から翌朝6時まで）。体調モード・起きた/寝た時刻・就寝の目安・夜モード・習慣・日記の記録（時刻・本文・気分/体調1〜5）・予定・ゲームをした時間帯・昼寝の候補。一度に31日まで。", input_schema: { type: "object", properties: { from: { type: "string", description: "YYYY-MM-DD" }, to: { type: "string", description: "YYYY-MM-DD（省くと from と同じ日）" } }, required: ["from"] } },
+  { name: "get_days", description: "Daylog の日ごとの記録を読む（1日は朝6時から翌朝6時まで）。体調モード・起きた/寝た時刻・就寝の目安・夜モード・自分との約束（守れたか：ふつう／最低ライン／まだ）・日記の記録（時刻・本文・気分/体調1〜5）・予定・ゲームをした時間帯・昼寝の候補。一度に31日まで。", input_schema: { type: "object", properties: { from: { type: "string", description: "YYYY-MM-DD" }, to: { type: "string", description: "YYYY-MM-DD（省くと from と同じ日）" } }, required: ["from"] } },
   { name: "get_tasks", description: "タスクを読む。status は open（やること）/ held（保留箱）/ done（終わった・60日以内）/ all。", input_schema: { type: "object", properties: { status: { type: "string", enum: ["open", "held", "done", "all"] } } } },
   { name: "get_goals", description: "今月・今週の目標と、その状態を読む。", input_schema: { type: "object", properties: {} } },
   { name: "get_memos", description: "ひとことメモと、ノート（題と本文の頭）を新しい順に読む。", input_schema: { type: "object", properties: { limit: { type: "integer", description: "それぞれ何件まで（ふつう20、最大60）" } } } },
@@ -82,9 +87,9 @@ async function runTool(uid: string, name: string, a: any): Promise<unknown> {
     let from = /^\d{4}-\d{2}-\d{2}$/.test(a.from) ? a.from : today; let to = /^\d{4}-\d{2}-\d{2}$/.test(a.to) ? a.to : from;
     if (to < from) [from, to] = [to, from];
     if ((Date.parse(to) - Date.parse(from)) / 864e5 > 30) from = addDays(to, -30);
-    const [days, pcs] = await Promise.all([col(uid, "days", { from, to }), col(uid, "pc", { from, to })]);
-    const dm = new Map(days.map((r) => [r.id, r.data])); const pm = new Map(pcs.map((r) => [r.id, r.data]));
-    const out = []; for (let d = from; d <= to; d = addDays(d, 1)) { if (dm.has(d) || pm.has(d)) out.push(dayView(d, dm.get(d), pm.get(d))); else out.push({ date: d, note: "記録なし" }); }
+    const [days, pcs, st] = await Promise.all([col(uid, "days", { from, to }), col(uid, "pc", { from, to }), one(uid, "settings", "main")]);
+    const dm = new Map(days.map((r) => [r.id, r.data])); const pm = new Map(pcs.map((r) => [r.id, r.data])); const pl = promiseList(st);
+    const out = []; for (let d = from; d <= to; d = addDays(d, 1)) { if (dm.has(d) || pm.has(d)) out.push(dayView(d, dm.get(d), pm.get(d), pl)); else out.push({ date: d, note: "記録なし" }); }
     return out;
   }
   if (name === "get_tasks") {
@@ -120,12 +125,12 @@ async function runTool(uid: string, name: string, a: any): Promise<unknown> {
 }
 
 // ── 今日のようす（道具を使わなくても答えられるように、少しだけ先に渡す）
-async function todaySummary(uid: string) {
-  const t = logicalDate(Date.now()); const y = addDays(t, -1);
+async function todaySummary(uid: string, settings: any) {
+  const t = logicalDate(Date.now()); const y = addDays(t, -1); const pl = promiseList(settings);
   const [days, pcs, pet] = await Promise.all([col(uid, "days", { from: y, to: t }), col(uid, "pc", { from: y, to: t }), one(uid, "pet", "main")]);
   const dm = new Map(days.map((r) => [r.id, r.data])); const pm = new Map(pcs.map((r) => [r.id, r.data]));
-  const v = dayView(t, dm.get(t), pm.get(t)); const vy = dayView(y, dm.get(y), pm.get(y));
-  return { pet, text: JSON.stringify({ today: { ...v, entries: v.entries.slice(-8) }, yesterday: { date: vy.date, mode: vy.mode, woke: vy.woke, slept: vy.slept, entriesCount: vy.entries.length, gameMinutesTotal: vy.gameMinutesTotal } }) };
+  const v = dayView(t, dm.get(t), pm.get(t), pl); const vy = dayView(y, dm.get(y), pm.get(y), pl);
+  return { pet, text: JSON.stringify({ today: { ...v, entries: v.entries.slice(-8) }, yesterday: { date: vy.date, mode: vy.mode, woke: vy.woke, slept: vy.slept, promises: vy.promises, entriesCount: vy.entries.length, gameMinutesTotal: vy.gameMinutesTotal } }) };
 }
 
 async function anthropic(body: unknown) {
@@ -158,7 +163,7 @@ async function chat(uid: string, raw: any[]) {
   }
   while (msgs.length && msgs[0].role !== "user") msgs.shift();
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") throw new Fail("bad_request", "話しかける言葉がない");
-  const [settings, sum] = await Promise.all([one(uid, "settings", "main"), todaySummary(uid)]);
+  const settings = await one(uid, "settings", "main"); const sum = await todaySummary(uid, settings);
   const pet = sum.pet || {}; const petName = pet.name || "ペット";
   const stage = ({ egg: "たまご", chibi: "ちび", adult: "おとな" } as any)[pet.stats?.stage] || "";
   const pref = cut(String(settings?.chatPrompt || "").trim(), 12000);

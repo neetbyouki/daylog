@@ -426,7 +426,7 @@ void main(){float d=length(v_q);if(d>1.0)discard;float a=pow(1.0-d,2.2);gl_FragC
           c.stroke();
         }
         pts.forEach((p, i) => {
-          const st = p.st, base = (st.k === 'night' ? 3.6 : st.k === 'gold' ? 2.6 : st.small ? 1.5 : 2.1) * d.boost * rs * dk, tw = 1 + 0.09 * Math.sin(t * 2.1 + i * 1.7 + d.i), size = base * 11 * tw;
+          const st = p.st, base = (st.k === 'night' ? 3.6 : st.k === 'gold' ? (st.small ? 1.8 : 2.6) : st.small ? 1.5 : 2.1) * d.boost * rs * dk, tw = 1 + 0.09 * Math.sin(t * 2.1 + i * 1.7 + d.i), size = base * 11 * tw;
           c.globalAlpha = Math.min(1, a * 1.05); c.drawImage(sprite(st.k), p.x - size / 2, p.y - size / 2, size, size);
           if (k.foc > 0.4 && d.d === s.day) {
             // 時刻の文字：ほかの文字や星と重ならない向き（右・左・上・下）をさがして置く

@@ -89,10 +89,26 @@ function todayView() {
   let h = headerHTML(dayLabel(d), sub, actions);
   h += alldayHTML(d);
   h += `<div class="modes" role="group" aria-label="今日の体調">${Object.entries(MODES).map(([k, m]) => `<button class="mode" style="--c:${m.c}" data-act="setMode" data-arg="${k}" aria-pressed="${mode === k}" title="${m.hint}">${m.label}</button>`).join('')}</div>`;
+  h += promiseBarHTML(d);
   h += `<div class="stack">${morningCard(d)}${todayCards(d)}</div>`;
   h += timelineHTML(d);
   h += `<div class="stack" style="margin-top:18px">${claudeCard(d)}</div>`;
   return h;
+}
+// 自分との約束：体調ボタンの下に3つ。タップ1回で最低ライン、2回でふつう、3回で戻す
+// 休養の日は最低ラインだけを出す（ふつうも押せる）。押すたびに、次に何をすればいいかを小さく出す
+function promiseHint(p, lv, mode) {
+  if (lv === 'full') return 'ふつうで守れた';
+  if (mode === 'rest') return lv === 'min' ? '守れた' : p.min;
+  return lv === 'min' ? `もう1回でふつう：${p.full}` : `最低ライン：${p.min}`;
+}
+function promiseBarHTML(d) {
+  const day = getDay(d); const list = promiseList(); if (!list.length) return '';
+  const kept = list.filter(p => promiseLv(day, p.id)).length;
+  return `<section class="yk-bar${kept === list.length ? ' all' : ''}" aria-label="自分との約束（${kept}/${list.length}）">${list.map((p, i) => {
+    const lv = promiseLv(day, p.id); const hint = promiseHint(p, lv, day.mode);
+    return `<button class="yk-b ${lv || ''}${fxc('pr' + p.id)}" data-act="promiseTap" data-arg="${esc(p.id)}" aria-label="${esc(PROMISE_NUM[i] + ' ' + p.title)}：${promiseLvText(lv)}。${esc(hint)}"><span class="yk-top">${promiseDot(lv)}<span class="yk-t">${esc(p.title)}</span></span><span class="yk-h">${esc(hint)}</span></button>`;
+  }).join('')}</section>`;
 }
 // 終日の予定（Googleカレンダー）：日付のすぐ下に1行。色の線＋名前で、時刻の流れとは分けて置く
 const calOfKey = k => CFG.CALS.find(c => c.key === k) || { name: '', color: 'var(--fg-3)' };
@@ -164,6 +180,11 @@ function entryBody(e, ro) {
   const open = S.openEntry === e.id;
   return `<button class="more" data-act="entryMenu" data-arg="${e.id}" aria-label="この記録の操作">⋯</button>${e.nap ? '<span class="nap" title="昼寝" aria-label="昼寝">💤</span>' : ''}${esc(e.text || '')}${(e.mood || e.body) ? `<div class="meta">${e.mood ? `<span title="気分 ${e.mood}" aria-label="気分 ${e.mood}">${dots(e.mood, 'var(--mood)')}</span>` : ''}${e.body ? `<span title="体調 ${e.body}" aria-label="体調 ${e.body}">${dots(e.body, 'var(--body)')}</span>` : ''}</div>` : ''}${open ? `<div class="row" style="margin-top:6px;white-space:normal"><button class="btn sm" data-act="entryEdit" data-arg="${e.id}">直す</button><button class="btn ghost sm" data-act="entryDelete" data-arg="${e.id}">消す</button><button class="btn ghost sm" data-act="entryMenu" data-arg="">閉じる</button></div>` : ''}`;
 }
+// 今日の流れの1行：記録か、守れた約束（約束は押した時刻に「◐ ② 外に出る（最低ライン）」）
+function itemBody(e, ro) {
+  if (!e.pr) return entryBody(e, ro);
+  const p = e.p; return `<span class="yk-line ${p.lv}">${promiseDot(p.lv)}${esc(p.n)} ${esc(p.title)}<span class="faint">（${promiseLvText(p.lv)}）</span></span>`;
+}
 function entryEditor(e) {
   const sel = (k, label) => `<label class="faint" style="font-size:12px">${label} <select class="field" id="ee-${k}" data-draft style="padding:3px 6px">${['', 1, 2, 3, 4, 5].map(v => `<option value="${v}" ${String(draft('ee-' + k, e[k] || '')) === String(v) ? 'selected' : ''}>${v || '－'}</option>`).join('')}</select></label>`;
   return `<div class="ee" style="white-space:normal"><textarea class="field" id="ee-text" data-draft rows="2" style="width:100%;min-height:56px" aria-label="記録を直す">${esc(draft('ee-text', e.text || ''))}</textarea>
@@ -187,7 +208,8 @@ function timelineHTML(d, o = {}) {
   // 予定の時間内に書いた記録は、その予定のカードの中に入れる
   // （重なっていたら、今進んでいる予定を優先。なければ後から始まった予定の中）
   const kids = new Map(); const loose = [];
-  for (const e of (getDay(d).entries || [])) {
+  const items = [...(getDay(d).entries || []), ...promisesKept(d).filter(p => p.at).map(p => ({ pr: true, id: 'pr' + p.id, t: p.at, p }))];
+  for (const e of items) {
     let host = null;
     for (const x of timed) {
       if (x.canceled || isBedEv(x) || !(x.start <= e.t && e.t < x.end)) continue;
@@ -221,7 +243,7 @@ function timelineHTML(d, o = {}) {
     let out = ''; let placed = !withNow;
     for (const e of list) {
       if (!placed && e.t > now) { out += nowFr(); placed = true; }
-      out += `<div class="fr fr-k${fxc('ent' + e.id, 'new')}" data-ts="${e.t}"><time>${hm(e.t)}</time><div class="c2">${entryBody(e, ro)}</div></div>`;
+      out += `<div class="fr fr-k${e.pr ? ' fr-yk' : ''}${fxc('ent' + e.id, 'new')}" data-ts="${e.t}"><time>${hm(e.t)}</time><div class="c2">${itemBody(e, ro)}</div></div>`;
     }
     if (!placed) out += nowFr();
     return out;
@@ -252,7 +274,7 @@ function timelineHTML(d, o = {}) {
     } else if (r.kind === 'now') {
       lis.push(`<li class="fl fl-now" data-ts="${now}"><time>${hm(now)}</time><div class="c2"><span>いま</span></div></li>`);
     } else if (r.kind === 'en') {
-      lis.push(`<li class="fl fl-en${fxc('ent' + r.e.id, 'new')}" data-ts="${r.e.t}"><time>${hm(r.e.t)}</time><div class="c2">${entryBody(r.e, ro)}</div></li>`);
+      lis.push(`<li class="fl ${r.e.pr ? 'fl-yk' : 'fl-en'}${fxc('ent' + r.e.id, 'new')}" data-ts="${r.e.t}"><time>${hm(r.e.t)}</time><div class="c2">${itemBody(r.e, ro)}</div></li>`);
     } else if (r.kind === 'bed') {
       const x = r.x; const c = calOf(x.cal); const key = x.cal + '|' + x.id; const done = !/目安/.test(x.title);
       lis.push(`<li class="fl fl-bed ${done ? 'done' : ''}" style="--c:${c.color}" data-ts="${x.start}"><time>${hm(x.start)}</time><div class="c2"><span class="bl-t" ${x.ghost ? '' : `data-act="calOpen" data-arg="${esc(key)}"`}>${done ? '🌙 就寝' : '🌙 就寝の目安'}</span></div></li>`);
@@ -573,6 +595,16 @@ A.replan = async () => {
 A.dismissReplan = () => { const d = today(); patchDay(d, { replan: { ...(getDay(d).replan || {}), dismissed: true } }); };
 A.habitToggle = id => { if (!id) return; fx('habit' + id); const d = S.night ? S.night.date : today(); const day = getDay(d); const on = !habitDone(day, id); patchDay(d, { habits: { ...(day.habits || {}), [id]: on, [id + 'At']: on ? Date.now() : null } }); };
 A.bathToggle = () => A.habitToggle('bath');
+// 約束：まだ → 最低ライン → ふつう → まだ。最低ラインからふつうにしても、守れた時刻は最初のまま
+A.promiseTap = id => {
+  if (!id) return; const d = S.night ? S.night.date : today(); const day = getDay(d);
+  const cur = promiseLv(day, id); const next = cur === null ? 'min' : cur === 'min' ? 'full' : null;
+  const at = next ? (cur ? promiseAt(day, id) || Date.now() : Date.now()) : null;
+  if (next) fx('pr' + id);
+  patchDay(d, { promises: { ...(day.promises || {}), [id]: next, [id + 'At']: at } });
+  const all = promiseList().every(p => (p.id === id ? next : promiseLv(day, p.id)));
+  if (next && all && !promiseList().every(p => promiseLv(day, p.id))) toast('今日の約束、ぜんぶ守れた。');
+};
 // 昨夜、今日の予定を入れていない（夜モードで送っていない）か
 function needsMorningPlan(d) {
   const y = addDays(d, -1); const yd = getDay(y); const day = getDay(d);
