@@ -336,6 +336,8 @@ async function quizReview(uid: string, quiz: any) {
 }
 
 async function cronSecret() { const { data } = await admin.from("push_keys").select("value").eq("key", "cron_secret").maybeSingle(); return data?.value || ""; }
+// 持ち主だけ（2026-11-28）：Claude API のお金を使うので、push_keys の owner_uid と同じアカウントだけ通す。見つからなければ断る
+async function ownerUid() { const { data } = await admin.from("push_keys").select("value").eq("key", "owner_uid").maybeSingle(); return data?.value || ""; }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -350,6 +352,8 @@ Deno.serve(async (req) => {
       if (error || !u?.user) return json({ error: { code: "not_signed_in", message: "ログインし直してほしい" } }, 401);
       uid = u.user.id;
     }
+    const owner = await ownerUid();
+    if (!owner || uid !== owner) return json({ error: { code: "forbidden", message: "この Daylog の持ち主だけが使える" } }, 403);
     if (b.kind === "quiz") return json(await quizMake(uid));
     if (b.kind === "quizReview") return json(await quizReview(uid, b.quiz));
     return json(await chat(uid, b.messages, b.kind === "night" ? "night" : ""));
