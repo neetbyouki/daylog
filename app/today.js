@@ -95,15 +95,18 @@ function todayView() {
   h += `<div class="stack" style="margin-top:18px">${claudeCard(d)}</div>`;
   return h;
 }
-// 自分との約束：体調ボタンの下に3つ。タップ1回で半分、2回でふつう、3回で戻す
-// 名前の下に（半分地点）だけを小さく出す。守れたかは円（半分・全部）で見せる
+// 自分との約束：体調ボタンの下に細いピルを1行（案A・2026-11-27b）。タップ1回で半分、2回でふつう、3回で戻す
+// ふだんは名前だけ。半分地点は、押して半分になった瞬間だけ小さな吹き出しで出す（S.ykFlash）
+const YK_FLASH_MS = 1800;
 function promiseHint(p) { return `（${p.min}）`; }
 function promiseBarHTML(d) {
   const day = getDay(d); const list = promiseList(); if (!list.length) return '';
   const kept = list.filter(p => promiseLv(day, p.id)).length;
+  const fl = S.ykFlash && S.ykFlash.d === d && Date.now() - S.ykFlash.at < YK_FLASH_MS ? S.ykFlash : null;
   return `<section class="yk-bar${kept === list.length ? ' all' : ''}" aria-label="自分との約束（${kept}/${list.length}）">${list.map((p, i) => {
     const lv = promiseLv(day, p.id); const hint = promiseHint(p);
-    return `<button class="yk-b ${lv || ''}${fxc('pr' + p.id)}" data-act="promiseTap" data-arg="${esc(p.id)}" aria-label="${esc(PROMISE_NUM[i] + ' ' + p.title + hint)}：${promiseLvText(lv)}。タップ1回で半分、2回でふつう"><span class="yk-top">${promiseDot(lv)}<span class="yk-t">${esc(p.title)}</span></span><span class="yk-h">${esc(hint)}</span></button>`;
+    const tip = fl && fl.id === p.id && lv === 'min' ? `<span class="yk-tip" aria-hidden="true" style="animation-delay:-${Date.now() - fl.at}ms">${esc(p.min)}でOK</span>` : '';
+    return `<button class="yk-b ${lv || ''}${fxc('pr' + p.id)}" data-act="promiseTap" data-arg="${esc(p.id)}" title="${esc(p.title + hint)}" aria-label="${esc(PROMISE_NUM[i] + ' ' + p.title + hint)}：${promiseLvText(lv)}。タップ1回で半分、2回でふつう">${promiseDot(lv)}<span class="yk-t">${esc(p.title)}</span>${tip}</button>`;
   }).join('')}</section>`;
 }
 // 終日の予定（Googleカレンダー）：日付のすぐ下に1行。色の線＋名前で、時刻の流れとは分けて置く
@@ -593,6 +596,7 @@ A.promiseTap = id => {
   const cur = promiseLv(day, id); const next = cur === null ? 'min' : cur === 'min' ? 'full' : null;
   const at = next ? (cur ? promiseAt(day, id) || Date.now() : Date.now()) : null;
   if (next) fx('pr' + id);
+  if (next === 'min' && !S.night) { const f = S.ykFlash = { id, d, at: Date.now() }; setTimeout(() => { if (S.ykFlash === f) { S.ykFlash = null; render(); } }, YK_FLASH_MS + 50); }
   patchDay(d, { promises: { ...(day.promises || {}), [id]: next, [id + 'At']: at } });
   const all = promiseList().every(p => (p.id === id ? next : promiseLv(day, p.id)));
   if (next && all && !promiseList().every(p => promiseLv(day, p.id))) toast('今日の約束、ぜんぶ守れた。');

@@ -110,22 +110,23 @@ h2.sec .r{letter-spacing:0;font-size:12px}
 .np-bubble.busy{display:grid;place-items:center}
 .np-name{font-size:12px;color:var(--fg-3)}
 /* 自分との約束：体調ボタンの下に3つ。1回で最低ライン（半分）、2回でふつう（全部） */
-.yk-bar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
-.yk-b{display:flex;flex-direction:column;gap:4px;min-width:0;text-align:left;padding:9px 10px 8px;border-radius:14px;background:var(--panel);border:1px solid var(--line);color:var(--fg);cursor:pointer;transition:border-color var(--t-open,.2s),background-color var(--t-open,.2s)}
-.yk-top{display:flex;align-items:center;gap:6px;min-width:0}
+.yk-bar{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.yk-b{position:relative;display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:100%;padding:7px 13px 7px 10px;border-radius:999px;background:var(--panel);border:1px solid transparent;color:var(--fg-2);font-size:13.5px;line-height:1.2;cursor:pointer;transition:background-color var(--t-open,.2s),color var(--t-open,.2s),border-color var(--t-open,.2s)}
 .yk-dot{flex:none;display:inline-block;width:13px;height:13px;border-radius:50%;border:1.5px solid var(--gold);box-sizing:border-box;background:transparent;vertical-align:-2px}
 .yk-dot.min{background:linear-gradient(90deg,var(--gold) 50%,transparent 50%)}
 .yk-dot.full{background:var(--gold)}
+.yk-b:not(.min):not(.full) .yk-dot{border-color:var(--fg-3)}
 .gc-g .yk-dot{width:10px;height:10px;margin-right:4px;vertical-align:-1px}
 .md-chip .yk-dot{width:10px;height:10px;margin-right:-3px}
-.yk-t{font-size:13px;font-weight:600;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
-.yk-h{font-size:11px;line-height:1.35;color:var(--fg-3);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
-.yk-b.min{border-color:color-mix(in srgb,var(--gold) 45%,var(--line))}
-.yk-b.full{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 11%,var(--panel))}
-.yk-b.full .yk-h{color:var(--gold)}
-.yk-bar.all .yk-b{box-shadow:0 0 0 1px color-mix(in srgb,var(--gold) 30%,transparent),0 0 18px -6px color-mix(in srgb,var(--gold) 60%,transparent)}
+.yk-t{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.yk-b.min,.yk-b.full{color:var(--fg)}
+.yk-b.full{background:color-mix(in srgb,var(--gold) 13%,var(--panel))}
+.yk-bar.all .yk-b{border-color:color-mix(in srgb,var(--gold) 35%,transparent)}
+.yk-tip{position:absolute;left:50%;top:calc(100% + 6px);z-index:3;transform:translateX(-50%);white-space:nowrap;font-size:11.5px;font-weight:500;color:var(--gold);background:var(--panel-2,var(--panel));border:1px solid color-mix(in srgb,var(--gold) 40%,var(--line));padding:3px 9px;border-radius:999px;pointer-events:none;animation:yk-tip 1.8s ease both}
+@keyframes yk-tip{0%{opacity:0;transform:translate(-50%,-3px)}12%,75%{opacity:1;transform:translate(-50%,0)}100%{opacity:0}}
+html[data-motion="calm"] .yk-tip{animation:none;opacity:1}
 .fx .yk-dot{animation:t-like-pop 320ms var(--t-spring)}
-html:not(.classic) .yk-b{border-radius:18px}
+html:not(.classic) .yk-b{border-radius:999px}
 /* 今日の流れの約束の行 */
 .yk-line{font-size:13.5px;color:var(--fg-2)}
 .yk-line .yk-dot{margin-right:6px;width:11px;height:11px}
