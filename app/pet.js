@@ -10,14 +10,20 @@
    データ：pet/main（名前・生まれた日・進化した姿・旅・ステータスの控え）、days/<日付>.pet（seen：会いに来た／snacks：おやつの数）、petmail（チャットのClaudeからの手紙） */
 const PET_SPR = {"chibi-happy":".........#........../........#o#........./.........#........../.........#........../.........#........../.........#........../.......######......./......#oooooo#....../.....#oooooooo#...../....#oooooooooo#..../...##ooooooooo#o#.../...#o#o#o#o#o#oo#.../...##ooo#o#ooo#o#.../...#oooooooooooo#.../...#oooooooooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......##....##......","dora-happy":"....#..........#..../....############..../.....##oooooo##...../.....#oooooooo#...../....#oooooooooo#..../...##ooooooooo#o#.../...#o#o#o#o#o#oo#.../.#.##ooo#o#ooo#o#.#./.###oooooooooooo###./.#o##oooooooooo##o#./.#oo##oooooooo##oo#./.#ooo##oooooo##ooo#./.####.########.####./....##ooo#oooo##..../.....#oo###ooo#...../.....#o#####oo#...../.....#oo#o#ooo#...../.....##oooooo##...../.....#o#oooo#o#...../.....##########.....","usa-happy":"......#......#....../.....#o#....#o#...../....#ooo#..#ooo#..../....#o#o#..#o#o#..../#...#o#o#..#o#o#..../....#ooo#..#ooo#.#.#/....#oo######oo#..#./.#..#o#oooooo#o#.#.#/....##oooooooo##..../....#oooooooooo#..../...##ooooooooo#o#.../...#o#o#o#o#o#oo#.../...##ooo#o#ooo#o#.../...#oooooooooooo#.../...#oooooooooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......###..###......","lion-happy":"...#.....#.....#..../...#############..../...#############..../...#####oooo####..../...###oooooooo##..../#####oooooooooo####./#####oooooooooo####./.####ooooooooo#o##../.###o#o#o#o#o#oo##../.####ooo#o#ooo#o##../####oooooooooooo###./#####oooo##oooo####./...##oooooooooo#.##./...###oooooooo######/...#####oooo########/...#############.##./...#..#####.##.#..#./.....#oo##.#oo####../.....#oo#..#oo#...../.....####..####.....","chibi-normal":".........#........../........#o#........./.........#........../.........#........../.........#........../.........#........../.......######......./......#oooooo#....../.....#oooooooo#...../....#oooooooooo#..../...#oooooooooooo#.../...#oo#ooooo#ooo#.../...#oooooooooooo#.../...#ooo#o#o#oooo#.../...#oooo#o#ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......##....##......","dora-normal":"....#..........#..../....############..../.....##oooooo##...../.....#oooooooo#...../....#oooooooooo#..../...#oooooooooooo#.../...#oo#ooooo#ooo#.../.#.#oooooooooooo#.#./.###ooo#o#o#oooo###./.#o##ooo#o#oooo##o#./.#oo##oooooooo##oo#./.#ooo##oooooo##ooo#./.####.########.####./....##ooo#oooo##..../.....#oo###ooo#...../.....#o#####oo#...../.....#oo#o#ooo#...../.....##oooooo##...../.....#o#oooo#o#...../.....##########.....","usa-normal":"......#......#....../.....#o#....#o#...../....#ooo#..#ooo#..../....#o#o#..#o#o#..../#...#o#o#..#o#o#..../....#ooo#..#ooo#.#.#/....#oo######oo#..#./.#..#o#oooooo#o#.#.#/....##oooooooo##..../....#oooooooooo#..../...#oooooooooooo#.../...#oo#ooooo#ooo#.../...#oooooooooooo#.../...#ooo#o#o#oooo#.../...#oooo#o#ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......###..###......","lion-normal":"...#.....#.....#..../...#############..../...#############..../...#####oooo####..../...###oooooooo##..../#####oooooooooo####./#####oooooooooo####./.###oooooooooooo##../.###oo#ooooo#ooo##../.###oooooooooooo##../####ooo#o#o#oooo###./#####ooo###oooo####./...##oooooooooo#.##./...###oooooooo######/...#####oooo########/...#############.##./...#..#####.##.#..#./.....#oo##.#oo####../.....#oo#..#oo#...../.....####..####.....","chibi-blink":".........#........../........#o#........./.........#........../.........#........../.........#........../.........#........../.......######......./......#oooooo#....../.....#oooooooo#...../....#oooooooooo#..../...#oooooooooooo#.../...#o##ooooo##oo#.../...#oooooooooooo#.../...#ooo#o#o#oooo#.../...#oooo#o#ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......##....##......","dora-blink":"....#..........#..../....############..../.....##oooooo##...../.....#oooooooo#...../....#oooooooooo#..../...#oooooooooooo#.../...#o##ooooo##oo#.../.#.#oooooooooooo#.#./.###ooo#o#o#oooo###./.#o##ooo#o#oooo##o#./.#oo##oooooooo##oo#./.#ooo##oooooo##ooo#./.####.########.####./....##ooo#oooo##..../.....#oo###ooo#...../.....#o#####oo#...../.....#oo#o#ooo#...../.....##oooooo##...../.....#o#oooo#o#...../.....##########.....","usa-blink":"......#......#....../.....#o#....#o#...../....#ooo#..#ooo#..../....#o#o#..#o#o#..../#...#o#o#..#o#o#..../....#ooo#..#ooo#.#.#/....#oo######oo#..#./.#..#o#oooooo#o#.#.#/....##oooooooo##..../....#oooooooooo#..../...#oooooooooooo#.../...#o##ooooo##oo#.../...#oooooooooooo#.../...#ooo#o#o#oooo#.../...#oooo#o#ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......###..###......","lion-blink":"...#.....#.....#..../...#############..../...#############..../...#####oooo####..../...###oooooooo##..../#####oooooooooo####./#####oooooooooo####./.###oooooooooooo##../.###o##ooooo##oo##../.###oooooooooooo##../####ooo#o#o#oooo###./#####ooo###oooo####./...##oooooooooo#.##./...###oooooooo######/...#####oooo########/...#############.##./...#..#####.##.#..#./.....#oo##.#oo####../.....#oo#..#oo#...../.....####..####.....","chibi-sleepy":".........#........../........#o#........./.........#........../.........#........../.........#........../.........#........../.......######......./......#oooooo#....../.....#oooooooo#...../....#oooooooooo#..../...##ooooooooo#o#.../...#o##ooooo##oo#.../...#oooooooooooo#.../...#ooo#o#o#oooo#.../...#oooo#o#ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......##....##......","dora-sleepy":"....#..........#..../....############..../.....##oooooo##...../.....#oooooooo#...../....#oooooooooo#..../...##ooooooooo#o#.../...#o##ooooo##oo#.../.#.#oooooooooooo#.#./.###ooo#o#o#oooo###./.#o##ooo#o#oooo##o#./.#oo##oooooooo##oo#./.#ooo##oooooo##ooo#./.####.########.####./....##ooo#oooo##..../.....#oo###ooo#...../.....#o#####oo#...../.....#oo#o#ooo#...../.....##oooooo##...../.....#o#oooo#o#...../.....##########.....","usa-sleepy":"......#......#....../.....#o#....#o#...../....#ooo#..#ooo#..../....#o#o#..#o#o#..../#...#o#o#..#o#o#..../....#ooo#..#ooo#.#.#/....#oo######oo#..#./.#..#o#oooooo#o#.#.#/....##oooooooo##..../....#oooooooooo#..../...##ooooooooo#o#.../...#o##ooooo##oo#.../...#oooooooooooo#.../...#ooo#o#o#oooo#.../...#oooo#o#ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......###..###......","lion-sleepy":"...#.....#.....#..../...#############..../...#############..../...#####oooo####..../...###oooooooo##..../#####oooooooooo####./#####oooooooooo####./.####ooooooooo#o##../.###o##ooooo##oo##../.###oooooooooooo##../####ooo#o#o#oooo###./#####ooo###oooo####./...##oooooooooo#.##./...###oooooooo######/...#####oooo########/...#############.##./...#..#####.##.#..#./.....#oo##.#oo####../.....#oo#..#oo#...../.....####..####.....","chibi-sleep":".........#......####/........#o#.......#./.........#.......#../.........#......####/.........#........../.........#........../.......######......./......#oooooo#....../.....#oooooooo#...../....#oooooooooo#..../...#oooooooooooo#.../...#oooooooooooo#.../...#o##ooooo##oo#.../...#oooooooooooo#.../...#oooo###ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......##....##......","dora-sleep":"....#..........#####/....############..#./.....##oooooo##..#../.....#oooooooo#.####/....#oooooooooo#..../...#oooooooooooo#.../...#oooooooooooo#.../.#.#o##ooooo##oo#.#./.###oooooooooooo###./.#o##ooo###oooo##o#./.#oo##oooooooo##oo#./.#ooo##oooooo##ooo#./.####.########.####./....##ooo#oooo##..../.....#oo###ooo#...../.....#o#####oo#...../.....#oo#o#ooo#...../.....##oooooo##...../.....#o#oooo#o#...../.....##########.....","usa-sleep":"......#......#..####/.....#o#....#o#...#./....#ooo#..#ooo#.#../....#o#o#..#o#o#####/#...#o#o#..#o#o#..../....#ooo#..#ooo#.#.#/....#oo######oo#..#./.#..#o#oooooo#o#.#.#/....##oooooooo##..../....#oooooooooo#..../...#oooooooooooo#.../...#oooooooooooo#.../...#o##ooooo##oo#.../...#oooooooooooo#.../...#oooo###ooooo#.../....#oooooooooo#..../.....#oooooooo#...../.....##oooooo##...../.....#o######o#...../......###..###......","lion-sleep":"...#.....#.....#####/...#############..#./...#############.#../...#####oooo########/...###oooooooo##..../#####oooooooooo####./#####oooooooooo####./.###oooooooooooo##../.###oooooooooooo##../.###o##ooooo##oo##../####oooooooooooo###./#####ooo###oooo####./...##oooooooooo#.##./...###oooooooo######/...#####oooo########/...#############.##./...#..#####.##.#..#./.....#oo##.#oo####../.....#oo#..#oo#...../.....####..####.....","egg":"..................../........####......../.......#oooo#......./......#oooooo#....../......#oooooo#....../.....#oooooo#o#...../.....#oooooooo#...../.....#oooooooo#...../.....#ooo#oooo#...../....#ooo#o#oooo#..../....#oooo#ooooo#..../....#oooooooooo#..../....#oooooooooo#..../....#oooooooooo#..../....#ooooooo#oo#..../.....#o#oooooo#...../.....#oooooooo#...../......#oooooo#....../.......#oooo#......./........####........","egg-crack":"..................../........####......../.......#oooo#......./......#oooooo#....../......#oooooo#....../.....#oooooo#o#...../.....#oooooooo#...../.....#oooooooo#...../.....#ooo#oooo#...../....#ooo#o#oooo#..../....##o#o#o#o#o#..../....#o#o#o#o#o##..../....#oooooooooo#..../....#oooooooooo#..../....#ooooooo#oo#..../.....#o#oooooo#...../.....#oooooooo#...../......#oooooo#....../.......#oooo#......./........####........","plant-0":"..................../..................../..................../..................../..................../..................../..................../..................../..................../..................../...........##......./.....##...#oo#....../....#oo#.#.##......./.....##..#........../.........#........../.....##########...../.....##########...../......#oooooo#....../......#oooooo#....../......########......","plant-1":"..................../..................../..................../..................../..................../..................../..................../..................../.....##....##......./....#oo#.##oo#....../.....##..#.##......./.....##..##oo#....../....#oo#.#.##......./.....##..#........../.........#........../.....##########...../.....##########...../......#oooooo#....../......#oooooo#....../......########......","plant-2":"..................../..................../..................../..................../..................../.....##....##......./....#oo#.##oo#....../.....##..#.##......./.....##..##oo#....../....#oo#.#.##......./.....##..#.##......./.....##..##oo#....../....#oo#.#.##......./.....##..#........../.........#........../.....##########...../.....##########...../......#oooooo#....../......#oooooo#....../......########......","plant-3":".........#........../........#o#........./.......#ooo#......../........#o#........./.........#........../.....##..#.##......./....#oo#.##oo#....../.....##..#.##......./.....##..##oo#....../....#oo#.#.##......./.....##..#.##......./.....##..##oo#....../....#oo#.#.##......./.....##..#........../.........#........../.....##########...../.....##########...../......#oooooo#....../......#oooooo#....../......########......"};
 const PET_FORMS = {
-  dora: { name: 'ほしドラ', theme: '星 × ドラゴン', why: 'ちから（おにく：タスク・タイマー）がいちばん高かった' },
-  usa: { name: 'ゆきうさ', theme: '氷 × ウサギ', why: 'かしこさ（やさい：記録・日記）がいちばん高かった' },
+  dora: { name: 'ほしドラ', theme: '星 × ドラゴン', why: 'ちから（おにく：タスク・タイマー・約束）がいちばん高かった' },
+  usa: { name: 'ゆきうさ', theme: '氷 × ウサギ', why: 'かしこさ（やさい：記録・日記・夜モード）がいちばん高かった' },
   lion: { name: 'ひだまりオン', theme: '太陽 × ライオン', why: 'ひかり（おやつ：早起き・早寝）がいちばん高かった' },
 };
 const PET_HATCH = 20, PET_ADULT = 300, PET_EXTRA = 3, PET_EXTRA_MAX = 3;
+// いちばん低い能力のごはんは1.5倍（追いつくように）。前の日までの能力で決めるので、その日のうちは変わらない。前の日々には付けない
+const PET_BONUS_FROM = '2026-11-27', PET_BONUS = 1.5;
+// 育成の3問：答えた1問ごとに成長＋4、3問を渡したら なつき＋2（能力には入らない）
+const QUIZ_XP = 4, QUIZ_BOND = 2;
+const quizOf = d => { const q = getDay(d).quiz; return q && Array.isArray(q.qs) && q.qs.length === 3 ? q : null; };
+const quizAnswered = q => (q && Array.isArray(q.ans) ? q.ans.filter(a => String(a || '').trim()).length : 0);
 const PET_FOODS = {
-  meat: { name: 'おにく', stat: 'ちから', from: 'タスク・タイマー', c: 'var(--rose)', form: 'dora' },
-  veg: { name: 'やさい', stat: 'かしこさ', from: '記録・日記・夜モード・習慣', c: 'var(--mint)', form: 'usa' },
+  meat: { name: 'おにく', stat: 'ちから', from: 'タスク・タイマー・約束', c: 'var(--rose)', form: 'dora' },
+  veg: { name: 'やさい', stat: 'かしこさ', from: '記録・日記・夜モード', c: 'var(--mint)', form: 'usa' },
   snack: { name: 'おやつ', stat: 'ひかり', from: '早起き・早寝', c: 'var(--gold)', form: 'lion' },
 };
 const PET_FOOD_KEYS = ['meat', 'veg', 'snack'];
@@ -49,8 +55,8 @@ const petOn = () => S.ready && !S.fatal && !S.settings.petHide && !!petDoc();
 const petSoft = d => ['bad', 'rest'].includes(getDay(d).mode);
 function petDoneByDay() { const m = {}; for (const t of Object.values(S.tasks)) if (t.status === 'done' && t.doneAt) (m[logicalDate(t.doneAt)] ||= []).push(t); return m; }
 // その日のごはん（ほし）を3種類に分けて数える。あとから数え直すので、端末が2つあっても二重にならない
-//  おにく：終えたタスク（軽2・ふつう4・重6）、タイマーの記録（⏱、1つ2・5つまで）
-//  やさい：記録・日記（1つ2・5つまで）、夜モード（5）、自分との約束（半分2・ふつう3）、前の習慣の記録（1つ3）
+//  おにく：終えたタスク（軽2・ふつう4・重6）、タイマーの記録（⏱、1つ2・5つまで）、自分との約束（半分2・ふつう3。2026-11-27c にやさいから移した）
+//  やさい：記録・日記（1つ2・5つまで）、夜モード（5）、前の習慣の記録（1つ3）
 //  おやつ：早起き（10時までに起きた5／12時まで3）、早寝（就寝の目安までに寝た4）
 function petEarned(d, doneBy) {
   const day = getDay(d); const ents = day.entries || [];
@@ -58,7 +64,7 @@ function petEarned(d, doneBy) {
   let meat = Math.min(5, timer) * 2, veg = Math.min(5, diary) * 2, snack = 0;
   for (const t of (doneBy[d] || [])) meat += ({ light: 2, mid: 4, heavy: 6 })[t.weight] || 3;
   for (const h of habitList()) if (habitDone(day, h.id)) veg += 3; // 約束の前の習慣（前の日の記録）
-  for (const p of promisesKept(d)) veg += p.lv === 'full' ? 3 : 2;
+  for (const p of promisesKept(d)) meat += p.lv === 'full' ? 3 : 2;
   if (closedAt(d)) veg += 5;
   const w = wakeAt(d); if (w) { const h = (w - dayStart(d).getTime()) / 36e5; snack += h <= 4 ? 5 : h <= 6 ? 3 : 0; }
   const slept = closedAt(d) || getDay(d).sleepAt; const target = petBedTarget(d);
@@ -85,16 +91,22 @@ const petLean = () => petFormOf(petStats());
 function petStats() {
   const p = petDoc(); if (!p) return null;
   const t = today(); const doneBy = petDoneByDay();
-  const eat = { meat: 0, veg: 0, snack: 0 }, extra = { meat: 0, veg: 0, snack: 0 }; let seen = 0, earnedToday = { meat: 0, veg: 0, snack: 0 }, extraToday = 0;
+  const eat = { meat: 0, veg: 0, snack: 0 }, extra = { meat: 0, veg: 0, snack: 0 }; let seen = 0, earnedToday = { meat: 0, veg: 0, snack: 0 }, extraToday = 0, bonusToday = null, quizXp = 0, quizBond = 0;
   for (let d = p.bornDay || t, i = 0; d <= t && i < 800; d = addDays(d, 1), i++) {
     const e = petEarned(d, doneBy); const x = getDay(d).pet || {};
+    if (d >= PET_BONUS_FROM) {
+      const cur = {}; for (const k of PET_FOOD_KEYS) cur[k] = eat[k] + extra[k] * PET_EXTRA;
+      const low = PET_FOOD_KEYS.slice().sort((a, b) => cur[a] - cur[b])[0];
+      e[low] = Math.round(e[low] * PET_BONUS); if (d === t) bonusToday = low;
+    }
+    const qz = quizOf(d); if (qz && qz.doneAt) { quizXp += quizAnswered(qz) * QUIZ_XP; quizBond += QUIZ_BOND; }
     const ex = { meat: 0, veg: 0, snack: 0, ...(x.extra || {}) }; if (x.snacks) ex.snack += x.snacks; // 前の形（おやつの数）も読む
     for (const k of PET_FOOD_KEYS) { eat[k] += e[k]; extra[k] += ex[k] || 0; }
     if (x.seen) seen++;
     if (d === t) { earnedToday = e; extraToday = PET_FOOD_KEYS.reduce((a, k) => a + (ex[k] || 0), 0); }
   }
   const extraN = PET_FOOD_KEYS.reduce((a, k) => a + extra[k], 0);
-  const xp = eat.meat + eat.veg + eat.snack + extraN * 2;
+  const xp = eat.meat + eat.veg + eat.snack + extraN * 2 + quizXp;
   const stage = xp < PET_HATCH ? 'egg' : xp < PET_ADULT ? 'chibi' : 'adult';
   // 能力：食べたごはんの種類で育つ（おかわりは1回で3）
   const power = eat.meat + extra.meat * PET_EXTRA, wisdom = eat.veg + extra.veg * PET_EXTRA, light = eat.snack + extra.snack * PET_EXTRA;
@@ -106,7 +118,7 @@ function petStats() {
   const late = petLate(t); energy = Math.round(clamp(energy - Math.floor(late.min / 30) * 10 + extraToday * 3, 5, 100));
   const next = stage === 'egg' ? PET_HATCH : PET_ADULT; const prev = stage === 'egg' ? 0 : PET_HATCH;
   const todaySum = earnedToday.meat + earnedToday.veg + earnedToday.snack;
-  return { xp, stage, form: p.form || null, power, wisdom, light, stock, bond: seen + extraN, energy, sleepH, late, earnedToday, todaySum, extraToday, grow: stage === 'adult' ? 1 : clamp((xp - prev) / (next - prev), 0, 1) };
+  return { xp, stage, form: p.form || null, power, wisdom, light, stock, bond: seen + extraN + quizBond, energy, sleepH, late, earnedToday, todaySum, extraToday, bonusToday, grow: stage === 'adult' ? 1 : clamp((xp - prev) / (next - prev), 0, 1) };
 }
 const petAsleep = () => { const c = closedAt(today()); return !!(c && Date.now() >= c); };
 function petFace(st) {
@@ -206,6 +218,9 @@ function petLines(st) {
     const pk = promisesKept(t).length, pn = promiseList().length;
     if (pn && pk === pn) out.unshift('今日の約束、ぜんぶ守れたね。ぼく、ちょっと誇らしい。', `約束の星が${pn}つそろった。きれい。`);
     else if (pk) out.push(`約束、${pk}つ守れてる。半分でも、ちゃんと守れたうち。`);
+    const qz = quizOf(t);
+    if (qz && qz.doneAt) out.unshift('今日の3問、いっしょに考えられてうれしかった。', '問題の答え、ちゃんと覚えておくね。');
+    else out.push('育成の3問、気が向いたらいっしょに考えよう。');
     if (ents.length) out.push(`今日は${ents.length}回書いたね。ぜんぶ星になってる。`);
     else out.push('今日はまだ静か。それもいい。');
     out.push('ここにいるよ。', `今夜は${moonName(moonAge(new Date()))}。`, '星がきれいだね。');
@@ -249,6 +264,7 @@ function petRoomHTML() {
       <div class="pr-bubble" aria-live="polite">${esc(petLine(st))}</div>
     </div>
     ${cards.join('')}
+    ${S.petQuiz ? petQuizHTML(st, name) : `${petQuizBtnHTML()}
     <div class="pr-tabs" role="tablist" aria-label="ペットの部屋"><button role="tab" data-act="petTab" data-arg="room" aria-selected="${S.petTab !== 'chat'}">ようす</button><button role="tab" data-act="petTab" data-arg="chat" aria-selected="${S.petTab === 'chat'}">おはなし</button></div>
     ${S.petTab === 'chat' ? petChatHTML(st, name) : `<div class="pr-meters">
       ${soft ? meter('元気', 1, '休む日', 'var(--rest)') : petAsleep() ? meter('元気', 1, 'ねている', 'var(--lav)') : meter('元気', st.energy / 100, String(st.energy), st.energy >= 70 ? 'var(--mint)' : st.energy >= 40 ? 'var(--blue)' : 'var(--warn)')}
@@ -256,11 +272,90 @@ function petRoomHTML() {
       ${meter('成長', st.grow, stageTxt.split('（')[0], 'var(--gold)')}
     </div>
     <div class="pr-stats"><div class="pr-h">能力</div>${PET_FOOD_KEYS.map(statRow).join('')}${lean ? `<div class="ps-lean">いまの能力なら、おとなになると<b>${lean.name}</b>になりそう</div>` : ''}</div>
-    <div class="pr-feed"><div class="pr-h">棚のごはん<span>3つで1回おかわり・1日${PET_EXTRA_MAX}回まで</span></div><div class="pf-row">${PET_FOOD_KEYS.map(feedBtn).join('')}</div>${feedWhy ? `<div class="faint pr-why">${feedWhy}</div>` : ''}</div>
+    <div class="pr-feed"><div class="pr-h">棚のごはん<span>3つで1回おかわり・1日${PET_EXTRA_MAX}回まで</span></div>${st.bonusToday ? `<div class="pf-bonus" style="--c:${PET_FOODS[st.bonusToday].c}">${petFoodSVG(st.bonusToday, 14)}今日は<b>${PET_FOODS[st.bonusToday].name}</b>が1.5倍（${PET_FOODS[st.bonusToday].stat}がいちばん低いから）</div>` : ''}<div class="pf-row">${PET_FOOD_KEYS.map(feedBtn).join('')}</div>${feedWhy ? `<div class="faint pr-why">${feedWhy}</div>` : ''}</div>
     <div class="pr-legend">${PET_FOOD_KEYS.map(k => `<span style="--c:${PET_FOODS[k].c}">${petFoodSVG(k, 14)}${PET_FOODS[k].name}＝${PET_FOODS[k].from} → ${PET_FOODS[k].stat}${st.earnedToday[k] ? `（今日＋${st.earnedToday[k]}）` : ''}</span>`).join('')}</div>
-    <p class="pr-note">ごはんはその場で自動で食べて、能力と成長になる。${st.stage === 'adult' ? '' : `${st.stage === 'egg' ? '生まれる' : 'おとなになる'}まで、あと ${Math.max(0, (st.stage === 'egg' ? PET_HATCH : PET_ADULT) - st.xp)}。`}おとなの姿は、いちばん高い能力で決まる：ちから→ほしドラ、かしこさ→ゆきうさ、ひかり→ひだまりオン。なつきは会いに来た日とおかわりで増え、減らない。続けた日数は数えない。</p>`}
+    <p class="pr-note">ごはんはその場で自動で食べて、能力と成長になる。${st.stage === 'adult' ? '' : `${st.stage === 'egg' ? '生まれる' : 'おとなになる'}まで、あと ${Math.max(0, (st.stage === 'egg' ? PET_HATCH : PET_ADULT) - st.xp)}。`}おとなの姿は、いちばん高い能力で決まる：ちから→ほしドラ、かしこさ→ゆきうさ、ひかり→ひだまりオン。いちばん低い能力のごはんは1.5倍になる。なつきは会いに来た日・おかわり・育成の3問で増え、減らない。続けた日数は数えない。</p>`}`}
   </div></div>`;
 }
+/* ── 育成：毎日ちがう3問（2026-11-27c）。答えると成長となつきになり、ペットから評価と答えが届く ── */
+// days/<日付>.quiz = { qs:[{ id, genre, title, prompt, sec, trains, ref }], ans:['','',''], at, doneAt, review:{ items:[{ good, angle, answer }], overall }, reviewAt }
+const QUIZ_N = 3;
+function petQuizBtnHTML() {
+  const q = quizOf(today()); const n = quizAnswered(q);
+  const done = q && q.doneAt; const sub = done ? (q.review ? '今日の3問は済み・評価を見る' : '評価を受け取る') : q && q.ans && q.ans.some(a => a != null) ? `つづきから（${Math.min(QUIZ_N, (q.ans || []).filter(a => a != null).length)}/${QUIZ_N}）` : '30秒くらいの問題が3つ・成長となつきになる';
+  return `<button class="pq-go${done ? ' done' : ''}" data-act="petQuizOpen"><span class="pq-go-ic" aria-hidden="true">${done ? '✓' : '✦'}</span><span class="pq-go-t"><b>育成</b><span>${esc(sub)}</span></span>${done ? `<span class="pq-go-n">${n}/${QUIZ_N}</span>` : '<span class="pq-go-n">›</span>'}</button>`;
+}
+function petQuizHTML(st, name) {
+  const Q = S.petQuiz; const q = quizOf(today());
+  const head = `<div class="pq-head"><button class="iconbtn" data-act="petQuizClose" aria-label="育成を閉じる">‹</button><b>育成・今日の3問</b><span class="pq-dots" aria-hidden="true">${[0, 1, 2].map(i => `<i class="${q && q.ans && q.ans[i] != null ? (String(q.ans[i]).trim() ? 'on' : 'skip') : ''}${Q.step === i ? ' cur' : ''}"></i>`).join('')}</span></div>`;
+  if (Q.busy && !q) return `<div class="pq">${head}<div class="pq-wait"><span class="thinking">${esc(name)}が今日の問題を考えている</span></div></div>`;
+  if (!q) return `<div class="pq">${head}<div class="pc-err" role="alert">${Q.err || '問題を受け取れなかった。'}</div><div class="row" style="gap:8px;margin-top:10px"><span class="spacer"></span><button class="btn primary" data-act="petQuizOpen">もう一度</button></div></div>`;
+  if (Q.step === 'review') return `<div class="pq">${head}${petQuizReviewHTML(q, st, name)}</div>`;
+  const i = Q.step; const x = q.qs[i]; const el = Math.max(0, Date.now() - (Q.startAt || Date.now())); const over = el >= x.sec * 1000;
+  const C = 2 * Math.PI * 15;
+  return `<div class="pq">${head}
+    <div class="pq-card">
+      <div class="pq-meta"><span class="pq-genre">${esc(x.genre)}</span><span class="pq-timer${over ? ' over' : ''}" title="目安の時間"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" class="tr"/><circle cx="18" cy="18" r="15" class="tf" style="stroke-dasharray:${C.toFixed(1)};animation-duration:${x.sec}s;animation-delay:-${el}ms"/></svg><span>${over ? '目安の時間' : `目安 ${x.sec === 60 ? '1分' : x.sec + '秒'}`}</span></span></div>
+      <div class="pq-title">［${esc(x.title)}］</div>
+      <p class="pq-prompt">${esc(x.prompt)}</p>
+      ${x.trains ? `<div class="pq-trains">鍛えられる：${esc(x.trains)}</div>` : ''}
+      <textarea class="field pq-in" id="pq-a${i}" data-draft rows="3" maxlength="600" placeholder="思いついたまま、一言でもいい" aria-label="${i + 1}問目の答え">${esc(draft('pq-a' + i, (q.ans && q.ans[i]) || ''))}</textarea>
+      ${over ? '<div class="faint pq-over">時間を過ぎても、そのまま書いていい。</div>' : ''}
+    </div>
+    <div class="row pq-foot">${i > 0 ? '<button class="btn ghost" data-act="petQuizBack">戻る</button>' : ''}<span class="spacer"></span><button class="btn ghost" data-act="petQuizNext" data-arg="skip">スキップ</button><button class="btn primary" data-act="petQuizNext">${i === QUIZ_N - 1 ? '答えを渡す' : '次へ'}</button></div>
+  </div>`;
+}
+function petQuizReviewHTML(q, st, name) {
+  const Q = S.petQuiz; const r = q.review; const n = quizAnswered(q);
+  const gain = `<div class="pq-gain"><span>成長 ＋${n * QUIZ_XP}</span><span>なつき ＋${QUIZ_BOND}</span></div>`;
+  const top = `<div class="pq-rv-top"><div class="pq-rv-pet">${petBodyHTML(st, 64)}</div><div class="np-bubble pq-rv-say">${Q.busy && !r ? `<span class="thinking">${esc(name)}が答えを読んでいる</span>` : r ? petRich(r.overall || 'ぜんぶ読んだよ。') : `${Q.err || '評価を受け取れなかった。'}<div style="margin-top:8px"><button class="btn primary" data-act="petQuizReview">もう一度</button></div>`}</div></div>`;
+  const items = q.qs.map((x, i) => { const a = String((q.ans || [])[i] || '').trim(); const it = (r && r.items && r.items[i]) || {};
+    return `<div class="pq-rv"><div class="pq-rv-h"><span class="pq-genre">${esc(x.genre)}</span><b>［${esc(x.title)}］</b></div><p class="pq-rv-q">${esc(x.prompt)}</p>
+      <div class="pq-rv-a${a ? '' : ' skip'}"><span>あなた</span>${a ? esc(a) : 'スキップ'}</div>
+      ${r ? `${it.good ? `<div class="pq-rv-l good"><span>よかった</span>${petRich(it.good)}</div>` : ''}${it.angle ? `<div class="pq-rv-l"><span>別の見方</span>${petRich(it.angle)}</div>` : ''}${it.answer ? `<div class="pq-rv-l ans"><span>答え・元ネタ</span>${petRich(it.answer)}</div>` : ''}` : ''}</div>`; }).join('');
+  return `${top}${gain}${items}<div class="row pq-foot"><span class="spacer"></span><button class="btn primary" data-act="petQuizClose">とじる</button></div><p class="pr-note">問題と評価は Claude（Haiku 5.5）が作る。ジャンルは哲学・文学・心理学・経済学・想像力・企画力を2日で一巡。</p>`;
+}
+const petQuizSaveAns = (i, v) => { const t = today(); const q = quizOf(t); if (!q) return null; const ans = [0, 1, 2].map(k => (q.ans || [])[k] ?? null); ans[i] = v; const nq = { ...q, ans }; patchDay(t, { quiz: nq }); return nq; };
+const petQuizFirstOpen = q => { if (q.doneAt) return 'review'; const k = [0, 1, 2].findIndex(i => !q.ans || q.ans[i] == null); return k < 0 ? QUIZ_N - 1 : k; };
+function petQuizTick() { clearTimeout(S.petQuizT); const Q = S.petQuiz; const q = quizOf(today()); if (!Q || typeof Q.step !== 'number' || !q) return; const left = q.qs[Q.step].sec * 1000 - (Date.now() - Q.startAt); if (left > 0) S.petQuizT = setTimeout(() => { if (S.petQuiz === Q) render(); }, left + 60); }
+const petQuizGo = step => { S.petQuiz = { ...(S.petQuiz || {}), step, startAt: Date.now(), err: null }; render(); petQuizTick(); if (typeof step === 'number') requestAnimationFrame(() => { const el = $('#pq-a' + step); if (el) { el.focus({ preventScroll: true }); el.scrollIntoView({ block: 'nearest' }); } }); };
+A.petQuizOpen = async () => {
+  const t = today(); const q = quizOf(t);
+  if (q) { petQuizGo(petQuizFirstOpen(q)); if (q.doneAt && !q.review) A.petQuizReview(); return; }
+  if (typeof window.daylogChat !== 'function') { S.petQuiz = { step: 0, err: 'この画面からはペットと話せないので、問題を受け取れない。' }; render(); return; }
+  S.petQuiz = { step: 0, busy: true }; render();
+  try {
+    const r = await window.daylogChat({ kind: 'quiz', messages: [] });
+    if (r && r.error) throw r.error;
+    const qs = r && r.quiz && Array.isArray(r.quiz.qs) ? r.quiz.qs.slice(0, QUIZ_N) : [];
+    if (qs.length !== QUIZ_N) throw { code: 'api', message: '問題の形がちがった' };
+    if (!quizOf(t)) { for (let i = 0; i < QUIZ_N; i++) delete S.drafts['pq-a' + i]; patchDay(t, { quiz: { qs, ans: [null, null, null], at: Date.now() } }); }
+    S.petQuiz = { step: 0, busy: false }; petQuizGo(petQuizFirstOpen(quizOf(t)));
+  } catch (e) { if (S.petQuiz) { S.petQuiz = { step: 0, busy: false, err: petChatErrMsg(e) }; render(); } }
+};
+A.petQuizClose = () => { clearTimeout(S.petQuizT); S.petQuiz = null; render(); };
+A.petQuizBack = () => { const Q = S.petQuiz; if (!Q || typeof Q.step !== 'number' || Q.step < 1) return; petQuizSaveAns(Q.step, String(draft('pq-a' + Q.step, '')).trim() || null); petQuizGo(Q.step - 1); };
+A.petQuizNext = arg => {
+  const Q = S.petQuiz; if (!Q || typeof Q.step !== 'number') return; const i = Q.step;
+  const v = arg === 'skip' ? '' : String(draft('pq-a' + i, (quizOf(today()).ans || [])[i] || '')).trim();
+  if (arg === 'skip') S.drafts['pq-a' + i] = '';
+  const nq = petQuizSaveAns(i, v); if (!nq) return;
+  if (i < QUIZ_N - 1) { petQuizGo(i + 1); return; }
+  const fin = { ...nq, ans: nq.ans.map(a => a == null ? '' : a), doneAt: Date.now() };
+  patchDay(today(), { quiz: fin }); S.petHop = Date.now(); petQuizGo('review'); A.petQuizReview();
+};
+A.petQuizReview = async () => {
+  const t = today(); const q = quizOf(t); if (!q || !q.doneAt || q.review || !S.petQuiz || S.petQuiz.busy) return;
+  if (typeof window.daylogChat !== 'function') { S.petQuiz = { ...S.petQuiz, err: 'この画面からはペットと話せないので、評価を受け取れない。' }; render(); return; }
+  S.petQuiz = { ...S.petQuiz, busy: true, err: null }; render();
+  try {
+    const r = await window.daylogChat({ kind: 'quizReview', messages: [], quiz: { qs: q.qs.map(({ genre, title, prompt, trains, ref }) => ({ genre, title, prompt, trains, ref })), ans: q.ans } });
+    if (r && r.error) throw r.error;
+    if (!r || !r.review || !Array.isArray(r.review.items)) throw { code: 'api', message: '評価の形がちがった' };
+    patchDay(t, { quiz: { ...quizOf(t), review: r.review, reviewAt: Date.now() } });
+    if (S.petQuiz) S.petQuiz = { ...S.petQuiz, busy: false }; render();
+  } catch (e) { if (S.petQuiz) { S.petQuiz = { ...S.petQuiz, busy: false, err: petChatErrMsg(e) }; render(); } }
+};
 // おみやげの絵はがき：行った先の星座（日付から決まる星の並び）
 function petPostcardSVG(place) {
   let h = 0; for (const c of place) h = (h * 131 + c.charCodeAt(0)) >>> 0;
@@ -342,7 +437,7 @@ A.petChatClear = v => {
 A.petChatPromptSave = () => { const v = String(draft('chat-prompt', S.settings.chatPrompt || '')).slice(0, 12000); patchSettings({ chatPrompt: v }); S.drafts['chat-prompt'] = v; toast('ペットへの指示を保存した。'); };
 
 A.petOpen = () => { S.petOpen = true; S.petTalkN = 0; S.petRenaming = false; render(); };
-A.petClose = () => { S.petOpen = false; S.petRenaming = false; render(); };
+A.petClose = () => { clearTimeout(S.petQuizT); S.petOpen = false; S.petRenaming = false; S.petQuiz = null; render(); };
 A.petTalk = () => { S.petTalkN = (S.petTalkN || 0) + 1; S.petHop = Date.now(); render(); };
 A.petFeed = k => {
   if (!PET_FOODS[k]) return; const st = petStats();

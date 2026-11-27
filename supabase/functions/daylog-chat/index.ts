@@ -1,4 +1,4 @@
-// Daylog のおしゃべり係：ペットの部屋の会話を Claude API（Haiku 5.5）に渡す
+// Daylog のおしゃべり係：ペットの部屋の会話・夜モードの一言・育成の3問を Claude API（Haiku 5.5）に渡す
 // ・アプリ版は Supabase のログイン（JWT）で直接呼ぶ。claude.ai版は api_daylog.call の 'chat' → daylog_private.chat_call（合言葉 x-cron-secret）から
 // ・Claude は Daylog を読む道具（日ごとの記録・タスク・目標・メモ・さがす・ペット）だけを使える。書き込みはしない
 // ・前もっての指示は settings/main の chatPrompt。使った量は meta/chatuse（今月のトークンと金額の目安・今日の回数）
@@ -232,6 +232,109 @@ async function chat(uid: string, raw: any[], kind = "") {
   return { reply, night: kind === "night" ? parseNight(reply) : undefined, used: { tools: used, usd: Math.round(usd * 1e5) / 1e5, monthUsd: next.usd, dayCalls: next.dayCalls, dayLimit: DAY_LIMIT } };
 }
 
+// ── 育成の3問（2026-11-27c）：毎日ちがう問題を3つ作る／答えにペットが評価と答えを返す
+// ・ジャンルは6つを2日で一巡（日ごとに3つ。並びは2日ごとに入れかわる）
+// ・作った問題は画面が days/<日付>.quiz に保存する。今日の分がもうあれば、作り直さずにそれを返す（端末が2つでも1セット）
+const QUIZ_GENRES = ["哲学", "文学", "心理学", "経済学", "想像力・発想力", "企画力"];
+function quizGenres(date: string) {
+  const n = Math.floor(Date.parse(date + "T00:00:00Z") / 864e5);
+  let h = Math.imul(Math.floor(n / 2) + 7, 2654435761) >>> 0; const order = QUIZ_GENRES.slice();
+  for (let i = order.length - 1; i > 0; i--) { h = (Math.imul(h, 1103515245) + 12345) >>> 0; const j = h % (i + 1); [order[i], order[j]] = [order[j], order[i]]; }
+  return n % 2 ? order.slice(3) : order.slice(0, 3);
+}
+async function useStart(uid: string, now: number) {
+  const today = logicalDate(now); const month = today.slice(0, 7);
+  const use0 = (await one(uid, "meta", "chatuse")) || {};
+  const use = { month, in: 0, out: 0, cr: 0, cw: 0, usd: 0, calls: 0, ...(use0.month === month ? use0 : {}), day: today, dayCalls: use0.day === today ? (use0.dayCalls || 0) : 0 };
+  if (use.dayCalls >= DAY_LIMIT) throw new Fail("day_limit", `今日はもう${DAY_LIMIT}回話した（使いすぎ防止）`);
+  return use;
+}
+async function useEnd(uid: string, use: any, u: any, now: number) {
+  const usage = { in: u.input_tokens || 0, out: u.output_tokens || 0, cr: u.cache_read_input_tokens || 0, cw: u.cache_creation_input_tokens || 0 };
+  const usd = (usage.in * PRICE.in + usage.out * PRICE.out + usage.cr * PRICE.cr + usage.cw * PRICE.cw) / 1e6;
+  const next = { ...use, in: use.in + usage.in, out: use.out + usage.out, cr: use.cr + usage.cr, cw: use.cw + usage.cw, usd: Math.round((use.usd + usd) * 1e5) / 1e5, calls: use.calls + 1, dayCalls: use.dayCalls + 1, at: now };
+  await admin.from("docs").upsert({ user_id: uid, collection: "meta", id: "chatuse", data: next });
+  return { usd: Math.round(usd * 1e5) / 1e5, monthUsd: next.usd, dayCalls: next.dayCalls, dayLimit: DAY_LIMIT };
+}
+const jsonOf = (t: string) => { const m = t.match(/\{[\s\S]*\}/); if (!m) return null; try { return JSON.parse(m[0]); } catch (_) { return null; } };
+const textOf = (r: any) => (r.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n");
+// 決めた形（input_schema）で答えさせる：tool_choice で道具を1つ指定すると、引数が必ずその形の JSON になる
+const toolInput = (r: any, name: string) => { const b = (r.content || []).find((x: any) => x.type === "tool_use" && x.name === name); return b ? b.input : jsonOf(textOf(r)); };
+const STR = { type: "string" };
+const QUIZ_TOOL = { name: "give_quiz", description: "今日の3問を渡す", input_schema: { type: "object", properties: { qs: { type: "array", minItems: 3, maxItems: 3, items: { type: "object", properties: { genre: STR, title: STR, prompt: STR, sec: { type: "integer", enum: [30, 60] }, trains: STR, ref: STR }, required: ["genre", "title", "prompt", "sec", "trains", "ref"] } } }, required: ["qs"] } };
+const REVIEW_TOOL = { name: "give_review", description: "3問の評価と答えを渡す", input_schema: { type: "object", properties: { items: { type: "array", minItems: 3, maxItems: 3, items: { type: "object", properties: { good: STR, angle: STR, answer: STR }, required: ["good", "angle", "answer"] } }, overall: STR }, required: ["items", "overall"] } };
+
+async function quizMake(uid: string) {
+  if (!KEY) throw new Fail("no_key", "サーバーに ANTHROPIC_API_KEY がまだ入っていない");
+  const now = Date.now(); const today = logicalDate(now);
+  const day = await one(uid, "days", today);
+  if (Array.isArray(day?.quiz?.qs) && day.quiz.qs.length === 3) return { quiz: { date: today, qs: day.quiz.qs, again: true } };
+  const use = await useStart(uid, now);
+  const past = (await col(uid, "days", { from: addDays(today, -90), to: addDays(today, -1) })).sort((a, b) => a.id.localeCompare(b.id));
+  const recent = past.flatMap(r => (r.data?.quiz?.qs || []).map((q: any) => `- ${q.genre}［${q.title}］${cut(q.prompt, 50)}`)).slice(-90);
+  const genres = quizGenres(today);
+  const ask = [
+    "山浦（21歳。マイクラ建築・3DCG・YouTube・ゲーム・アニメが身近）が、ペットの育成のために毎日3問だけ答える。目的は、知識と考える力を少しずつ積み上げることと、答えられた手ごたえで自己肯定感を育てること。",
+    `今日の3問のジャンル（この順で1問ずつ）：${genres.join("／")}`,
+    "",
+    "問題の条件：",
+    "- 30秒〜1分で、自由に一言〜数行で答えられる。正解が1つに決まらず、どんな答えにも良いところを見つけられる",
+    "- 問題文だけで答えられる（前提知識がいらない）。知識は、答えたあとの「答え・元ネタ」で渡す",
+    "- 形式を毎回変える：思考実験／もしも／今日の言葉で短文／逆から考える／2択と理由／名前をつける／組み合わせる／一言で定義する／身近なものの別の使い道／架空の店・道具・ルールを作る など。3問で同じ形式を使わない",
+    "- 抽象的すぎない。具体的な場面やモノを1つ入れる。ゲーム・ネット・街・食べ物など身近な題材を混ぜてよい（毎回マイクラにしない）",
+    "- よく知られた定番（テセウスの船・トロッコ問題・残響など）は、最近出していなくても週に1回まで。まだ出していない題材を優先する",
+    "- 重すぎる題材（死・病気・お金の不安・人間関係のつらさ）は避ける。説教・自己啓発っぽくしない",
+    "- 哲学・心理学・経済学・文学の問題は、実在する考え方・実験・用語・作品に結びつける（ref に書く。確かなものだけ。あやしい人名や数字は書かない）",
+    recent.length ? `\n最近出した問題（同じ題材・同じ問いは避ける）：\n${recent.join("\n")}` : "",
+    "",
+    "give_quiz で渡す。各問：genre（上のジャンル）、title（ミッション名・12字以内。「形式：題材」の形）、prompt（問題文・90字以内。やわらかいタメ口で、「〜してください」は使わない）、sec（30 か 60。短文を作る問題は 60）、trains（鍛えられる力・25字以内）、ref（答えのあとに紹介する元ネタ・用語・人物・40字以内）。",
+  ].join("\n");
+  const r = await anthropic({ model: MODEL, max_tokens: 1500, tools: [QUIZ_TOOL], tool_choice: { type: "tool", name: "give_quiz" }, messages: [{ role: "user", content: ask }] });
+  const used = await useEnd(uid, use, r.usage || {}, now);
+  const j = toolInput(r, "give_quiz"); const raw = Array.isArray(j?.qs) ? j.qs : [];
+  if (raw.length !== 3) console.error("quiz parse", JSON.stringify(r.content || []).slice(0, 1500));
+  const qs = raw.slice(0, 3).map((q: any, i: number) => ({
+    id: `q${i + 1}`, genre: genres.includes(q?.genre) ? q.genre : genres[i], title: cut(String(q?.title || "").trim(), 24), prompt: cut(String(q?.prompt || "").trim(), 160),
+    sec: Number(q?.sec) >= 60 ? 60 : 30, trains: cut(String(q?.trains || "").trim(), 40), ref: cut(String(q?.ref || "").trim(), 80),
+  })).filter((q: any) => q.title && q.prompt);
+  if (qs.length !== 3) throw new Fail("api", "問題をうまく作れなかった。もう一度押してみて");
+  return { quiz: { date: today, qs }, used };
+}
+
+async function quizReview(uid: string, quiz: any) {
+  if (!KEY) throw new Fail("no_key", "サーバーに ANTHROPIC_API_KEY がまだ入っていない");
+  const qs = Array.isArray(quiz?.qs) ? quiz.qs.slice(0, 3) : []; const ans = Array.isArray(quiz?.ans) ? quiz.ans.slice(0, 3) : [];
+  if (qs.length !== 3) throw new Fail("bad_request", "問題がない");
+  const now = Date.now(); const use = await useStart(uid, now);
+  const settings = await one(uid, "settings", "main"); const pet = (await one(uid, "pet", "main")) || {};
+  const petName = pet.name || "ペット"; const pref = cut(String(settings?.chatPrompt || "").trim(), 12000);
+  const base = [
+    `あなたは、山浦の生活アプリ「Daylog」の中にいるペット「${petName}」。山浦が育成のために今日の3問に答えた。ペットとして、評価と答えを返す。`,
+    "・画面に出せる形：太字（**ことば**）と改行だけ。",
+    "・点数はつけない。比べない。叱らない。空欄（スキップ）は責めず、その問題は答え・元ネタだけを渡す。",
+    "・答えの事実（人物・用語・作品・実験）は確かなものだけ。あやしいときは名前を出さずに考え方だけを書く。",
+    "・あなたが山浦の事を助けるつもりで全力でサポートしてください。",
+    pref ? `\n――山浦が書いた指示（キャラ・口調はこれに従う。長さはこの返事の決まりを優先）――\n${pref}` : "・日本語で、やさしく短く。",
+  ].join("\n");
+  const body = qs.map((q: any, i: number) => `【${i + 1}】${q.genre}［${q.title}］\n問題：${q.prompt}\n鍛えられる：${q.trains}\n元ネタの候補：${q.ref}\n山浦の答え：${cut(String(ans[i] || "").trim(), 600) || "（スキップ）"}`).join("\n\n");
+  const ask = [
+    body, "",
+    "それぞれの問題に：",
+    "- good：答えの良かったところを具体的に1つ（山浦の言葉を短く引用する。40〜80字。スキップなら空）",
+    "- angle：別の見方を1つ（40〜80字）",
+    "- answer：答え・元ネタ（用語・人物・作品・実験と、その考え方。60〜140字）",
+    "最後に overall：3問ぜんぶを見たペットからのひとこと（2文・80字以内。できたことを認める）",
+    "give_review で、問題の順に items を3つと overall を渡す。",
+  ].join("\n");
+  const r = await anthropic({ model: MODEL, max_tokens: 1800, system: [{ type: "text", text: base, cache_control: { type: "ephemeral" } }], tools: [REVIEW_TOOL], tool_choice: { type: "tool", name: "give_review" }, messages: [{ role: "user", content: ask }] });
+  const used = await useEnd(uid, use, r.usage || {}, now);
+  const j = toolInput(r, "give_review");
+  if (!j || !Array.isArray(j.items)) console.error("review parse", JSON.stringify(r.content || []).slice(0, 1500));
+  if (!j || !Array.isArray(j.items)) throw new Fail("api", "評価をうまく作れなかった。もう一度押してみて");
+  const items = [0, 1, 2].map(i => { const x = j.items[i] || {}; return { good: cut(String(x.good || "").trim(), 200), angle: cut(String(x.angle || "").trim(), 200), answer: cut(String(x.answer || "").trim(), 320) }; });
+  return { review: { items, overall: cut(String(j.overall || "").trim(), 200) }, used };
+}
+
 async function cronSecret() { const { data } = await admin.from("push_keys").select("value").eq("key", "cron_secret").maybeSingle(); return data?.value || ""; }
 
 Deno.serve(async (req) => {
@@ -247,6 +350,8 @@ Deno.serve(async (req) => {
       if (error || !u?.user) return json({ error: { code: "not_signed_in", message: "ログインし直してほしい" } }, 401);
       uid = u.user.id;
     }
+    if (b.kind === "quiz") return json(await quizMake(uid));
+    if (b.kind === "quizReview") return json(await quizReview(uid, b.quiz));
     return json(await chat(uid, b.messages, b.kind === "night" ? "night" : ""));
   } catch (e) {
     const f = e instanceof Fail ? e : new Fail("internal", String((e as Error)?.message || e));
