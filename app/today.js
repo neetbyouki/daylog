@@ -90,7 +90,7 @@ function todayView() {
   h += alldayHTML(d);
   h += `<div class="modes" role="group" aria-label="今日の体調">${Object.entries(MODES).map(([k, m]) => `<button class="mode" style="--c:${m.c}" data-act="setMode" data-arg="${k}" aria-pressed="${mode === k}" title="${m.hint}">${m.label}</button>`).join('')}</div>`;
   h += promiseBarHTML(d);
-  h += `<div class="stack">${morningCard(d)}${todayCards(d)}</div>`;
+  h += `<div class="stack">${todayCards(d)}</div>`;
   h += timelineHTML(d);
   h += `<div class="stack" style="margin-top:18px">${claudeCard(d)}</div>`;
   return h;
@@ -132,10 +132,6 @@ function replanLocal(d) {
   const keep = openTasks().filter(t => t.deadline && diffDays(d, t.deadline) <= 0);
   if (!later.length && !keep.length) return '';
   return `<div class="note-local" style="margin-top:8px">${keep.length ? `今日まで：${keep.map(t => esc(t.title)).join('、')}\n` : ''}${later.length ? `明日に回してもいい重いタスク：${later.map(t => esc(t.title)).join('、')}` : ''}</div>`;
-}
-function morningCard(d) {
-  if (!needsMorningPlan(d) || new Date().getHours() >= 22) return '';
-  return `<div class="card note"><span class="k">今日の予定</span><div class="v"><div style="font-size:14px">今日の予定はまだ。入れる？</div><div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="morningPlan">入れる</button><button class="btn sm ghost" data-act="morningSkip">今日はなし</button></div></div></div>`;
 }
 function claudeCard(d) {
   const day = getDay(d); const mode = day.mode; const bt = day.bedtime; const restQ = mode === 'rest';
@@ -601,20 +597,11 @@ A.promiseTap = id => {
   const all = promiseList().every(p => (p.id === id ? next : promiseLv(day, p.id)));
   if (next && all && !promiseList().every(p => promiseLv(day, p.id))) toast('今日の約束、ぜんぶ守れた。');
 };
-// 昨夜、今日の予定を入れていない（夜モードで送っていない）か
-function needsMorningPlan(d) {
-  const y = addDays(d, -1); const yd = getDay(y); const day = getDay(d);
-  if (day.morningPlan) return false; // 入れた・今日はなしにした
-  const planned = (yd.plan || []).some(p => p.date === d) || !!day.wakePlan;
-  return !planned;
-}
 function startMorning(d, adhoc) {
   const y = addDays(d, -1); const now = new Date(Date.now() + 15 * 6e4);
   S.sheet = null;
-  S.night = { morning: true, adhoc: !!adhoc, date: y, step: 2, mood: 0, body: 0, text: '', plan: [], sent: { wake: 'ok' }, wake: `${pad(now.getHours())}:${pad(now.getMinutes())}`, meds: false, comment: '', name: '' };
+  S.night = { morning: true, adhoc: !!adhoc, date: y, step: 0, mood: 0, body: 0, text: '', plan: [], sent: { wake: 'ok' }, wake: `${pad(now.getHours())}:${pad(now.getMinutes())}`, meds: false, comment: '', name: '' };
   render(); loadEvents(d);
 }
-A.morningPlan = () => startMorning(today());
 A.todayPlan = () => startMorning(today(), true);
-A.morningSkip = () => { const d = today(); patchDay(d, { morningPlan: { skipped: true, at: Date.now() } }); S.night = null; render(); };
 function finishMorning() { const d = today(); const n = S.night; if (!getDay(d).morningPlan) patchDay(d, { morningPlan: { done: true, at: Date.now(), count: (n && n.plan.length) || 0 } }); S.night = null; render(); loadEvents(d, true); toast('今日の予定に入れた。'); }

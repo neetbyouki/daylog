@@ -65,7 +65,7 @@ function dayView(date: string, day: any, pc: any, plist: any[] = DEFAULT_PROMISE
   return {
     date, weekday: DOW[d.getUTCDay()], mode: day.mode || null,
     woke: isFinite(wake) ? md(wake) : null, slept: md(slept), bedtimeTarget: day.bedtime?.time || null,
-    nightModeDone: !!(day.close && day.close.done), close: day.close ? { mood: day.close.mood, body: day.close.body, constellation: day.close.name || undefined } : undefined,
+    nightModeDone: !!(day.close && day.close.done), close: day.close ? { mood: day.close.mood, body: day.close.body, note: day.close.text ? cut(day.close.text, 300) : undefined, constellation: day.close.name || undefined } : undefined,
     promises: day.promises || date >= "2026-11-25" ? promiseView(day, plist) : undefined, oldHabitsDone: habits.length ? habits : undefined, entries: ents, plans: plans.length ? plans : undefined,
     gameMinutesTotal: pc.gameMinutes ?? undefined, games: games.length ? games : undefined,
     pcNaps: (pc.naps || []).map((n: any) => `${hm(n.from)}〜${hm(n.to)}`),
@@ -147,7 +147,22 @@ async function anthropic(body: unknown) {
   return j;
 }
 
-async function chat(uid: string, raw: any[]) {
+// 夜モードの締め：ペットとしての一言と、今日の星座の名前（JSONで受け取る）
+const NIGHT_ASK = [
+  "（夜モード）山浦がいま、夜モードで今日を締めているところ。ペットとして、今日の締めの一言をかけて。",
+  "- 2〜3文、100字以内。今日のようす（記録・約束・気分・締めのメモ）から、具体的なことを1つ拾う",
+  "- 守れなかったこと・できなかったことは責めない。しんどそうな日は、そのままでいいと伝える",
+  "- もう寝るところなので、質問で終わらない",
+  "それと、今日の星座に名前をつけて：ファンタジーの物語や古い神話に出てきそうな名前。今日の出来事をそのまま書かず、魔法・伝承・遠い国の言葉に置き換える。「〇〇座」の形で、座を含めて14字以内。",
+  "返事は JSON だけ：{\"comment\":\"一言\",\"name\":\"〇〇座\"}",
+].join("\n");
+function parseNight(reply: string) {
+  const m = reply.match(/\{[\s\S]*\}/);
+  if (m) { try { const j = JSON.parse(m[0]); if (j && j.comment) return { comment: cut(String(j.comment).trim(), 240), name: cut(String(j.name || "").trim(), 20) }; } catch (_) { /* そのまま下へ */ } }
+  return { comment: cut(reply.replace(/```[a-z]*|```/g, "").trim(), 240), name: "" };
+}
+
+async function chat(uid: string, raw: any[], kind = "") {
   if (!KEY) throw new Fail("no_key", "サーバーに ANTHROPIC_API_KEY がまだ入っていない");
   // 使いすぎ防止（1日の回数）
   const now = Date.now(); const today = logicalDate(now); const month = today.slice(0, 7);
@@ -161,6 +176,7 @@ async function chat(uid: string, raw: any[]) {
     const last = msgs[msgs.length - 1];
     if (last && last.role === role) last.content += "\n" + text; else msgs.push({ role, content: text });
   }
+  if (kind === "night") msgs.splice(0, msgs.length, { role: "user", content: NIGHT_ASK });
   while (msgs.length && msgs[0].role !== "user") msgs.shift();
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") throw new Fail("bad_request", "話しかける言葉がない");
   const settings = await one(uid, "settings", "main"); const sum = await todaySummary(uid, settings);
@@ -213,7 +229,7 @@ async function chat(uid: string, raw: any[]) {
   const usd = (usage.in * PRICE.in + usage.out * PRICE.out + usage.cr * PRICE.cr + usage.cw * PRICE.cw) / 1e6;
   const next = { ...use, in: use.in + usage.in, out: use.out + usage.out, cr: use.cr + usage.cr, cw: use.cw + usage.cw, usd: Math.round((use.usd + usd) * 1e5) / 1e5, calls: use.calls + 1, dayCalls: use.dayCalls + 1, at: now };
   await admin.from("docs").upsert({ user_id: uid, collection: "meta", id: "chatuse", data: next });
-  return { reply, used: { tools: used, usd: Math.round(usd * 1e5) / 1e5, monthUsd: next.usd, dayCalls: next.dayCalls, dayLimit: DAY_LIMIT } };
+  return { reply, night: kind === "night" ? parseNight(reply) : undefined, used: { tools: used, usd: Math.round(usd * 1e5) / 1e5, monthUsd: next.usd, dayCalls: next.dayCalls, dayLimit: DAY_LIMIT } };
 }
 
 async function cronSecret() { const { data } = await admin.from("push_keys").select("value").eq("key", "cron_secret").maybeSingle(); return data?.value || ""; }
@@ -231,7 +247,7 @@ Deno.serve(async (req) => {
       if (error || !u?.user) return json({ error: { code: "not_signed_in", message: "ログインし直してほしい" } }, 401);
       uid = u.user.id;
     }
-    return json(await chat(uid, b.messages));
+    return json(await chat(uid, b.messages, b.kind === "night" ? "night" : ""));
   } catch (e) {
     const f = e instanceof Fail ? e : new Fail("internal", String((e as Error)?.message || e));
     if (!(e instanceof Fail)) console.error(e);

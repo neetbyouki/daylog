@@ -235,7 +235,7 @@ function afterMain() {
   if (host && !window.DaylogGalaxy.attach(host, galaxyApi())) { render(); return; } // WebGLが使えなかった：前からの描きかたに切りかえる
   if (!host) drawSky();
 }
-function afterOver() { if (S.night && S.night.step === 6) playRise(); }
+function afterOver() { if (S.night && !S.night.morning && nightKey(S.night) === 'star') playRise(); }
 function fitCanvas(cv, hRatio, maxH) {
   const w = cv.parentElement.clientWidth; const h = Math.min(maxH, Math.round(w * hRatio));
   const dpr = Math.min(2, window.devicePixelRatio || 1);

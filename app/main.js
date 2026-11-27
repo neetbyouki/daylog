@@ -72,7 +72,6 @@ function runDaily() {
   if (lastOpen !== d) {
     if (!lastOpen) S.sheet = { kind: 'welcome' };
     else if (S.settings.okaeri && diffDays(lastOpen, d) >= 3) S.sheet = { kind: 'okaeri', gap: diffDays(lastOpen, d) };
-    else if (needsMorningPlan(d)) setTimeout(() => { if (!S.night && !S.sheet) startMorning(d); }, 600);
     else S.sheet = { kind: 'first' };
     patchSettings({ lastOpenDay: d, lastOpenAt: Date.now() });
   }

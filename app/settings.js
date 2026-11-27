@@ -53,7 +53,6 @@ function settingsView() {
   h += `<h2 class="sec"><span>見た目</span></h2><div class="card settings"><div class="item"><div class="l">画面の見た目<small>記録はどちらでも同じ。いつでも切り替えられる。</small></div><div class="seg" role="group" aria-label="画面の見た目"><button data-act="setLook" data-arg="nova" aria-pressed="${look === 'nova'}">新しい見た目</button><button data-act="setLook" data-arg="classic" aria-pressed="${look === 'classic'}">前の見た目</button></div></div><div class="item"><div class="l">画面の動き<small>「控えめ」にすると、画面の切りかえや★・チェックの動きを止める。この端末だけの設定。</small></div><div class="seg" role="group" aria-label="画面の動き"><button data-act="setMotion" data-arg="full" aria-pressed="${!motionCalm()}">ふつう</button><button data-act="setMotion" data-arg="calm" aria-pressed="${motionCalm()}">控えめ</button></div></div><div class="item"><div class="l">ペット<small>今日のタブと星空のタブに出す。隠しても、ほしや成長はそのまま。</small></div><div class="seg" role="group" aria-label="ペット"><button data-act="setPet" data-arg="show" aria-pressed="${!S.settings.petHide}">出す</button><button data-act="setPet" data-arg="hide" aria-pressed="${!!S.settings.petHide}">隠す</button></div></div></div>`;
   h += petChatSettingsHTML();
   h += `<h2 class="sec"><span>朝と夜</span></h2><div class="card settings">
-    <div class="item"><div class="l">「起きる」予定の時刻<small>夜モードで翌朝の予定として.｡oOに入る。夜モードでその日だけ変えることもできる。</small></div><input class="field" type="time" id="set-wake" value="${esc(st.wakeTime)}" data-onchg="setWake" aria-label="起きる時刻"></div>
     ${pushItemHTML()}
     ${sw('bedtimeNotify', '就寝目安の通知', st.pushOn ? '目安が決まると.｡oOに「🌙 就寝の目安」が入り、45分前にDaylogから通知が来る。PCにも30分前に出す。' : '目安が決まると.｡oOに「🌙 就寝の目安」が自動で入る。スマホはGoogleカレンダーのアプリが45分前に知らせる。PCにも30分前に出す。')}
     <div class="item"><div class="l">参加型の曜日<small>この曜日は、就寝目安を1時より後にする。</small></div><div class="wd">${WD.map((w, i) => `<button data-act="craftDay" data-arg="${i}" aria-pressed="${(st.craftDays || []).includes(i)}">${w}</button>`).join('')}</div></div>
@@ -259,7 +258,6 @@ A.logout = () => { if (window.daylogLogout) window.daylogLogout(); };
 A.toggleClaude = () => { patchSettings({ useClaude: S.settings.useClaude === false }); };
 A.toggleSetting = k => { patchSettings({ [k]: !S.settings[k] }); schedulePCPush(); };
 A.toggleCal = k => { patchSettings({ cals: { ...S.settings.cals, [k]: !(S.settings.cals[k] !== false) } }); S.events = {}; loadEvents(today(), true); };
-A.setWake = v => { if (v) patchSettings({ wakeTime: v }); };
 A.craftDay = i => { const n = Number(i); const cur = S.settings.craftDays || []; patchSettings({ craftDays: cur.includes(n) ? cur.filter(x => x !== n) : [...cur, n].sort() }); };
 A.syncPC = () => syncPC();
 A.pushPC = async () => { await pushPCConfig(true); toast(S.pcCfgErr ? 'PCに送れなかった。' : 'PCに設定を送った。'); };
