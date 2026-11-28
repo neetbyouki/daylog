@@ -1,0 +1,30 @@
+{
+ "autoOpenBoot": false,
+ "autoOpenGame": false,
+ "bedtimeNotify": true,
+ "calHide": {},
+ "cals": {
+  "app": true,
+  "holiday": true,
+  "i1lz": true,
+  "main": false,
+  "panda": true,
+  "star": true
+ },
+ "craftDays": [
+  0,
+  1,
+  2,
+  3,
+  5
+ ],
+ "gameExes": [
+  "VALORANT-Win64-Shipping"
+ ],
+ "lastOpenAt": 0,
+ "lastOpenDay": "",
+ "okaeri": true,
+ "restQuiet": false,
+ "useClaude": false,
+ "wakeTime": "10:00"
+}

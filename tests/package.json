@@ -1,0 +1,7 @@
+{
+  "name": "daylog-tests",
+  "private": true,
+  "description": "Daylog の画面テスト（Playwright）。node run.js で全部、node run.js promises quiz で一部",
+  "scripts": { "test": "node run.js" },
+  "devDependencies": { "playwright": "1.63.0" }
+}

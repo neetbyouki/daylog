@@ -1,0 +1,6 @@
+
+# テストの出力（画面写真・作った daylog.html）と道具
+tests/.out/
+tests/node_modules/
+# 公開しない個人の値
+private/
