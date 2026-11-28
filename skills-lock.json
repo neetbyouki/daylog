@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "skills": {
+    "baseline-ui": {
+      "source": "ibelick/ui-skills",
+      "commit": "49289efa4ce27c3c174f9c90731c6ce4013830eb",
+      "sourceType": "github",
+      "skillPath": "skills/baseline-ui/SKILL.md",
+      "computedHash": "a7336b9eab7479fb012abc59030fcd9736a31fc6c7cffc0dd9f90b36e34861aa"
+    }
+  }
+}
