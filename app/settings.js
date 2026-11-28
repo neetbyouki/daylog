@@ -48,29 +48,29 @@ function schedulePCPush() { clearTimeout(pcPushT); pcPushT = setTimeout(() => pu
 function settingsView() {
   const st = S.settings;
   const sw = (key, label, small) => `<div class="item"><div class="l">${label}${small ? `<small>${small}</small>` : ''}</div><button class="switch" role="switch" aria-checked="${!!st[key]}" data-act="toggleSetting" data-arg="${key}" aria-label="${label}"></button></div>`;
-  let h = headerHTML('設定', 'もう一度右上のボタンを押すと、もとの画面に戻る');
+  let h = headerHTML('設定');
   const look = st.look === 'classic' ? 'classic' : 'nova';
-  h += `<h2 class="sec"><span>見た目</span></h2><div class="card settings"><div class="item"><div class="l">画面の見た目<small>記録はどちらでも同じ。いつでも切り替えられる。</small></div><div class="seg" role="group" aria-label="画面の見た目"><button data-act="setLook" data-arg="nova" aria-pressed="${look === 'nova'}">新しい見た目</button><button data-act="setLook" data-arg="classic" aria-pressed="${look === 'classic'}">前の見た目</button></div></div><div class="item"><div class="l">画面の動き<small>「控えめ」にすると、画面の切りかえや★・チェックの動きを止める。この端末だけの設定。</small></div><div class="seg" role="group" aria-label="画面の動き"><button data-act="setMotion" data-arg="full" aria-pressed="${!motionCalm()}">ふつう</button><button data-act="setMotion" data-arg="calm" aria-pressed="${motionCalm()}">控えめ</button></div></div><div class="item"><div class="l">ペット<small>今日のタブと星空のタブに出す。隠しても、ほしや成長はそのまま。</small></div><div class="seg" role="group" aria-label="ペット"><button data-act="setPet" data-arg="show" aria-pressed="${!S.settings.petHide}">出す</button><button data-act="setPet" data-arg="hide" aria-pressed="${!!S.settings.petHide}">隠す</button></div></div></div>`;
+  h += `<h2 class="sec"><span>見た目</span></h2><div class="card settings"><div class="item"><div class="l">画面の見た目</div><div class="seg" role="group" aria-label="画面の見た目"><button data-act="setLook" data-arg="nova" aria-pressed="${look === 'nova'}">新しい見た目</button><button data-act="setLook" data-arg="classic" aria-pressed="${look === 'classic'}">前の見た目</button></div></div><div class="item"><div class="l">画面の動き</div><div class="seg" role="group" aria-label="画面の動き"><button data-act="setMotion" data-arg="full" aria-pressed="${!motionCalm()}">ふつう</button><button data-act="setMotion" data-arg="calm" aria-pressed="${motionCalm()}">控えめ</button></div></div><div class="item"><div class="l">ペット</div><div class="seg" role="group" aria-label="ペット"><button data-act="setPet" data-arg="show" aria-pressed="${!S.settings.petHide}">出す</button><button data-act="setPet" data-arg="hide" aria-pressed="${!!S.settings.petHide}">隠す</button></div></div></div>`;
   h += petChatSettingsHTML();
   h += `<h2 class="sec"><span>朝と夜</span></h2><div class="card settings">
     ${pushItemHTML()}
-    ${sw('bedtimeNotify', '就寝目安の通知', st.pushOn ? '目安が決まると.｡oOに「🌙 就寝の目安」が入り、45分前にDaylogから通知が来る。PCにも30分前に出す。' : '目安が決まると.｡oOに「🌙 就寝の目安」が自動で入る。スマホはGoogleカレンダーのアプリが45分前に知らせる。PCにも30分前に出す。')}
-    <div class="item"><div class="l">参加型の曜日<small>この曜日は、就寝目安を1時より後にする。</small></div><div class="wd">${WD.map((w, i) => `<button data-act="craftDay" data-arg="${i}" aria-pressed="${(st.craftDays || []).includes(i)}">${w}</button>`).join('')}</div></div>
+    ${sw('bedtimeNotify', '就寝目安の通知')}
+    <div class="item"><div class="l">参加型の曜日</div><div class="wd">${WD.map((w, i) => `<button data-act="craftDay" data-arg="${i}" aria-pressed="${(st.craftDays || []).includes(i)}">${w}</button>`).join('')}</div></div>
   </div>`;
   h += `<h2 class="sec"><span>続ける仕組み</span></h2><div class="card settings">
-    ${sw('autoOpenBoot', 'PCを起動したときにDaylogを開く', 'PCの見張り役が開く。')}
-    ${sw('okaeri', 'おかえり画面', '3日以上あいたときに、責めずに迎える画面を出す。')}
-    ${sw('restQuiet', '休養の日は演出を止める', '自動で開く機能と、星空のアニメーションを止める。')}
+    ${sw('autoOpenBoot', 'PCを起動したときにDaylogを開く')}
+    ${sw('okaeri', 'おかえり画面')}
+    ${sw('restQuiet', '休養の日は演出を止める')}
   </div>`;
-  h += `<h2 class="sec"><span>今日の画面に出すカレンダー</span></h2><div class="card settings">${CFG.CALS.map(c => `<div class="item"><div class="l"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${c.color};margin-right:8px"></span>${esc(c.name)}${c.key === 'app' ? '<small>Daylogが予定を入れる専用カレンダー</small>' : ''}</div><button class="switch" role="switch" aria-checked="${st.cals[c.key] !== false}" data-act="toggleCal" data-arg="${c.key}" aria-label="${esc(c.name)}を表示"></button></div>`).join('')}</div>`;
+  h += `<h2 class="sec"><span>今日の画面に出すカレンダー</span></h2><div class="card settings">${CFG.CALS.map(c => `<div class="item"><div class="l"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${c.color};margin-right:8px"></span>${esc(c.name)}${c.key === 'app' ? '' : ''}</div><button class="switch" role="switch" aria-checked="${st.cals[c.key] !== false}" data-act="toggleCal" data-arg="${c.key}" aria-label="${esc(c.name)}を表示"></button></div>`).join('')}</div>`;
   const pcTxt = { ok: `つながっている（${S.pcAt ? hm(S.pcAt) + 'に同期' : ''}${S.pcLastSeen ? ` · 見張り役の最後の連絡 ${hm(S.pcLastSeen)}` : ''}）`, none: 'まだつながっていない。PCの見張り役に合言葉を入れると届くようになる。', error: '同期に失敗した。少しして「今すぐ同期」を押してみて。', unknown: '確認中' }[S.pcStatus];
   h += `<h2 class="sec"><span>つながり</span></h2><div class="card settings">
-    <div class="item"><div class="l">Googleカレンダー<small>${S.mcp ? (S.gcalLinked === false ? 'まだ許可されていない。ログインし直すと許可できる。' : 'ログインしたGoogleアカウントのカレンダーを読み書きできる') : '準備中'}</small></div><button class="btn sm" data-act="relogin">ログインし直す</button></div>
+    <div class="item"><div class="l">Googleカレンダー<small>${S.mcp ? (S.gcalLinked === false ? 'まだ許可されていない。ログインし直すと許可できる。' : '') : '準備中'}</small></div><button class="btn sm" data-act="relogin">ログインし直す</button></div>
     <div class="item"><div class="l">PCの見張り役<small>${pcTxt}</small></div>${S.pcStatus === 'ok' || S.pcStatus === 'error' ? `<div class="row"><button class="btn sm" data-act="syncPC">今すぐ同期</button></div>` : ''}</div>
     <div class="item"><div class="l">ログイン中<small>${esc((S.user && S.user.email) || '')}</small></div><button class="btn sm ghost" data-act="logout">ログアウト</button></div>
   </div>`;
   h += backupCardHTML();
-  h += `<p class="faint" style="font-size:12px;margin-top:16px">記録は自分のアカウントだけが読み書きできる。アドレスを誰かに送っても、ログインしないと日記は見えない。</p>`;
+  h += ``;
   return h;
 }
 
@@ -126,9 +126,9 @@ function backupCardHTML() {
   const E = S.errView || {};
   let h = `<h2 class="sec"><span>記録の守り</span></h2><div class="card settings">
     <div class="item"><div class="l">Googleドライブに保存<small>${txt}<br>毎週月曜の朝4:30に、ドライブの「Daylog バックアップ」フォルダへ自動で保存する（新しい12回分を残す）。</small></div><div class="row">${relog ? '<button class="btn sm" data-act="relogin">ログインし直す</button>' : ''}<button class="btn sm${relog ? ' ghost' : ''}" data-act="backupNow" ${waiting ? 'aria-disabled="true"' : ''}>${waiting ? '保存中…' : '今すぐ保存'}</button></div></div>
-    <div class="item"><div class="l">ファイルに書き出す<small>記録をまるごと1つのファイル（JSON）にして、この端末に保存する。ノートの画像も入る。</small></div><button class="btn sm" data-act="exportJson" ${S.exporting ? 'aria-disabled="true"' : ''}>${S.exporting ? '書き出し中…' : '書き出す'}</button></div>
+    <div class="item"><div class="l">ファイルに書き出す</div><button class="btn sm" data-act="exportJson" ${S.exporting ? 'aria-disabled="true"' : ''}>${S.exporting ? '書き出し中…' : '書き出す'}</button></div>
     ${imgStatHTML()}
-    <div class="item"><div class="l">画面で起きたエラー<small>こわれた動きがあると、自動でここに記録される（90日で消える）。</small></div><button class="btn sm ghost" data-act="showErrors">${E.open ? '閉じる' : '見る'}</button></div>`;
+    <div class="item"><div class="l">画面で起きたエラー</div><button class="btn sm ghost" data-act="showErrors">${E.open ? '閉じる' : '見る'}</button></div>`;
   if (E.open) {
     let body;
     if (E.loading) body = '<p class="faint">読み込み中…</p>';
@@ -224,14 +224,14 @@ function pushItemHTML() {
   const btn = p.busy ? '<span class="thinking" style="font-size:12px">設定中</span>'
     : on ? '<button class="btn sm" data-act="pushTest">テスト</button><button class="btn ghost sm" data-act="pushOff">オフ</button>'
     : (st === 'off' ? '<button class="btn primary sm" data-act="pushOn">オンにする</button>' : '');
-  const small = on ? 'この端末に、予定の15分前・就寝目安の45分前・タイマーの終わりに通知が来る（アプリを閉じていても届く）。'
-    : st === 'off' ? '予定の15分前・就寝目安の45分前・タイマーの終わりに、アプリを閉じていてもDaylogから通知を出す。'
+  const small = on ? ''
+    : st === 'off' ? ''
     : PUSH_MSG[st] || '確認中…';
   // 通知が届く端末。スマホがまだなら、スマホでオンにする手順
   const devs = p.devs || null; const mob = devs && devs.some(x => isPhoneUA(x.ua));
   const devTxt = devs ? (devs.length ? `<br>届く端末：${devs.map(x => esc(devName(x.ua))).join('、')}` : '<br>届く端末：まだない') : '';
   const phoneTip = devs && !mob ? `<br><span class="bk-err">スマホにはまだ届かない。</span>スマホでホーム画面のDaylogを開き、ここで「オンにする」を押すと届く。それまでは、Daylogが入れる予定にGoogleカレンダーの通知（15分前）も付ける。` : '';
-  return `<div class="item"><div class="l">Daylogからの通知${on ? ' <span class="pill">オン</span>' : ''}<small>${esc(small)}${devTxt}${phoneTip}${p.msg ? `<br>${esc(p.msg)}` : ''}</small></div><div class="row" style="gap:6px">${btn}</div></div>`;
+  return `<div class="item"><div class="l">Daylogからの通知${on ? ' <span class="pill">オン</span>' : ''}<small>${esc(small)}${devTxt}${phoneTip}${p.msg ? `<br>${esc(p.msg)}` : ''}</small></div><div class="row" style="gap:8px">${btn}</div></div>`;
 }
 A.pushOn = async () => {
   S.push.busy = true; S.push.msg = ''; render();

@@ -243,9 +243,9 @@ function petRoomHTML() {
   const cards = [];
   if (st.stage !== 'egg' && !p.name) cards.push(`<div class="pr-card"><b>生まれた！</b><p>名前を付けてあげて。あとで変えられる。</p><div class="row" style="gap:8px;margin-top:8px"><input class="field grow" id="pet-name" data-draft maxlength="12" placeholder="名前（12文字まで）" value="${esc(draft('pet-name'))}" data-enter="petName"><button class="btn primary" data-act="petName">決める</button></div></div>`);
   if (S.petRenaming && p.name) cards.push(`<div class="pr-card"><b>名前を変える</b><div class="row" style="gap:8px;margin-top:8px"><input class="field grow" id="pet-name" data-draft maxlength="12" value="${esc(draft('pet-name', p.name))}" data-enter="petName"><button class="btn ghost" data-act="petRenameCancel">やめる</button><button class="btn primary" data-act="petName">決める</button></div></div>`);
-  if (form && p.evoSeen === false) cards.push(`<div class="pr-card gold"><b>おとなになった：${form.name}</b><p>${form.theme}。${form.why}から、この姿になった。どの姿も良い・悪いはない。</p><button class="link" data-act="petEvoSeen">わかった</button></div>`);
+  if (form && p.evoSeen === false) cards.push(`<div class="pr-card gold"><b>おとなになった：${form.name}</b><p>${form.theme}。${form.why}。</p><button class="link" data-act="petEvoSeen">わかった</button></div>`);
   if (p.trip && !p.trip.seen) cards.push(`<div class="pr-card post"><b>おかえり</b><p>${diffDays(p.trip.from, p.trip.to)}日のあいだ、${esc(p.trip.place)}のほうまで旅をしていた。おみやげに絵はがきを持って帰ってきた。</p><div class="pr-postcard" aria-hidden="true">${petPostcardSVG(p.trip.place)}</div><button class="link" data-act="petTripSeen">しまっておく</button></div>`);
-  for (const m of petUnread().slice(0, 1)) cards.push(`<div class="pr-card mail"><b>✉ 手紙が届いた</b><p class="pr-letter">${petRich(m.text)}</p><button class="link" data-act="petLetterRead" data-arg="${esc(m.id)}">読んだ</button></div>`);
+  for (const m of petUnread().slice(0, 1)) cards.push(`<div class="pr-card mail"><b class="ic-row">${lu('mail', 16)}手紙が届いた</b><p class="pr-letter">${petRich(m.text)}</p><button class="link" data-act="petLetterRead" data-arg="${esc(m.id)}">読んだ</button></div>`);
   const name = p.name || (st.stage === 'egg' ? 'たまご' : '名前はまだ');
   const stageTxt = st.stage === 'adult' && form ? `${form.name}（${form.theme}）` : PET_STAGE_LABEL[st.stage];
   const asleep = petAsleep(); const full = st.extraToday >= PET_EXTRA_MAX;
@@ -256,7 +256,7 @@ function petRoomHTML() {
   const feedBtn = k => { const f = PET_FOODS[k]; const n = st.stock[k]; const ok = !feedWhy && n > 0;
     return `<button class="pf-btn" style="--c:${f.c}" data-act="petFeed" data-arg="${k}" ${ok ? '' : 'disabled'} aria-label="${f.name}のおかわりをあげる（棚に${n}回分）"><span class="pf-ic">${petFoodSVG(k, 26)}</span><span class="pf-t">${f.name}</span><span class="pf-n">×${n}</span></button>`; };
   return `<div class="overlay pet-over" role="dialog" aria-modal="true" aria-label="ペットの部屋"><div class="pet-room">
-    <div class="pr-top"><button class="iconbtn pr-back" data-act="petClose" aria-label="戻る">‹</button><div class="pr-title"><b>${esc(name)}</b><span>${esc(stageTxt)}</span></div>${p.name && !S.petRenaming ? '<button class="iconbtn" data-act="petRename" aria-label="名前を変える" title="名前を変える">✎</button>' : '<span style="width:36px"></span>'}</div>
+    <div class="pr-top"><button class="iconbtn pr-back" data-act="petClose" aria-label="戻る">${lu('chevron-left', 20)}</button><div class="pr-title"><b>${esc(name)}</b><span>${esc(stageTxt)}</span></div>${p.name && !S.petRenaming ? `<button class="iconbtn" data-act="petRename" aria-label="名前を変える" title="名前を変える">${lu('pencil', 16)}</button>` : '<span style="width:36px"></span>'}</div>
     <div class="pr-scene${night ? ' night' : ''}${soft ? ' soft' : ''}">
       <div class="pr-window" aria-hidden="true"><i class="pr-sky"></i>${night ? '<i class="pr-moon"></i>' : '<i class="pr-sun"></i>'}</div>
       <div class="pr-plant" aria-label="いっしょに育つ観葉植物">${petSVG('plant-' + plant, 92)}</div>
@@ -267,9 +267,9 @@ function petRoomHTML() {
     ${S.petQuiz ? petQuizHTML(st, name) : `${petQuizBtnHTML()}
     <div class="pr-tabs" role="tablist" aria-label="ペットの部屋"><button role="tab" data-act="petTab" data-arg="room" aria-selected="${S.petTab !== 'chat'}">ようす</button><button role="tab" data-act="petTab" data-arg="chat" aria-selected="${S.petTab === 'chat'}">おはなし</button></div>
     ${S.petTab === 'chat' ? petChatHTML(st, name) : `<div class="pr-meters">
-      ${soft ? meter('元気', 1, '休む日', 'var(--rest)') : petAsleep() ? meter('元気', 1, 'ねている', 'var(--lav)') : meter('元気', st.energy / 100, String(st.energy), st.energy >= 70 ? 'var(--mint)' : st.energy >= 40 ? 'var(--blue)' : 'var(--warn)')}
-      ${meter('なつき', Math.min(1, st.bond / 60), String(st.bond), 'var(--rose)')}
-      ${meter('成長', st.grow, stageTxt.split('（')[0], 'var(--gold)')}
+      ${soft ? meter('元気', 1, '休む日', 'var(--rest)') : petAsleep() ? meter('元気', 1, 'ねている', 'var(--lav)') : meter('元気', st.energy / 100, String(st.energy), st.energy >= 40 ? 'var(--acc)' : 'var(--warn)')}
+      ${meter('なつき', Math.min(1, st.bond / 60), String(st.bond), 'var(--acc)')}
+      ${meter('成長', st.grow, stageTxt.split('（')[0], 'var(--acc)')}
     </div>
     <div class="pr-stats"><div class="pr-h">能力</div>${PET_FOOD_KEYS.map(statRow).join('')}${lean ? `<div class="ps-lean">いまの能力なら、おとなになると<b>${lean.name}</b>になりそう</div>` : ''}</div>
     <div class="pr-feed"><div class="pr-h">棚のごはん<span>3つで1回おかわり・1日${PET_EXTRA_MAX}回まで</span></div>${st.bonusToday ? `<div class="pf-bonus" style="--c:${PET_FOODS[st.bonusToday].c}">${petFoodSVG(st.bonusToday, 14)}今日は<b>${PET_FOODS[st.bonusToday].name}</b>が1.5倍（${PET_FOODS[st.bonusToday].stat}がいちばん低いから）</div>` : ''}<div class="pf-row">${PET_FOOD_KEYS.map(feedBtn).join('')}</div>${feedWhy ? `<div class="faint pr-why">${feedWhy}</div>` : ''}</div>
@@ -282,14 +282,14 @@ function petRoomHTML() {
 const QUIZ_N = 3;
 function petQuizBtnHTML() {
   const q = quizOf(today()); const n = quizAnswered(q);
-  const done = q && q.doneAt; const sub = done ? (q.review ? '今日の3問は済み・評価を見る' : '評価を受け取る') : q && q.ans && q.ans.some(a => a != null) ? `つづきから（${Math.min(QUIZ_N, (q.ans || []).filter(a => a != null).length)}/${QUIZ_N}）` : '30秒くらいの問題が3つ・成長となつきになる';
-  return `<button class="pq-go${done ? ' done' : ''}" data-act="petQuizOpen"><span class="pq-go-ic" aria-hidden="true">${done ? '✓' : '✦'}</span><span class="pq-go-t"><b>育成</b><span>${esc(sub)}</span></span>${done ? `<span class="pq-go-n">${n}/${QUIZ_N}</span>` : '<span class="pq-go-n">›</span>'}</button>`;
+  const done = q && q.doneAt; const sub = done ? (q.review ? '今日の3問は済み・評価を見る' : '評価を受け取る') : q && q.ans && q.ans.some(a => a != null) ? `つづきから（${Math.min(QUIZ_N, (q.ans || []).filter(a => a != null).length)}/${QUIZ_N}）` : '今日の3問';
+  return `<button class="pq-go${done ? ' done' : ''}" data-act="petQuizOpen"><span class="pq-go-ic" aria-hidden="true">${done ? lu('check', 16) : lu('sparkles', 16)}</span><span class="pq-go-t"><b>育成</b><span>${esc(sub)}</span></span>${done ? `<span class="pq-go-n">${n}/${QUIZ_N}</span>` : `<span class="pq-go-n">${lu('chevron-right', 16)}</span>`}</button>`;
 }
 function petQuizHTML(st, name) {
   const Q = S.petQuiz; const q = quizOf(today());
-  const head = `<div class="pq-head"><button class="iconbtn" data-act="petQuizClose" aria-label="育成を閉じる">‹</button><b>育成・今日の3問</b><span class="pq-dots" aria-hidden="true">${[0, 1, 2].map(i => `<i class="${q && q.ans && q.ans[i] != null ? (String(q.ans[i]).trim() ? 'on' : 'skip') : ''}${Q.step === i ? ' cur' : ''}"></i>`).join('')}</span></div>`;
+  const head = `<div class="pq-head"><button class="iconbtn" data-act="petQuizClose" aria-label="育成を閉じる">${lu('chevron-left', 20)}</button><b>育成・今日の3問</b><span class="pq-dots" aria-hidden="true">${[0, 1, 2].map(i => `<i class="${q && q.ans && q.ans[i] != null ? (String(q.ans[i]).trim() ? 'on' : 'skip') : ''}${Q.step === i ? ' cur' : ''}"></i>`).join('')}</span></div>`;
   if (Q.busy && !q) return `<div class="pq">${head}<div class="pq-wait"><span class="thinking">${esc(name)}が今日の問題を考えている</span></div></div>`;
-  if (!q) return `<div class="pq">${head}<div class="pc-err" role="alert">${Q.err || '問題を受け取れなかった。'}</div><div class="row" style="gap:8px;margin-top:10px"><span class="spacer"></span><button class="btn primary" data-act="petQuizOpen">もう一度</button></div></div>`;
+  if (!q) return `<div class="pq">${head}<div class="pc-err" role="alert">${Q.err || '問題を受け取れなかった。'}</div><div class="row" style="gap:8px;margin-top:8px"><span class="spacer"></span><button class="btn primary" data-act="petQuizOpen">もう一度</button></div></div>`;
   if (Q.step === 'review') return `<div class="pq">${head}${petQuizReviewHTML(q, st, name)}</div>`;
   const i = Q.step; const x = q.qs[i]; const el = Math.max(0, Date.now() - (Q.startAt || Date.now())); const over = el >= x.sec * 1000;
   const C = 2 * Math.PI * 15;
@@ -405,7 +405,7 @@ const petChatScroll = (input) => requestAnimationFrame(() => { const l = $('#pc-
 // 設定：前もって伝えておくこと
 function petChatSettingsHTML() {
   const cur = S.settings.chatPrompt || '';
-  return `<h2 class="sec"><span>ペットとの会話</span></h2><div class="card settings"><div class="item" style="display:block"><div class="l">前もって伝えておくこと<small>ペットの部屋の「おはなし」で、毎回この指示を読んでから答える。話し方・呼び方・気をつけてほしいこと・自分のことなど。</small></div>
+  return `<h2 class="sec"><span>ペットとの会話</span></h2><div class="card settings"><div class="item" style="display:block"><div class="l">前もって伝えておくこと</div>
     <textarea class="field autosize" id="chat-prompt" data-draft rows="4" maxlength="12000" style="width:100%;margin-top:8px" placeholder="例：結論から短く。ぼくのことは「山浦」と呼んで。しんどい日はアドバイスより先に話を聞いて。根性論は言わない。">${esc(draft('chat-prompt', cur))}</textarea>
     <div class="row" style="margin-top:8px;gap:8px"><span class="faint" style="font-size:12px">${String(draft('chat-prompt', cur)).length}／12000字・${esc(petChatUseText())}・1日150回まで</span><span class="spacer"></span><button class="btn primary" data-act="petChatPromptSave">保存</button></div></div></div>`;
 }

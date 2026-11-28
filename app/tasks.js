@@ -12,10 +12,10 @@ function taskFlags(t) {
   if (t.status !== 'open') return f;
   if (t.deadline) {
     const left = diffDays(d, t.deadline);
-    if (left < 0) { f.cls += ' late'; f.icons += `<span class="flag late" title="締切を過ぎている">⏳ ${-left}日過ぎ</span>`; }
-    else if (left <= 2) { f.cls += ' soon'; f.icons += `<span class="flag soon" title="締切が近い">⏳ ${left === 0 ? '今日まで' : left === 1 ? '明日まで' : 'あさってまで'}</span>`; }
+    if (left < 0) { f.cls += ' late'; f.icons += `<span class="flag late" title="締切を過ぎている">${lu('hourglass', 12)}${-left}日過ぎ</span>`; }
+    else if (left <= 2) { f.cls += ' soon'; f.icons += `<span class="flag soon" title="締切が近い">${lu('hourglass', 12)}${left === 0 ? '今日まで' : left === 1 ? '明日まで' : 'あさってまで'}</span>`; }
   }
-  if (t.plannedDate && t.plannedDate < d) { f.cls += ' past'; f.icons += `<span class="flag past" title="${shortLabel(t.plannedDate)}にやる予定だった">↺ ${shortLabel(t.plannedDate)}</span>`; }
+  if (t.plannedDate && t.plannedDate < d) { f.cls += ' past'; f.icons += `<span class="flag past" title="${shortLabel(t.plannedDate)}にやる予定だった">${lu('undo-2', 12)}${shortLabel(t.plannedDate)}</span>`; }
   return f;
 }
 const byDeadline = (a, b) => (a.deadline || '9999') < (b.deadline || '9999') ? -1 : (a.deadline || '9999') > (b.deadline || '9999') ? 1 : (a.createdAt || 0) - (b.createdAt || 0);
@@ -24,7 +24,7 @@ function deadlinePill(t) {
   const left = diffDays(today(), t.deadline);
   if (t.status === 'open' && left <= 2) return ''; // 近いものは ⏳ の印で出す
   const txt = left < 0 ? `${shortLabel(t.deadline)}（${-left}日過ぎ）` : left === 0 ? '今日' : shortLabel(t.deadline);
-  return `<span class="pill ${left <= 1 ? 'warn' : ''}" title="締切 ${shortLabel(t.deadline)}（あと${left}日）">⏱ ${txt}</span>`;
+  return `<span class="pill ${left <= 1 ? 'warn' : ''}" title="締切 ${shortLabel(t.deadline)}（あと${left}日）">${lu('clock', 12)}${txt}</span>`;
 }
 function taskHTML(t) {
   const steps = t.steps || []; const done = steps.filter(s => s.done).length;
@@ -34,13 +34,13 @@ function taskHTML(t) {
   return `<li class="task ${t.status === 'done' ? 'done' : ''}${fl.cls}${fxc('new' + t.id, 'new')}${fxc('drop' + t.id, 'dropped')}"${t.status === 'open' ? ` data-sort="${t.id}"` : ''}>
     <div class="head"><button class="check ${t.status === 'done' ? 'on' + fxc('task' + t.id) : ''}" data-act="${t.status === 'done' ? 'taskUndo' : 'taskDone'}" data-arg="${t.id}" aria-label="完了にする">${t.status === 'done' ? CHECK : ''}</button>
       <div class="title" data-act="taskOpen" data-arg="${t.id}" style="cursor:pointer">${esc(t.title)}
-        <div class="chips">${fl.icons}${weightMark(t.weight)}${deadlinePill(t)}${goal ? `<span class="pill gold">✦ ${esc(goal.title)}</span>` : ''}${t.plannedDate && t.status === 'open' && !(t.plannedDate < today()) ? `<span class="pill" title="${shortLabel(t.plannedDate)}にやる予定">▸ ${shortLabel(t.plannedDate)}</span>` : ''}${steps.length ? `<span class="pill">${done}/${steps.length}</span>` : ''}</div>
+        <div class="chips">${fl.icons}${weightMark(t.weight)}${deadlinePill(t)}${goal ? `<span class="pill gold">${lu('sparkle', 12)}${esc(goal.title)}</span>` : ''}${t.plannedDate && t.status === 'open' && !(t.plannedDate < today()) ? `<span class="pill" title="${shortLabel(t.plannedDate)}にやる予定">▸ ${shortLabel(t.plannedDate)}</span>` : ''}${steps.length ? `<span class="pill">${done}/${steps.length}</span>` : ''}</div>
       </div>
       ${t.status === 'open' ? `<span class="grip" aria-hidden="true" title="ドラッグで並べかえ"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>` : ''}<button class="iconbtn chev ${open ? 'open' : ''}" data-act="taskOpen" data-arg="${t.id}" aria-expanded="${open}" aria-label="${open ? '閉じる' : '開く'}">${ICON.chev}</button></div>
     ${steps.length ? `<div class="bar" aria-hidden="true"><i style="width:${Math.round(done / steps.length * 100)}%"></i></div>` : ''}
-    ${open ? `<ul class="steps${fxc('open' + t.id, 'fx')}">${steps.map(s => `<li class="${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' + fxc('step' + s.id) : ''}" style="width:18px;height:18px" data-act="stepToggle" data-arg="${t.id}:${s.id}" aria-label="ステップを完了">${s.done ? CHECK : ''}</button><span>${esc(s.title)}</span><span class="spacer"></span><button class="btn ghost sm" data-act="stepDel" data-arg="${t.id}:${s.id}" aria-label="ステップを消す">×</button></li>`).join('')}
+    ${open ? `<ul class="steps${fxc('open' + t.id, 'fx')}">${steps.map(s => `<li class="${s.done ? 'done' : ''}"><button class="check ${s.done ? 'on' + fxc('step' + s.id) : ''}" style="width:18px;height:18px" data-act="stepToggle" data-arg="${t.id}:${s.id}" aria-label="ステップを完了">${s.done ? CHECK : ''}</button><span>${esc(s.title)}</span><span class="spacer"></span><button class="btn ghost sm" data-act="stepDel" data-arg="${t.id}:${s.id}" aria-label="ステップを消す">${lu('x', 14)}</button></li>`).join('')}
       <li><input class="field grow" id="step-${t.id}" data-draft placeholder="ステップを足す（Enterで追加）" value="${esc(draft('step-' + t.id))}" data-enter="stepAdd" data-arg="${t.id}"><button class="btn sm" data-act="stepAdd" data-arg="${t.id}">追加</button></li></ul>
-      <div class="row" style="margin-top:10px;padding-left:32px">
+      <div class="row" style="margin-top:8px;padding-left:32px">
         ${weightSeg(t.weight, 'taskWeight', t.id)}
         <input class="field" type="date" id="tdl-${t.id}" value="${t.deadline || ''}" data-onchg="taskDeadline" data-arg="${t.id}" aria-label="締切">
         <select class="field" id="tgoal-${t.id}" data-onchg="taskGoal" data-arg="${t.id}" aria-label="目標">${goalOpts(t.goalId)}</select>
@@ -75,11 +75,11 @@ function tasksView() {
   if (f) h += `<div class="filterbar"><span>△ ${esc(S.goals[f].title)} のタスクだけ表示中</span><button class="link" data-act="taskFilter" data-arg="">すべて表示</button></div>`;
   // 書き込むまでは1行だけ。書き始める（または欄に触れる）と、重さ・締切・目標が出る
   const tOpen = S.taskAddOpen || !!String(draft('task-title')).trim() || !!draft('task-w') || !!draft('task-dl') || !!draft('task-goal');
-  h += `<div class="taskadd ${tOpen ? 'open' : ''}"><div class="line"><span class="plus" aria-hidden="true">＋</span><input class="field grow" id="task-title" data-draft placeholder="タスクを足す" value="${esc(draft('task-title'))}" data-enter="taskAdd" aria-label="タスク名"><button class="btn primary sm add" data-act="taskAdd">追加</button></div>
+  h += `<div class="taskadd ${tOpen ? 'open' : ''}"><div class="line"><span class="plus" aria-hidden="true">${lu('plus', 16)}</span><input class="field grow" id="task-title" data-draft placeholder="タスクを足す" value="${esc(draft('task-title'))}" data-enter="taskAdd" aria-label="タスク名"><button class="btn primary sm add" data-act="taskAdd">追加</button></div>
     <div class="more">${weightSeg(draft('task-w'), 'newWeight')}<input class="field" type="date" id="task-dl" data-draft value="${esc(draft('task-dl'))}" aria-label="締切" title="締切"><select class="field" id="task-goal" data-draft aria-label="目標">${goalOpts(draft('task-goal'))}</select></div>
   </div>`;
-  h += open.length ? `<ul class="tasks">${open.map(taskHTML).join('')}</ul>` : `<div class="empty">${f ? 'この目標のタスクはまだない。上の欄から足すと、この目標につながる。' : 'やることは空っぽ。思いついたら上の欄から足せる。'}</div>`;
-  h += `<details class="fold" ${S.foldHeld ? 'open' : ''} data-fold="foldHeld"><summary>保留箱（${held.length}）</summary>${held.length ? `<ul class="tasks" style="margin-top:8px">${held.map(taskHTML).join('')}</ul>` : '<div class="faint" style="margin-top:6px;font-size:13px">保留箱は空。</div>'}</details>`;
+  h += open.length ? `<ul class="tasks">${open.map(taskHTML).join('')}</ul>` : `<div class="empty">${f ? 'この目標のタスクはまだない' : 'やることはない'}</div>`;
+  h += `<details class="fold" ${S.foldHeld ? 'open' : ''} data-fold="foldHeld"><summary>保留箱（${held.length}）</summary>${held.length ? `<ul class="tasks" style="margin-top:8px">${held.map(taskHTML).join('')}</ul>` : '<div class="faint" style="margin-top:8px;font-size:13px">保留箱は空</div>'}</details>`;
   h += `<details class="fold" ${S.foldDone ? 'open' : ''} data-fold="foldDone"><summary>終わったタスク（最近${done.length}件）</summary>${done.length ? `<ul class="tasks" style="margin-top:8px">${done.map(taskHTML).join('')}</ul>` : ''}</details>`;
   return h;
 }
@@ -92,9 +92,9 @@ function goalsSection() {
   const prDays = id => Object.keys(S.days).filter(x => x.startsWith(mk) && promiseLv(S.days[x], id)).length;
   const block = (label, list, scope, canAdd, ph, extra = '') => {
     const open = S.goalAddOpen === scope;
-    const plus = canAdd ? `<button class="gplus" data-act="goalAddOpen" data-arg="${scope}" aria-expanded="${open}" aria-label="${ph}">${open ? '×' : '＋'}</button>` : '';
+    const plus = canAdd ? `<button class="gplus" data-act="goalAddOpen" data-arg="${scope}" aria-expanded="${open}" aria-label="${ph}">${open ? lu('x', 16) : lu('plus', 16)}</button>` : '';
     const input = canAdd && open ? `<div class="row gadd"><input class="field grow" id="goal-${scope}" data-draft placeholder="${ph}" value="${esc(draft('goal-' + scope))}" data-enter="goalAdd" data-arg="${scope}" aria-label="${ph}"><button class="btn ghost sm" data-act="goalAdd" data-arg="${scope}">置く</button></div>` : '';
-    return `<div class="gblock"><div class="gk"><span>${label}</span><span class="row" style="gap:6px">${extra}${plus}</span></div>${list.map(goalRow).join('') || (open ? '' : '<div class="faint gempty">まだない</div>')}${input}</div>`;
+    return `<div class="gblock"><div class="gk"><span>${label}</span><span class="row" style="gap:8px">${extra}${plus}</span></div>${list.map(goalRow).join('') || (open ? '' : '<div class="faint gempty">まだない</div>')}${input}</div>`;
   };
   // 自分との約束（編集のとき）：名前・半分地点を直す・消す・足す（3つまで）と、まだの約束のお知らせ
   const prEditor = p => `<div class="habit-ed" role="group" aria-label="${p ? '約束を直す' : '約束を足す'}">
@@ -109,11 +109,11 @@ function goalsSection() {
   }).join('') || (S.promiseEdit === 'new' ? '' : '<div class="faint gempty">まだない</div>');
   if (S.promiseEdit === 'new') promise += prEditor(null);
   const pon = S.settings.promiseNotify !== false;
-  const notify = `<div class="row yk-notify"><span>まだの約束を知らせる</span><span class="spacer"></span><input class="field" type="time" id="pr-at" value="${esc(S.settings.promiseAt || '18:00')}" data-onchg="promiseAtSet" aria-label="知らせる時刻" ${pon ? '' : 'disabled'}><button class="btn ghost sm" data-act="promiseNotify" aria-pressed="${pon}">${pon ? 'オン' : 'オフ'}</button></div><div class="faint hb-note">約束が残っているときだけ、1日1回。休養の日は知らせない。届くのはDaylogの通知をオンにした端末。</div>`;
+  const notify = `<div class="row yk-notify"><span>まだの約束を知らせる</span><span class="spacer"></span><input class="field" type="time" id="pr-at" value="${esc(S.settings.promiseAt || '18:00')}" data-onchg="promiseAtSet" aria-label="知らせる時刻" ${pon ? '' : 'disabled'}><button class="btn ghost sm" data-act="promiseNotify" aria-pressed="${pon}">${pon ? 'オン' : 'オフ'}</button></div>`;
   const past = Object.values(S.goals).filter(g => !(g.scope === 'month' && g.period === mk) && !(g.scope === 'week' && g.period === wk)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 30);
   if (!S.goalEdit) {
     // ふだんは眺めるだけのコンパクト表示。操作は「編集」ひとつ
-    const line = list => list.length ? list.map(g => `<span class="gc-g ${g.status === 'done' ? 'done' : ''}"><i aria-hidden="true">${g.status === 'done' ? '✦' : '✧'}</i>${esc(g.title)}</span>`).join('') : '<span class="faint">まだない</span>';
+    const line = list => list.length ? list.map(g => `<span class="gc-g ${g.status === 'done' ? 'done' : ''}"><i aria-hidden="true">${lu('sparkle', 12, { fill: g.status === 'done' })}</i>${esc(g.title)}</span>`).join('') : '<span class="faint">まだない</span>';
     const prs = !pl.length ? '<span class="faint">まだない</span>' : pl.map(p => { const lv = promiseLv(day, p.id); return `<span class="gc-g ${lv ? 'done' : ''}">${promiseDot(lv)}${esc(promiseName(p, lv))}</span>`; }).join('');
     return `<section class="card goals compact" aria-label="目標"><div class="gc-head"><span class="goals-title">目標</span><button class="gedit" data-act="goalEdit">編集</button></div>
       <div class="gc-row"><span class="gc-k">${Number(mk.slice(5))}月</span><div class="gc-v">${line(month)}</div></div>
@@ -123,7 +123,7 @@ function goalsSection() {
   return `<section class="card goals" aria-label="目標"><div class="gc-head"><span class="goals-title">目標</span><button class="gedit on" data-act="goalEdit">閉じる</button></div><div class="goals-sub" style="margin-bottom:4px">こなすものではなく、心に置いておく言葉</div>
     ${block(`${Number(mk.slice(5))}月の目標`, month, 'month', month.length < 3, '今月、大事にしたいこと（3つまで）', month.length ? `${month.length}/3` : '')}
     ${block('今週の目標', week, 'week', true, '今週、大事にしたいこと')}
-    <div class="gblock"><div class="gk"><span>自分との約束</span><span class="row" style="gap:6px">${pl.length ? `<span class="faint">${pl.length}/${PROMISE_MAX}</span>` : ''}${pl.length < PROMISE_MAX && !S.promiseEdit ? '<button class="gplus" data-act="promiseEdit" data-arg="new" aria-label="約束を足す">＋</button>' : ''}</span></div>${promise}<div class="faint hb-note">タップ1回で半分、2回でふつう。どちらでも守れたことになる。</div>${notify}</div>
+    <div class="gblock"><div class="gk"><span>自分との約束</span><span class="row" style="gap:8px">${pl.length ? `<span class="faint">${pl.length}/${PROMISE_MAX}</span>` : ''}${pl.length < PROMISE_MAX && !S.promiseEdit ? '<button class="gplus" data-act="promiseEdit" data-arg="new" aria-label="約束を足す">＋</button>' : ''}</span></div>${promise}${notify}</div>
     ${past.length ? `<details class="fold"><summary>前の目標（${past.length}）</summary>${past.map(g => `<div class="goal ${g.status === 'done' ? 'done' : ''}"><span class="pill">${g.scope === 'month' ? g.period.replace('-', '年') + '月' : shortLabel(g.period) + '〜の週'}</span><div class="title">${esc(g.title)}</div>${g.status === 'done' ? '<span class="pill gold">叶った</span>' : ''}</div>`).join('')}</details>` : ''}
   </section>`;
 }
@@ -132,9 +132,9 @@ function goalRow(g) {
   const dn = linked.filter(t => t.status === 'done').length;
   const on = S.taskFilter === g.id; const done = g.status === 'done'; const menu = S.goalMenu === g.id;
   const tl = linked.length ? `<button class="link gtask" data-act="taskFilter" data-arg="${g.id}" aria-pressed="${on}">関わるタスク ${dn}/${linked.length}${on ? '（表示中）' : ''}</button>` : '';
-  return `<div class="goal concept ${done ? 'done' : ''}"><span class="gmark" aria-hidden="true">${done ? '✦' : '✧'}</span>
+  return `<div class="goal concept ${done ? 'done' : ''}"><span class="gmark" aria-hidden="true">${lu('sparkle', 14, { fill: done })}</span>
     <div class="title">${esc(g.title)}${tl ? `<div>${tl}</div>` : ''}</div>
-    <button class="gmore" data-act="goalMenu" data-arg="${g.id}" aria-expanded="${menu}" aria-label="この目標のメニュー">⋯</button></div>
+    <button class="gmore" data-act="goalMenu" data-arg="${g.id}" aria-expanded="${menu}" aria-label="この目標のメニュー">${lu('ellipsis', 16)}</button></div>
     ${menu ? `<div class="gmenu"><button class="link" data-act="goalToggle" data-arg="${g.id}">${done ? '達成を取り消す' : '叶ったことにする'}</button>${linked.length ? '' : `<button class="link" data-act="taskFilter" data-arg="${g.id}">タスクとつなげる</button>`}<button class="link danger" data-act="goalDelete" data-arg="${g.id}">消す</button></div>` : ''}`;
 }
 /* ── タイマー（タスクの画面の右上から開く。全画面。端末ごとに覚え、閉じても・開き直しても進み続ける） ── */
@@ -155,7 +155,7 @@ const tmLeft = () => (TM.state === 'run' ? Math.max(0, (TM.endAt - Date.now()) /
 const tmFmt = sec => { const t = Math.ceil(sec - 0.001), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), ss = t % 60; return h ? `${h}:${pad(m)}:${pad(ss)}` : `${pad(m)}:${pad(ss)}`; };
 const tmMin = sec => (sec < 60 ? `${Math.max(1, Math.round(sec))}秒` : sec >= 3600 && sec % 3600 === 0 ? `${sec / 3600}時間` : sec >= 3600 ? `${Math.floor(sec / 3600)}時間${Math.round(sec % 3600 / 60)}分` : `${Math.round(sec / 60)}分`);
 const TM_R = 132, TM_C = 2 * Math.PI * TM_R;
-const TM_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.6 1.6M9.5 3h5M12 3v3"/></svg>';
+const TM_ICON = lu('timer', 16);
 // 右上のボタン：タスクの画面ではいつも出す。ほかの画面では、タイマーが動いている間だけ残り時間を小さく出す
 function timerChipHTML() {
   const active = TM.state !== 'idle';
@@ -166,16 +166,16 @@ function timerChipHTML() {
 // タイマーの画面のアイコン（文字の代わり。押せるものには必ず aria-label と title を付ける）
 const TI = (d, sw = 2) => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const TMI = {
-  back: TI('<path d="M14.5 5.5l-6.5 6.5 6.5 6.5"/>'),
-  snd: TI('<path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/><path d="M15.8 9a4 4 0 0 1 0 6M18.3 6.5a7.5 7.5 0 0 1 0 11"/>', 1.8),
-  mute: TI('<path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>', 1.8),
-  play: '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.6-6.8a.8.8 0 0 0 0-1.4L9.2 4.5A.8.8 0 0 0 8 5.2z" fill="currentColor"/></svg>',
-  pause: '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></svg>',
-  stop: '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.2" fill="currentColor"/></svg>',
-  again: TI('<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v4h4"/>'),
-  close: TI('<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>'),
-  log: TI('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 2.2),
-  aim: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".8" fill="currentColor"/></svg>',
+  back: lu('chevron-left', 24),
+  snd: lu('volume-2', 24, { sw: 1.75 }),
+  mute: lu('volume-x', 24, { sw: 1.75 }),
+  play: lu('play', 24, { sw: 1 }),
+  pause: lu('pause', 24, { sw: 1 }),
+  stop: lu('square', 20, { sw: 1 }),
+  again: lu('rotate-ccw', 24),
+  close: lu('x', 24),
+  log: lu('check', 24, { sw: 2.25 }),
+  aim: lu('target', 16),
 };
 const tmBtn = (act, icon, label, cls = '', arg = '', extra = '') => `<button class="tm-ic ${cls}" data-act="${act}"${arg !== '' ? ` data-arg="${arg}"` : ''} aria-label="${label}" title="${label}" ${extra}>${icon}</button>`;
 function timerHTML() {

@@ -5,16 +5,16 @@
 function skyView() {
   const sk = S.sky; const age = moonAge(new Date());
   const [yy, mm] = sk.month.split('-').map(Number);
-  let h = headerHTML('星空', `<span class="row" style="gap:5px">${moonSVG(age, 14)}今夜は${moonName(age)}（月齢 ${age.toFixed(1)}）</span>`);
-  h += `<div class="crumbs"><button data-act="skyLevel" data-arg="universe" aria-current="${sk.level === 'universe'}">${sk.year}年の宇宙</button><span class="sep">›</span><button data-act="skyLevel" data-arg="month" aria-current="${sk.level === 'month'}">${mm}月の銀河</button>${sk.level === 'day' ? `<span class="sep">›</span><button aria-current="true">${shortLabel(sk.day)}の星座</button>` : ''}${sk.level === 'day' && sk.day === today() ? '' : `<span class="spacer"></span><button class="crumb-today" data-act="skyToday">今日へ</button>`}</div>`;
+  let h = headerHTML('星空', `<span class="row" style="gap:4px">${moonSVG(age, 14)}今夜は${moonName(age)}（月齢 ${age.toFixed(1)}）</span>`);
+  h += `<div class="crumbs"><button data-act="skyLevel" data-arg="universe" aria-current="${sk.level === 'universe'}">${sk.year}年の宇宙</button><span class="sep">${lu('chevron-right', 14)}</span><button data-act="skyLevel" data-arg="month" aria-current="${sk.level === 'month'}">${mm}月の銀河</button>${sk.level === 'day' ? `<span class="sep">${lu('chevron-right', 14)}</span><button aria-current="true">${shortLabel(sk.day)}の星座</button>` : ''}${sk.level === 'day' && sk.day === today() ? '' : `<span class="spacer"></span><button class="crumb-today" data-act="skyToday">今日へ</button>`}</div>`;
   // 銀河（galaxy.js）が使えるときはそれで描く。読み込み中・WebGLが使えない端末は、前からの描きかた
-  h += `<div class="skybox">${galaxyOk() ? '<div id="gx-host" class="gx-host"></div>' : '<canvas id="sky" aria-label="星空。星をタップするとその記録が読める"></canvas>'}<div class="skynav"><button data-act="skyPrev" aria-label="前へ">‹</button><button data-act="skyNext" aria-label="次へ">›</button></div>${petMiniHTML('sky')}</div>`;
+  h += `<div class="skybox">${galaxyOk() ? '<div id="gx-host" class="gx-host"></div>' : '<canvas id="sky" aria-label="星空。星をタップするとその記録が読める"></canvas>'}<div class="skynav"><button data-act="skyPrev" aria-label="前へ">${lu('chevron-left', 20)}</button><button data-act="skyNext" aria-label="次へ">${lu('chevron-right', 20)}</button></div>${petMiniHTML('sky')}</div>`;
   h += `<div class="legend"><span><i style="--c:${STAR_C.diary}"></i>日記</span><span><i style="--c:${STAR_C.task}"></i>タスク</span><span><i style="--c:${STAR_C.gold}"></i>習慣・目標</span><span><i style="--c:${STAR_C.night}"></i>夜モード</span><span><i class="neb"></i>星雲</span>${info(sk.level === 'universe' ? '1年が12個の銀河。明るい銀河ほど記録が多い月。銀河をタップすると、その月の中へ進む。下の目盛りをなぞっても選べる。' : sk.level === 'month' ? '1か月が1つの渦巻銀河。腕の内側が月初、外側が月末で、点線の輪が10日・20日・30日の目安。星の集まりをタップすると、その日の星座へ進む。下の目盛りは日ごとの星の数（色はその日の体調）で、なぞると日を選べる。中心の金色は今月の目標の星座。星雲は不調・休養の日。横にドラッグすると銀河が回る。' : '星をタップすると、その時の記録が読める。線は記録した順で、数字はその時刻。下の目盛りをなぞると、ほかの日へ移れる。星雲は不調・休養の日。')}</div>`;
   if (sk.level === 'day') {
     const day = getDay(sk.day); const nm = day.close && day.close.name;
     h += `<div class="card" style="margin-top:12px"><div class="cname">${nm ? esc(nm) : `${shortLabel(sk.day)}の星座`}</div><div class="faint" style="font-size:12px">${dayLabel(sk.day)} · 星 ${starsForDay(sk.day).length} 個${isNebula(sk.day) ? ' · 星雲の日' : ''}</div>${day.close && day.close.comment ? `<div class="claude" style="margin-top:8px">${esc(day.close.comment)}</div>` : ''}</div>`;
   }
-  if (sk.sel) h += `<div class="card" style="margin-top:8px"><div class="eyebrow">${esc(sk.sel.when || '')}</div><div style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(sk.sel.label)}</div>${sk.sel.day ? `<button class="link" data-act="skyDay" data-arg="${sk.sel.day}" style="margin-top:6px">この日の星座を見る</button>` : ''}</div>`;
+  if (sk.sel) h += `<div class="card" style="margin-top:8px"><div class="eyebrow">${esc(sk.sel.when || '')}</div><div style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(sk.sel.label)}</div>${sk.sel.day ? `<button class="link" data-act="skyDay" data-arg="${sk.sel.day}" style="margin-top:8px">この日の星座を見る</button>` : ''}</div>`;
   h += reviewSection();
   return h;
 }
@@ -38,13 +38,13 @@ function reviewSection() {
   const prDays = prFrom ? past.filter(d => d >= prFrom) : []; const prN = prDays.reduce((a, d) => a + promisesKept(d).length, 0);
   const stat = (n, unit, l) => `<div class="stat"><div><b>${n}</b><small>${unit}</small></div><span>${l}</span></div>`;
   let h = `<section class="rev"><div class="revhead"><h2>ふりかえり</h2>
-    <div class="row"><div class="seg" role="group" aria-label="期間"><button data-act="revKind" data-arg="week" aria-pressed="${r.kind === 'week'}">週</button><button data-act="revKind" data-arg="month" aria-pressed="${r.kind === 'month'}">月</button></div><span class="spacer"></span><button class="btn sm" data-act="revMove" data-arg="-1" aria-label="前の期間">‹</button><span class="revlabel">${label}</span><button class="btn sm" data-act="revMove" data-arg="1" aria-label="次の期間">›</button></div></div>`;
+    <div class="row"><div class="seg" role="group" aria-label="期間"><button data-act="revKind" data-arg="week" aria-pressed="${r.kind === 'week'}">週</button><button data-act="revKind" data-arg="month" aria-pressed="${r.kind === 'month'}">月</button></div><span class="spacer"></span><button class="btn sm" data-act="revMove" data-arg="-1" aria-label="前の期間">${lu('chevron-left', 20)}</button><span class="revlabel">${label}</span><button class="btn sm" data-act="revMove" data-arg="1" aria-label="次の期間">${lu('chevron-right', 20)}</button></div></div>`;
   h += `<div class="stats">${stat(wroteN, ` / ${past.length}日`, '書いた日')}${stat(nightN, '日', '夜モード')}${stat(taskN, '個', '終えたタスク')}${pl.length && prDays.length ? stat(prN, ` / ${prDays.length * pl.length}`, '守った約束') : ''}</div>`;
   h += colorCal(days);
   h += promiseChart(days) + moodChart(days) + sleepChart(days) + gameChart(days);
   const rv = S.reviews[reviewKey()];
-  if (claudeReady()) h += `<div class="chart"><div class="ct"><span>Claudeの気づき</span></div>${S.busy.rev ? '<div class="thinking" style="margin:6px 0">記録を読んでいる</div>' : rv && rv.text ? `<div class="insight" style="margin-top:6px">${esc(rv.text)}</div>` : '<div class="faint" style="font-size:13px;margin-top:4px">この期間の記録から、傾向を3つ拾ってもらえる。</div>'}
-    ${claudeReady() ? `<div class="row" style="margin:8px 0 6px"><button class="btn sm" data-act="revInsight" ${S.busy.rev ? 'disabled' : ''}>${rv && rv.text ? '作り直す' : '気づきを出してもらう'}</button></div>` : '<div class="faint" style="font-size:12px;margin:6px 0">Claudeが使えるときに出せる。</div>'}</div>`;
+  if (claudeReady()) h += `<div class="chart"><div class="ct"><span>Claudeの気づき</span></div>${S.busy.rev ? '<div class="thinking" style="margin:8px 0">記録を読んでいる</div>' : rv && rv.text ? `<div class="insight" style="margin-top:8px">${esc(rv.text)}</div>` : '<div class="faint" style="font-size:13px;margin-top:4px">この期間の記録から、傾向を3つ拾ってもらえる。</div>'}
+    ${claudeReady() ? `<div class="row" style="margin:8px 0 8px"><button class="btn sm" data-act="revInsight" ${S.busy.rev ? 'disabled' : ''}>${rv && rv.text ? '作り直す' : '気づきを出してもらう'}</button></div>` : '<div class="faint" style="font-size:12px;margin:8px 0">Claudeが使えるときに出せる。</div>'}</div>`;
   return h + '</section>';
 }
 function colorCal(days) {
@@ -60,7 +60,7 @@ function colorCal(days) {
     cells.push(`<div class="c ${d === t ? 'today' : ''}" style="background:${c};${d > t ? 'opacity:.35' : ''}" data-tip="${esc(tip)}">${isNebula(d) ? '<span class="neb"></span>' : ''}<span style="position:relative">${Number(d.slice(8))}</span></div>`);
   }
   return `<div class="chart"><div class="ct"><span>気分の色</span><span class="ramp">低 ${[1, 2, 3, 4, 5].map(i => `<i style="background:${MOOD_C[i]}"></i>`).join('')} 高</span></div><div class="cal7">${heads.map(w => `<div class="h">${w}</div>`).join('')}${cells.join('')}</div>
-    <div class="faint" style="font-size:11px;margin:6px 0 4px" hidden>光の輪は不調・休養の日（星雲）。マスをタップすると中身が出る。</div></div>`;
+    <div class="faint" style="font-size:11px;margin:8px 0 4px" hidden>光の輪は不調・休養の日（星雲）。マスをタップすると中身が出る。</div></div>`;
 }
 function chartFrame(title, legend, svg, note = '') { return `<div class="chart"><div class="ct"><span>${title}${note ? info(note) : ''}</span><span class="lg">${legend}</span></div>${svg}</div>`; }
 const chartW = () => (window.innerWidth < 560 ? 360 : 600);

@@ -59,7 +59,7 @@ let ok = true; const check = (n, c, x) => { console.log((c ? 'OK  ' : 'NG  ') + 
   await p.click(cell(Y)); await p.waitForTimeout(1200);
   const txt = await p.evaluate(() => { const s = document.querySelector('#mo-day'); return s ? s.innerText : ''; });
   check('選んだ日の流れが出る', /この日の流れ/.test(txt) && /動画編集/.test(txt) && /なんかしんどい/.test(txt) && /起きた/.test(txt), txt.slice(0, 400));
-  check('前の晩に寝た・睡眠', /前の晩に寝た/.test(txt) && /睡眠/.test(txt));
+  check('睡眠のまとまり（寝た→起きた）', /睡眠/.test(txt) && /起きた/.test(txt));
   check('体調・ゲーム・締め・習慣のチップ', await p.evaluate(() => [...document.querySelectorAll('.md-chip')].map(x => x.textContent.trim())).then(a => (console.log('  chips', a), a.some(x => /不調/.test(x)) && a.some(x => /3時間1分/.test(x)) && a.some(x => /締め/.test(x)) && a.some(x => /お風呂/.test(x)))));
   check('見るだけ（⋯・✎・予定の⋯なし）', await p.evaluate(() => { const s = document.querySelector('#mo-day'); return !s.querySelector('.more, .fixbtn, .evmore'); }));
   check('ゲームの帯（2本・後ろは目安を過ぎて濃い）', await p.evaluate(() => { const s = document.querySelector('#mo-day'); return [s.querySelectorAll('.gm-band:not(.late)').length, s.querySelectorAll('.gm-band.late').length, s.querySelectorAll('.gm-chip').length]; }).then(a => (console.log('  bands', a), a[0] === 2 && a[1] === 1 && a[2] === 2)));
@@ -74,7 +74,7 @@ let ok = true; const check = (n, c, x) => { console.log((c ? 'OK  ' : 'NG  ') + 
   const t2 = await p.evaluate(() => document.querySelector('#mo-day').innerText);
   check('動かしたあとも14:00の動画編集', /14:00[\s\S]{0,40}動画編集/.test(t2), t2.slice(0, 300));
   check('控えがある日は読みに行かない', (await p.evaluate(y => window.__gcal.filter(s => s.startsWith(y)).length, Y)) === 0);
-  check('その日の予定のまま の印', /その日の予定のまま/.test(t2));
+  check('その日の予定のまま の印', /その日のまま/.test(t2));
   // 記録のない昔の日：控えを作らない（docs を増やさない）
   await p.click(cell(O)).catch(() => {}); await p.waitForTimeout(800);
   check('昔の日には days を作らない', !docs.has('days/' + O));

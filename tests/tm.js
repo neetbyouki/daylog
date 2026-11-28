@@ -123,7 +123,7 @@ const wrap = j => JSON.stringify({ result: 'Below ... <untrusted-data-u1> bounda
   await p.click('[data-act="timerLog"]'); await p.waitForTimeout(400); ok('記録に残すは1回だけ', await p.evaluate(() => document.querySelector('[data-act="timerLog"]').disabled));
   await p.click('[data-act="timerReset"]'); await p.waitForTimeout(300); ok('次のタイマーは目的が空から', await p.evaluate(() => document.querySelector('#tm-purpose').value === '' && document.querySelector('#tm-start').getAttribute('aria-disabled') === 'true'));
   await p.click('[data-act="timerClose"]'); await p.waitForTimeout(600);
-  ok('今日の流れに記録が入る（途中でやめた分も）', (await q('#app-main')).includes('⏱ 動画の構成を書く（5分）') && (await q('#app-main')).includes('⏱ 動画の構成を書く（2分 / 予定5分）'), (await q('#app-main')).match(/⏱[^\n]*/g) + '');
+  ok('今日の流れに記録が入る（途中でやめた分も。⏱ はアイコンで出す）', (await q('#app-main')).includes('動画の構成を書く（5分）') && (await q('#app-main')).includes('動画の構成を書く（2分 / 予定5分）') && await p.evaluate(() => document.querySelectorAll('ul.flow .ic-lead svg.lu-timer').length >= 2) && !(await q('#app-main')).includes('⏱'), (await q('#app-main')).match(/動画の構成[^\n]*/g) + '');
   ok('動いていなければ、ほかの画面のボタンは消える', !(await p.$('.tm-btn')));
   // メモ：改行できる
   await p.click('[data-act="go"][data-arg="memos"]').catch(() => {}); await p.waitForTimeout(400);

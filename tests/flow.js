@@ -54,9 +54,10 @@ const wrap = j => JSON.stringify({ result: 'Below ... <untrusted-data-u1> bounda
     const leftTimes = [...fl.querySelectorAll('time')].map(t => t.innerText.replace(/\s+/g, ' ').trim()).filter(Boolean);
     const fut = [...fl.querySelectorAll('li.gap.fut')].map(li => ({ t: li.innerText.replace(/\s+/g, ' ').replace('＋', '').trim(), h: li.getBoundingClientRect().height }));
     const past = [...fl.querySelectorAll('li.gap.past')].map(li => li.innerText.trim());
-    return { rightTimes, leftTimes, fut, past, h: fl.getBoundingClientRect().height, nowLi: !!fl.querySelector('li.fl-now'), nowIn: !!fl.querySelector('li.ev .fr-now'), sleep: (fl.querySelector('li.gap.sleep') || {}).innerText };
+    return { rightTimes, leftTimes, fut, past, h: fl.getBoundingClientRect().height, nowLi: !!fl.querySelector('li.fl-now'), nowIn: !!fl.querySelector('li.ev .fr-now'), sleep: (fl.querySelector('li.fl-sleep .fr-s .sl-d') || {}).innerText };
   });
   let I = await info();
+  await p.screenshot({ path: __dirname + '/.out/flow.png', fullPage: true });
   ok('時刻は左の列だけ（右側の文に時刻がない）', I.rightTimes.length === 0, JSON.stringify(I.rightTimes));
   ok('左の列に、寝た・起きた・記録・予定の始まりと終わり・いま・就寝の目安', ['02:10', '10:12', '10:40', '12:35', '13:00', '13:40', '14:00', '15:05', '15:20', '16:00 18:00', '20:00 21:00', '22:00 01:00', '02:30'].every(t => I.leftTimes.includes(t)) && !I.leftTimes.includes('11:05 12:20'), JSON.stringify(I.leftTimes));
   ok('これからの空きが帯で出る（いま〜16:00・18〜20時・21〜22時・1時〜2:30）', JSON.stringify(I.fut.map(f => f.t)) === JSON.stringify(['空き 40分', '空き 2時間', '空き 1時間', '空き 1時間30分']), JSON.stringify(I.fut.map(f => f.t)));
@@ -68,11 +69,11 @@ const wrap = j => JSON.stringify({ result: 'Below ... <untrusted-data-u1> bounda
     const card = [...ul.querySelectorAll('li.ev')].find(li => li.innerText.includes('メルカリ')).getBoundingClientRect();
     const bands = [...ul.querySelectorAll('.gm-band')].map(b => { const r = b.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; });
     const chips = [...ul.querySelectorAll('.gm-chip')].map(c => { const r = c.getBoundingClientRect(); return { t: c.innerText.replace(/\s+/g, ' ').trim(), tip: c.dataset.tip, top: r.top, bottom: r.bottom }; });
-    return { rows: ul.querySelectorAll('li.fl-game, .fr-g, .gm-line').length, bands, chips, card: { top: card.top, bottom: card.bottom, left: card.left, right: card.right }, a: row('起きた。少しだるい'), b: row('お昼ごはん') };
+    return { chipIcon: [...ul.querySelectorAll('.gm-chip')].every(c => !!c.querySelector('svg.lu-gamepad-2')), rows: ul.querySelectorAll('li.fl-game, .fr-g, .gm-line').length, bands, chips, card: { top: card.top, bottom: card.bottom, left: card.left, right: card.right }, a: row('起きた。少しだるい'), b: row('お昼ごはん') };
   });
   ok('ゲームは行にしない（その時間に重ねる帯）', gm.rows === 0 && gm.bands.length === 2 && gm.chips.length === 2, JSON.stringify(gm.chips.map(c => c.t)));
   const [b1, b2] = gm.bands; const [c1, c2] = gm.chips;
-  ok('札は横書きで「名前 長さ」', c1.t === '🎮 Valorant 1時間15分' && c2.t === '🎮 Valorant 50分', JSON.stringify([c1.t, c2.t]));
+  ok('札は横書きで「アイコン 名前 長さ」', c1.t === 'Valorant 1時間15分' && c2.t === 'Valorant 50分' && gm.chipIcon, JSON.stringify([c1.t, c2.t]));
   ok('札に触れると時刻も出る', /Valorant\n11:05〜12:20（1時間15分）/.test(c1.tip) && /Valorant\n13:30〜14:20（50分）/.test(c2.tip));
   ok('予定のない時間のゲーム：記録の行の間に帯', b1.top > gm.a && b1.bottom <= gm.b + 2, JSON.stringify({ b1, a: gm.a, b: gm.b }));
   ok('予定と重なったゲーム：帯が予定のカードにかぶる（はみ出した分は下へ）', b2.top > gm.card.top && b2.top < gm.card.bottom && b2.bottom > gm.card.bottom && b2.right >= gm.card.right, JSON.stringify({ b2, card: gm.card }));
@@ -84,7 +85,8 @@ const wrap = j => JSON.stringify({ result: 'Below ... <untrusted-data-u1> bounda
   const wg = await p.evaluate(() => [...document.querySelectorAll('.wk-col.is-today .wk-game')].map(e => e.dataset.tip));
   ok('カレンダーの週の画面にも、ゲームの時間の細い帯', wg.length === 2 && /Valorant\n11:05〜12:20（1時間15分）/.test(wg[0]) && /13:30〜14:20/.test(wg[1]), JSON.stringify(wg));
   await p.click('[data-act="go"][data-arg="today"]'); await p.waitForTimeout(500);
-  ok('前の晩からの睡眠の長さ', I.sleep === '睡眠 8時間2分', I.sleep);
+  ok('前の晩からの睡眠の長さ（寝た時刻の行に）', I.sleep === '睡眠 8時間2分', I.sleep);
+  ok('絵文字を使わない（今日の流れ）', !(await p.evaluate(() => /[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(document.querySelector('ul.flow').innerText))));
   ok('予定の外の「いま」は1行', I.nowLi && !I.nowIn);
   ok('縦にコンパクト（1時間ごとの線がない）', I.h < 860 && !(await p.$('ul.flow li.hr')), Math.round(I.h));
   // 空きを押すと、その時刻から予定を入れられる

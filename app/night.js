@@ -14,26 +14,26 @@ function sheetHTML() {
   const s = S.sheet; const d = today(); const day = getDay(d);
   const modeRow = `<div class="modes" role="group" aria-label="今日の体調">${Object.entries(MODES).map(([k, m]) => `<button class="mode" style="--c:${m.c}" data-act="setMode" data-arg="${k}" aria-pressed="${day.mode === k}">${m.label}<small>${m.hint}</small></button>`).join('')}</div>`;
   if (s.kind === 'welcome') {
-    return `<div class="sheet"><div class="card"><h3>Daylogへようこそ</h3><p class="muted" style="margin:0 0 10px">ここは毎日戻ってくる場所。書く量は少なくていい。</p>
+    return `<div class="sheet"><div class="card"><h3>Daylogへようこそ</h3><p class="muted" style="margin:0 0 8px">ここは毎日戻ってくる場所。書く量は少なくていい。</p>
       <ul style="margin:0 0 12px;padding-left:1.2em;color:var(--fg-2);font-size:14px"><li>日中は、思いついたときに1行ずつ記録</li><li>寝る前は「夜モード」で今日を振り返って締める</li><li>記録するたびに星が増えて、1日が星座になる</li></ul>
-      <div class="eyebrow">今日の体調は？</div>${modeRow}<div class="row" style="margin-top:14px"><span class="spacer"></span><button class="btn primary" data-act="closeSheet">はじめる</button></div></div></div>`;
+      <div class="eyebrow">今日の体調は？</div>${modeRow}<div class="row" style="margin-top:16px"><span class="spacer"></span><button class="btn primary" data-act="closeSheet">はじめる</button></div></div></div>`;
   }
   if (s.kind === 'okaeri') {
     return `<div class="sheet"><div class="card"><h3>おかえり</h3><p class="muted" style="margin:0 0 12px">${s.gap}日ぶり。あいた日はそのまま残るだけで、何も減っていない。今の気分を1行だけ置いたら、いつもの画面に戻る。</p>
       <input class="field" style="width:100%" id="okaeri-text" data-draft placeholder="いまの気分を1行で" value="${esc(draft('okaeri-text'))}" data-enter="okaeriSave">
       <div class="eyebrow" style="margin-top:12px">今日の体調は？</div>${modeRow}
-      <div class="row" style="margin-top:14px"><button class="btn ghost" data-act="closeSheet">書かずに戻る</button><span class="spacer"></span><button class="btn primary" data-act="okaeriSave">置いて戻る</button></div></div></div>`;
+      <div class="row" style="margin-top:16px"><button class="btn ghost" data-act="closeSheet">書かずに戻る</button><span class="spacer"></span><button class="btn primary" data-act="okaeriSave">置いて戻る</button></div></div></div>`;
   }
   if (s.kind === 'first') {
     const mk = monthKey(d), wk = weekStart(d);
     const mg = activeGoals('month', mk), wg = activeGoals('week', wk); const pl = promiseList();
-    const list = gs => gs.length ? gs.map(g => `<div class="row" style="padding:3px 0"><span style="color:${g.status === 'done' ? 'var(--gold)' : 'var(--fg-3)'}">${g.status === 'done' ? '★' : '△'}</span><span style="min-width:0;overflow-wrap:anywhere">${esc(g.title)}</span></div>`).join('') : '<div class="faint" style="font-size:13px">まだない</div>';
+    const list = gs => gs.length ? gs.map(g => `<div class="row" style="padding:4px 0"><span style="display:inline-grid;color:${g.status === 'done' ? 'var(--gold)' : 'var(--fg-3)'}">${lu('sparkle', 14, { fill: g.status === 'done' })}</span><span style="min-width:0;overflow-wrap:anywhere">${esc(g.title)}</span></div>`).join('') : '<div class="faint" style="font-size:13px">まだない</div>';
     return `<div class="sheet"><div class="card"><div class="eyebrow">${dayLabel(d)}</div><h3>今日の目標</h3>
       <div class="note" style="margin-top:8px"><span class="k">今月</span><div class="v">${list(mg)}</div></div>
       <div class="note" style="margin-top:8px"><span class="k">今週</span><div class="v">${list(wg)}</div></div>
       <div class="note" style="margin-top:8px"><span class="k">約束</span><div class="v">${pl.length ? pl.map((p, i) => `<div>${PROMISE_NUM[i]} ${esc(p.title)}<span class="faint">（${esc(p.min)}）</span></div>`).join('') : '<span class="muted">まだ置いていない</span>'}</div></div>
-      <div class="eyebrow" style="margin-top:14px">今日の体調は？（あとで変えられる）</div>${modeRow}
-      <div class="row" style="margin-top:14px">${!mg.length ? '<button class="btn ghost" data-act="sheetGoGoals">目標を置く</button>' : ''}<span class="spacer"></span><button class="btn primary" data-act="closeSheet">閉じる</button></div></div></div>`;
+      <div class="eyebrow" style="margin-top:16px">今日の体調は？（あとで変えられる）</div>${modeRow}
+      <div class="row" style="margin-top:16px">${!mg.length ? '<button class="btn ghost" data-act="sheetGoGoals">目標を置く</button>' : ''}<span class="spacer"></span><button class="btn primary" data-act="closeSheet">閉じる</button></div></div></div>`;
   }
   if (s.kind === 'which') {
     const y = addDays(d, -1);
@@ -66,10 +66,10 @@ function nightReviewHTML(d) {
   h += row('起きてから', w ? `${hm(w)}に起きて、${fmtMin(Math.max(0, Math.round((Math.min(now, dayStart(d).getTime() + 24 * 3600e3) - w) / 6e4)))}` : '<span class="faint">起きた時刻はわからない</span>');
   h += row('約束', pl.length ? `<span class="nv-pr">${pl.map(p => { const lv = promiseLv(day, p.id); return `<span>${promiseDot(lv)}${esc(promiseName(p, lv))}</span>`; }).join('')}</span><span class="faint">${pk.length}/${pl.length}</span>` : '<span class="faint">まだない</span>');
   h += row('記録', notes.length ? `${notes.length}回${mAvg ? `<span class="faint">・気分の平均 ${mAvg}</span>` : ''}<div class="nv-last">「${esc(String(notes[notes.length - 1].text || '').slice(0, 40))}${String(notes[notes.length - 1].text || '').length > 40 ? '…' : ''}」</div>` : '<span class="faint">なし</span>');
-  h += row('終えたこと', done.length ? done.slice(0, 5).map(t => `<div>✓ ${esc(t.title)}</div>`).join('') + (done.length > 5 ? `<div class="faint">ほか${done.length - 5}つ</div>` : '') : '<span class="faint">なし（それでいい日もある）</span>');
+  h += row('終えたこと', done.length ? done.slice(0, 5).map(t => `<div class="ic-row">${lu('check', 14)}${esc(t.title)}</div>`).join('') + (done.length > 5 ? `<div class="faint">ほか${done.length - 5}つ</div>` : '') : '<span class="faint">なし（それでいい日もある）</span>');
   if (timers.length) h += row('タイマー', `${timers.length}回${tmin ? `・${fmtMin(tmin)}` : ''}`);
   if (game) h += row('ゲーム', fmtMin(game));
-  return `<div class="card nv">${h}</div><div class="faint" style="font-size:12px;margin-top:8px">見るだけでいい。次で今日の気分をつける。</div>`;
+  return `<div class="card nv">${h}</div>`;
 }
 // ペットの一言：ペットの会話（daylog-chat）に「夜」として頼む。だめなときは Daylog の中で作った一言
 function nightPetLocal(d) {
@@ -108,16 +108,16 @@ function nightHTML() {
   } else if (key === 'close') {
     const scale = (k, label, color) => `<div style="margin-top:12px"><div class="eyebrow">${label}</div><div class="scale" role="group" aria-label="${label}">${[1, 2, 3, 4, 5].map(i => `<button style="--c:${color}" data-act="nightScore" data-arg="${k}:${i}" aria-pressed="${n[k] === i}">${i}</button>`).join('')}</div><div class="scale-l"><span>低い</span><span>高い</span></div></div>`;
     body = `${scale('mood', '今日の気分', 'var(--mood)')}${scale('body', '今日の体調', 'var(--body)')}
-      <div style="margin-top:14px"><div class="eyebrow">今日のまとめ（なくてもいい）</div><textarea class="field" id="night-text" data-draft placeholder="今日あったこと、思ったこと">${esc(draft('night-text', n.text || ''))}</textarea></div>
-      ${(!n.mood || !n.body) ? '<div class="faint" style="font-size:12px;margin-top:6px">スコアをつけない場合は日中のスコアの平均を使う</div>' : ''}`;
+      <div style="margin-top:16px"><div class="eyebrow">今日のまとめ（なくてもいい）</div><textarea class="field" id="night-text" data-draft placeholder="今日あったこと、思ったこと">${esc(draft('night-text', n.text || ''))}</textarea></div>
+      ${(!n.mood || !n.body) ? '' : ''}`;
     foot = `${back}<span class="spacer"></span>${day.mode === 'rest' ? '<button class="btn" data-act="nightQuick">ここで締める</button>' : ''}<button class="btn primary" data-act="nightNext">次へ</button>`;
   } else if (key === 'goals') {
     const mg = activeGoals('month', monthKey(d)), wg = activeGoals('week', weekStart(d)); const pl = promiseList();
-    const row = g => `<div class="goal concept ${g.status === 'done' ? 'done' : ''}"><span class="gmark" aria-hidden="true">${g.status === 'done' ? '✦' : '·'}</span><div class="title">${esc(g.title)}</div><span class="pill">${g.scope === 'month' ? '今月' : '今週'}</span></div>`;
+    const row = g => `<div class="goal concept ${g.status === 'done' ? 'done' : ''}"><span class="gmark" aria-hidden="true">${lu('sparkle', 14, { fill: g.status === 'done' })}</span><div class="title">${esc(g.title)}</div><span class="pill">${g.scope === 'month' ? '今月' : '今週'}</span></div>`;
     body = `<div class="eyebrow">今日の約束</div>
-      ${pl.length ? pl.map((p, i) => { const lv = promiseLv(day, p.id); return `<button class="bigcheck yk-check ${lv || ''}" data-act="promiseTap" data-arg="${esc(p.id)}" aria-pressed="${!!lv}" style="margin-top:6px"><span class="box" aria-hidden="true">${promiseDot(lv)}</span><span>${PROMISE_NUM[i]} ${esc(p.title)}<span class="faint yk-st">（${esc(p.min)}）</span></span></button>`; }).join('')
-        + `<div class="faint" style="font-size:12px;margin-top:8px">${pl.every(p => promiseLv(day, p.id)) ? 'ぜんぶ守れた日。' : '守れなかった約束は、そのままでいい。明日また。'}</div>` : '<div class="muted" style="font-size:14px;margin-top:6px">約束はまだ置いていない。タスクの画面の「目標 → 編集」から置ける。</div>'}
-      ${mg.length || wg.length ? `<div class="eyebrow" style="margin-top:14px">今月・今週の目標</div><div class="card" style="margin-top:6px">${[...mg, ...wg].map(row).join('')}</div><div class="faint" style="font-size:12px;margin-top:6px">眺めるだけでいい。</div>` : ''}`;
+      ${pl.length ? pl.map((p, i) => { const lv = promiseLv(day, p.id); return `<button class="bigcheck yk-check ${lv || ''}" data-act="promiseTap" data-arg="${esc(p.id)}" aria-pressed="${!!lv}" style="margin-top:8px"><span class="box" aria-hidden="true">${promiseDot(lv)}</span><span>${PROMISE_NUM[i]} ${esc(p.title)}<span class="faint yk-st">（${esc(p.min)}）</span></span></button>`; }).join('')
+        + `<div class="faint" style="font-size:12px;margin-top:8px">${pl.every(p => promiseLv(day, p.id)) ? 'ぜんぶ守れた日。' : '守れなかった約束は、そのままでいい。明日また。'}</div>` : '<div class="muted" style="font-size:14px;margin-top:8px">約束はまだ置いていない。タスクの画面の「目標 → 編集」から置ける。</div>'}
+      ${mg.length || wg.length ? `<div class="eyebrow" style="margin-top:16px">今月・今週の目標</div><div class="card" style="margin-top:8px">${[...mg, ...wg].map(row).join('')}</div>` : ''}`;
     foot = `${back}<span class="spacer"></span><button class="btn primary" data-act="nightNext">次へ</button>`;
   } else if (key === 'check') {
     body = `<button class="bigcheck" data-act="nightMeds" aria-pressed="${!!n.meds}"><span class="box">${n.meds ? CHECK : ''}</span><span>薬を飲んだ</span></button>`;
@@ -126,7 +126,7 @@ function nightHTML() {
     const st = petOn() ? petStats() : null;
     body = `<div class="np">${st ? `<div class="np-pet">${petBodyHTML(st, 88)}</div>` : ''}<div class="np-bubble${n.petBusy ? ' busy' : ''}">${n.petBusy ? `<span class="thinking">${esc(st ? petName(st) : 'ペット')}が今日を読んでいる</span>` : n.comment ? petRich(n.comment) : ''}</div>${st ? `<div class="np-name">${esc(petName(st))}</div>` : ''}</div>
       ${n.petErr && !n.petBusy ? `<div class="faint" style="font-size:12px;margin-top:8px">${esc(n.petErr)}</div>` : ''}
-      ${n.name && !n.petBusy ? `<div class="faint" style="font-size:12px;margin-top:10px;text-align:center">今日の星座の名前：<span class="cname" style="font-size:16px;color:var(--fg)">${esc(n.name)}</span></div>` : ''}`;
+      ${n.name && !n.petBusy ? `<div class="faint" style="font-size:12px;margin-top:8px;text-align:center">今日の星座の名前：<span class="cname" style="font-size:16px;color:var(--fg)">${esc(n.name)}</span></div>` : ''}`;
     foot = `<span class="spacer"></span>${n.petErr && !n.petBusy && typeof window.daylogChat === 'function' ? '<button class="btn" data-act="nightPetAgain">もう一度</button>' : ''}<button class="btn primary" data-act="nightNext" ${n.petBusy ? 'disabled' : ''}>星座を見る</button>`;
   } else if (key === 'star') {
     const quiet = day.mode === 'rest' && S.settings.restQuiet;
@@ -139,17 +139,17 @@ function nightHTML() {
     const cands = [...carryTasks(tm), ...openTasks().filter(t => !(t.plannedDate && t.plannedDate < tm))].filter((t, i, a) => a.indexOf(t) === i && !used.has(t.id)).sort(byDeadline);
     const evs = (st.list || []).filter(e => !e.allDay);
     const plan = [...n.plan].sort((a, b) => slotDate(tm, a.start) - slotDate(tm, b.start));
-    body = `<div class="eyebrow">タスクから選ぶ（タップで追加）</div><div class="pick-list" style="margin-top:6px">${cands.slice(0, 14).map(t => `<button data-act="planAdd" data-arg="${t.id}">${esc(t.title)}${t.weight ? ` · ${weightLabel(t.weight)}` : ''}${t.deadline ? ` · 締切${shortLabel(t.deadline)}` : ''}</button>`).join('') || '<span class="faint" style="font-size:13px">タスクは空。下から直接入れられる。</span>'}</div>
-      <div class="row" style="margin-top:10px"><input class="field grow" id="plan-free" data-draft placeholder="タスクにない予定を入れる" value="${esc(draft('plan-free'))}" data-enter="planFree"><button class="btn sm" data-act="planFree">入れる</button></div>
-      <div class="eyebrow" style="margin-top:14px">今日の予定（${plan.length}）</div>
-      <div class="card" style="margin-top:6px;padding:4px 12px">${plan.map(p => `<div class="plan-item"><input class="field" type="time" id="pt-${p.id}" value="${p.start}" data-onchg="planTime" data-arg="${p.id}" aria-label="開始時刻"><select class="field" id="pm-${p.id}" data-onchg="planMin" data-arg="${p.id}" aria-label="長さ">${[15, 30, 45, 60, 90, 120, 180, 240].map(m => `<option value="${m}" ${p.minutes === m ? 'selected' : ''}>${m}分</option>`).join('')}</select><span class="nm">${esc(p.title)}</span><button class="btn ghost sm del" data-act="planDel" data-arg="${p.id}" aria-label="外す">×</button></div>`).join('') || '<div class="faint" style="font-size:13px;padding:8px 0">まだ空。</div>'}</div>
-      ${evs.length ? `<div class="eyebrow" style="margin-top:12px">今日もともと入っている予定</div><div style="font-size:13px;color:var(--fg-2);margin-top:4px">${evs.map(e => `<div>${hm(e.start)}〜${hm(e.end)} ${esc(e.title)}</div>`).join('')}</div>` : st.loading ? '<div class="thinking" style="margin-top:10px">予定を読み込み中</div>' : ''}
-      ${n.check ? `<div class="${n.check.local ? 'note-local' : 'claude'}" style="margin-top:12px">${esc(n.check.note)}</div>` : ''}${S.busy.check ? '<div class="thinking" style="margin-top:12px">詰め込みすぎていないか見ている</div>' : ''}${n.check && n.check.local && !n.check.ok ? '<div class="faint" style="font-size:12px;margin-top:4px">直さずにこのまま「次へ」で進んでもいい。</div>' : ''}`;
+    body = `<div class="eyebrow">タスクから選ぶ（タップで追加）</div><div class="pick-list" style="margin-top:8px">${cands.slice(0, 14).map(t => `<button data-act="planAdd" data-arg="${t.id}">${esc(t.title)}${t.weight ? ` · ${weightLabel(t.weight)}` : ''}${t.deadline ? ` · 締切${shortLabel(t.deadline)}` : ''}</button>`).join('') || '<span class="faint" style="font-size:13px">タスクは空</span>'}</div>
+      <div class="row" style="margin-top:8px"><input class="field grow" id="plan-free" data-draft placeholder="タスクにない予定を入れる" value="${esc(draft('plan-free'))}" data-enter="planFree"><button class="btn sm" data-act="planFree">入れる</button></div>
+      <div class="eyebrow" style="margin-top:16px">今日の予定（${plan.length}）</div>
+      <div class="card" style="margin-top:8px;padding:4px 12px">${plan.map(p => `<div class="plan-item"><input class="field" type="time" id="pt-${p.id}" value="${p.start}" data-onchg="planTime" data-arg="${p.id}" aria-label="開始時刻"><select class="field" id="pm-${p.id}" data-onchg="planMin" data-arg="${p.id}" aria-label="長さ">${[15, 30, 45, 60, 90, 120, 180, 240].map(m => `<option value="${m}" ${p.minutes === m ? 'selected' : ''}>${m}分</option>`).join('')}</select><span class="nm">${esc(p.title)}</span><button class="btn ghost sm del" data-act="planDel" data-arg="${p.id}" aria-label="外す">${lu('x', 16)}</button></div>`).join('') || '<div class="faint" style="font-size:13px;padding:8px 0">まだ空。</div>'}</div>
+      ${evs.length ? `<div class="eyebrow" style="margin-top:12px">今日もともと入っている予定</div><div style="font-size:13px;color:var(--fg-2);margin-top:4px">${evs.map(e => `<div>${hm(e.start)}〜${hm(e.end)} ${esc(e.title)}</div>`).join('')}</div>` : st.loading ? '<div class="thinking" style="margin-top:8px">予定を読み込み中</div>' : ''}
+      ${n.check ? `<div class="${n.check.local ? 'note-local' : 'claude'}" style="margin-top:12px">${esc(n.check.note)}</div>` : ''}${S.busy.check ? '<div class="thinking" style="margin-top:12px">詰め込みすぎていないか見ている</div>' : ''}${n.check && n.check.local && !n.check.ok ? '' : ''}`;
     foot = `${back}<span class="spacer"></span>${n.plan.length && !n.check ? `<button class="btn" data-act="planCheck" ${S.busy.check ? 'disabled' : ''}>詰め込みチェック</button>` : ''}<button class="btn primary" data-act="nightNext">次へ</button>`;
   } else if (key === 'send') {
     const tm = addDays(d, 1);
     const plan = [...n.plan].sort((a, b) => slotDate(tm, a.start) - slotDate(tm, b.start));
-    const mark = s => s === 'ok' ? '<span style="color:var(--good)">✓</span>' : s === 'ng' ? '<span style="color:var(--warn)">!</span>' : s === 'run' ? '<span class="faint">…</span>' : '<span class="faint">·</span>';
+    const mark = s => s === 'ok' ? `<span style="color:var(--good)">${lu('check', 14)}</span>` : s === 'ng' ? '<span style="color:var(--warn)">!</span>' : s === 'run' ? '<span class="faint">…</span>' : '<span class="faint">·</span>';
     body = `<div class="card"><ul class="sendlist">${plan.map(p => `<li><span class="st">${mark(n.sent[p.id])}</span><span class="mono faint">${p.start}</span><span style="min-width:0;overflow-wrap:anywhere">${esc(p.title)}（${p.minutes}分）</span></li>`).join('')}</ul></div>
       <div class="faint" style="font-size:12px;margin-top:8px">.｡oOに入る。</div>
       ${n.sendErr ? `<div class="err" style="margin-top:8px">${esc(n.sendErr)}</div>` : ''}

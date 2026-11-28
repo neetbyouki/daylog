@@ -76,11 +76,11 @@ const wrap = j => JSON.stringify({ result: 'Below ... <untrusted-data-u1> bounda
   await p.click(`[data-act="timeFix"][data-arg="wake:${D}"]`); await p.fill('#tf-time', '09:40'); await p.click('[data-act="timeFixSave"]'); await p.waitForTimeout(800);
   const dd = docs.get('days/' + D).data;
   ok('起きた時刻を直せる', dd.wakeFix === true && dd.wakeAt === at(D, 9, 40), new Date(dd.wakeAt).toISOString());
-  ok('今日の流れの起きた時刻も変わる', (await p.evaluate(() => document.querySelector('li.fl-wake').innerText)).includes('09:40'));
+  ok('今日の流れの起きた時刻も変わる', (await p.evaluate(() => document.querySelector('li.fl-sleep .fr-w').innerText)).includes('09:40'));
   await p.click(`[data-act="timeFix"][data-arg="sleep:${Y}"]`); await p.fill('#tf-time', '01:55'); await p.click('[data-act="timeFixSave"]'); await p.waitForTimeout(800);
   const yd = docs.get('days/' + Y).data;
   ok('前の晩に寝た時刻を直せる', yd.sleepFix === true && yd.sleepAt === at(Y, 1, 55), new Date(yd.sleepAt).toISOString());
-  ok('前の晩の表示も変わる', (await p.evaluate(() => document.querySelector('li.fl-slept').innerText)).includes('01:55'));
+  ok('前の晩の表示も変わる', (await p.evaluate(() => document.querySelector('li.fl-sleep .fr-s').innerText)).includes('01:55'));
   // 6) 通知の設定：claude.ai版ではアプリ版でオンにする案内
   await p.click('[data-act="toggleSettings"]'); await p.waitForTimeout(500);
   ok('通知の案内が出る', (await text()).includes('ホーム画面のDaylog（アプリ版）でオンにする'));

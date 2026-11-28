@@ -67,7 +67,7 @@ async function run(name, setup, body, opts = {}) {
     const day = () => docs.get('days/' + D).data;
     await p.click('.pet-mini'); await p.waitForTimeout(500);
     let t = await p.evaluate(() => document.querySelector('.pq-go').innerText);
-    check('部屋に「育成」ボタン', /育成/.test(t) && /30秒くらいの問題が3つ/.test(t), t);
+    check('部屋に「育成」ボタン', /育成/.test(t) && /今日の3問/.test(t), t);
     const before = await p.evaluate(() => [...document.querySelectorAll('.pr-m')].map(x => x.innerText.replace(/\s+/g, ' ')));
     await p.click('.pq-go'); await p.waitForTimeout(700);
     check('問題を作ってもらう（kind quiz）', global.__chatReqs.some(r => r.kind === 'quiz'));

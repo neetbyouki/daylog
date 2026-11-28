@@ -126,13 +126,13 @@ function lanes(evs, d) {
   if (cluster.length) flush();
   return out;
 }
-const evChip = e => `<button class="ev-chip" style="--c:${calOf(e.cal).color}" data-act="calOpen" data-arg="${e.cal}|${esc(e.id)}" title="${esc(e.title)}">${e.allDay ? '' : `<span class="mono">${hm(e.start)}</span> `}${esc(e.title)}</button>`;
+const evChip = e => `<button class="ev-chip" style="--c:${calOf(e.cal).color}" data-act="calOpen" data-arg="${e.cal}|${esc(e.id)}" title="${esc(e.title)}">${e.allDay ? '' : `<span class="mono">${hm(e.start)}</span> `}${evTitleHTML(e.title)}</button>`;
 function calView() {
   const c = S.cal; const r = calRange(); const st = S.calCache[calKey(r)] || {}; const list = st.list || [];
   const hide = S.settings.calHide || {};
   const label = c.mode === 'week' ? `${shortLabel(r.days[0])} 〜 ${shortLabel(r.days[6])}` : `${r.mk.slice(0, 4)}年${Number(r.mk.slice(5))}月`;
-  let h = headerHTML('カレンダー', `<span>${label}</span>${st.loading ? '<span class="thinking">読み込み中</span>' : ''}`, `<button class="btn primary" data-act="calNew" data-arg="">＋ 予定</button>`);
-  h += `<div class="row" style="margin-top:10px"><div class="seg" role="group" aria-label="表示の切り替え"><button data-act="calMode" data-arg="week" aria-pressed="${c.mode === 'week'}">週</button><button data-act="calMode" data-arg="month" aria-pressed="${c.mode === 'month'}">月</button></div><button class="btn sm" data-act="calToday">今日</button><span class="spacer"></span>${S.mcp ? `<button class="iconbtn" data-act="calReload" aria-label="読み込み直す" title="読み込み直す">${ICON.reload}</button>` : ''}<button class="btn sm" data-act="calMove" data-arg="-1" aria-label="前へ">‹</button><button class="btn sm" data-act="calMove" data-arg="1" aria-label="次へ">›</button></div>`;
+  let h = headerHTML('カレンダー', `<span>${label}</span>${st.loading ? '<span class="thinking">読み込み中</span>' : ''}`, `<button class="btn primary" data-act="calNew" data-arg="">${lu('plus', 16)}予定</button>`);
+  h += `<div class="row" style="margin-top:8px"><div class="seg" role="group" aria-label="表示の切り替え"><button data-act="calMode" data-arg="week" aria-pressed="${c.mode === 'week'}">週</button><button data-act="calMode" data-arg="month" aria-pressed="${c.mode === 'month'}">月</button></div><button class="btn sm" data-act="calToday">今日</button><span class="spacer"></span>${S.mcp ? `<button class="iconbtn" data-act="calReload" aria-label="読み込み直す" title="読み込み直す">${ICON.reload}</button>` : ''}<button class="btn sm" data-act="calMove" data-arg="-1" aria-label="前へ">${lu('chevron-left', 18)}</button><button class="btn sm" data-act="calMove" data-arg="1" aria-label="次へ">${lu('chevron-right', 18)}</button></div>`;
   h += `<div class="calchips" role="group" aria-label="表示するカレンダー">${CFG.CALS.map(k => `<button class="calchip" style="--c:${k.color}" data-act="calHide" data-arg="${k.key}" aria-pressed="${!hide[k.key]}">${esc(k.name)}</button>`).join('')}</div>`;
   if (!S.mcp) h += `<div class="err" style="margin-top:8px">Googleカレンダーにつながっていないので、予定を出せない。</div>`;
   if (st.error) h += `<div class="err" style="margin-top:8px">${esc(st.error.msg)}${st.error.code === 'approval_required' ? ' <button class="btn sm" data-act="calReload">許可して読み込む</button>' : ''}</div>`;
@@ -149,7 +149,7 @@ function weekGrid(r, list) {
     const blocks = lanes(calEventsFor(list, d).filter(e => !e.allDay), d).map(x => {
       const c = calOf(x.e.cal); const top = x.s / 60 * H_PX, hh = Math.max(18, (x.t - x.s) / 60 * H_PX - 2);
       const dg = calEditable(x.e.cal) && !/^(🌙|☀)/.test(x.e.title) ? ` data-drag="${x.e.cal}|${esc(x.e.id)}" data-s="${x.e.start}" data-e="${x.e.end}"` : '';
-      return `<button class="wk-ev${dg ? ' can-drag' : ''}${hh < 30 ? ' short' : ''}${fxc('moved' + x.e.cal + '|' + x.e.id, 'moved')}" style="--c:${c.color};top:${top}px;height:${hh}px;left:calc(${x.lane / x.lanes * 100}% + 1px);width:calc(${100 / x.lanes}% - 2px)" data-act="calOpen" data-arg="${x.e.cal}|${esc(x.e.id)}"${dg} title="${esc(x.e.title)}">${dg ? '<i class="rz rz-t" aria-hidden="true"></i>' : ''}<span class="t">${esc(x.e.title)}</span><span class="m">${hh >= 34 ? hm(x.e.start) : ''}</span>${dg ? '<i class="rz rz-b" aria-hidden="true"></i>' : ''}</button>`;
+      return `<button class="wk-ev${dg ? ' can-drag' : ''}${hh < 30 ? ' short' : ''}${fxc('moved' + x.e.cal + '|' + x.e.id, 'moved')}" style="--c:${c.color};top:${top}px;height:${hh}px;left:calc(${x.lane / x.lanes * 100}% + 1px);width:calc(${100 / x.lanes}% - 2px)" data-act="calOpen" data-arg="${x.e.cal}|${esc(x.e.id)}"${dg} title="${esc(x.e.title)}">${dg ? '<i class="rz rz-t" aria-hidden="true"></i>' : ''}<span class="t">${evTitleHTML(x.e.title)}</span><span class="m">${hh >= 34 ? hm(x.e.start) : ''}</span>${dg ? '<i class="rz rz-b" aria-hidden="true"></i>' : ''}</button>`;
     }).join('');
     const nowLine = d === t ? `<div class="wk-now" style="top:${minFromDayStart(d, now) / 60 * H_PX}px"></div>` : '';
     // ゲームをした時間：列の左はしに細い帯（触れると名前と時間）
@@ -176,11 +176,11 @@ function moDayHTML(d) {
   const day = getDay(d); const m = MODES[day.mode]; const t = today();
   const chips = [];
   if (m) chips.push(`<span class="md-chip" style="--c:${m.c}"><i aria-hidden="true"></i>${m.label}</span>`);
-  if (d <= t && S.pc[d]) { const gm = pcGame(d); if (gm) chips.push(`<span class="md-chip" style="--c:var(--game)" data-tip="${esc(gameTip(d))}">🎮 ${fmtMin(gm)}</span>`); }
+  if (d <= t && S.pc[d]) { const gm = pcGame(d); if (gm) chips.push(`<span class="md-chip" style="--c:var(--game)" data-tip="${esc(gameTip(d))}">${lu('gamepad-2', 12)}${fmtMin(gm)}</span>`); }
   const cl = day.close || {};
   if (cl.mood || cl.body) chips.push(`<span class="md-chip md-close" aria-label="締め：気分${cl.mood || '－'}・体調${cl.body || '－'}">締め${cl.mood ? `<span title="気分 ${cl.mood}">${dots(cl.mood, 'var(--mood)')}</span>` : ''}${cl.body ? `<span title="体調 ${cl.body}">${dots(cl.body, 'var(--body)')}</span>` : ''}</span>`);
   const hb = habitList().filter(x => habitDone(day, x.id)).map(x => x.title); // 約束の前の習慣（前の日の記録）
-  if (hb.length) chips.push(`<span class="md-chip" style="--c:var(--gold)">✓ ${esc(hb.join('・'))}</span>`);
+  if (hb.length) chips.push(`<span class="md-chip" style="--c:var(--gold)">${lu('check', 12)}${esc(hb.join('・'))}</span>`);
   const pk = promisesKept(d);
   if (pk.length) chips.push(`<span class="md-chip" style="--c:var(--gold)" data-tip="${esc(pk.map(p => `${p.n} ${promiseName(p, p.lv)}`).join('\n'))}">約束 ${pk.map(p => promiseDot(p.lv)).join('')} ${pk.length}/${promiseList().length}</span>`);
   const when = d === t ? '今日' : d < t ? `${diffDays(d, t)}日前` : `${diffDays(t, d)}日後`;
@@ -209,7 +209,7 @@ function calSheetHTML() {
   const rem = [['10', '10分前'], ['0', '開始時'], ['30', '30分前'], ['60', '1時間前'], ['default', 'カレンダーの既定'], ['none', 'なし']];
   return `<div class="sheet"><div class="card">
     <div class="row"><span class="eyebrow">${isNew ? '予定を追加' : editable ? '予定を変える' : '予定'}</span><span class="spacer"></span><button class="btn ghost sm" data-act="csClose">閉じる</button></div>
-    ${editable ? `<input class="field" style="width:100%;font-size:17px;margin-top:8px" id="cs-title" data-draft placeholder="予定の名前" value="${esc(g('cs-title'))}" aria-label="予定の名前">` : `<h3 style="margin-top:6px">${esc(s.title)}</h3>`}
+    ${editable ? `<input class="field" style="width:100%;font-size:17px;margin-top:8px" id="cs-title" data-draft placeholder="予定の名前" value="${esc(g('cs-title'))}" aria-label="予定の名前">` : `<h3 style="margin-top:8px">${esc(s.title)}</h3>`}
     <div class="cs-grid">
       <span class="lb">カレンダー</span><div>${calSel}</div>
       <span class="lb">終日</span><div><input type="checkbox" id="cs-allday" ${s.allDay ? 'checked' : ''} data-onchg="csAllDay" ${dis} aria-label="終日"></div>
@@ -217,9 +217,9 @@ function calSheetHTML() {
       <span class="lb">終わり</span><div class="row"><input class="field" type="date" id="cs-ed" data-draft value="${g('cs-ed')}" ${dis} aria-label="終わりの日">${s.allDay ? '' : `<input class="field" type="time" id="cs-et" data-draft value="${g('cs-et')}" ${dis} aria-label="終わりの時刻">`}</div>
       ${isNew ? `<span class="lb">通知</span><div><select class="field" id="cs-rem" data-draft aria-label="通知">${rem.map(([v, l]) => `<option value="${v}" ${g('cs-rem', '10') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : ''}
     </div>
-    ${s.rec ? '<div class="faint" style="font-size:12px;margin-top:10px">繰り返しの予定。変える・消すのはこの回だけ。</div>' : ''}
-    ${!editable ? '<div class="faint" style="font-size:12px;margin-top:10px">祝日のカレンダーは変えられない。</div>' : ''}
-    ${s.err ? `<div class="err" style="margin-top:10px">${esc(s.err)}</div>` : ''}
+    ${s.rec ? '<div class="faint" style="font-size:12px;margin-top:8px">繰り返しの予定。変える・消すのはこの回だけ。</div>' : ''}
+    ${!editable ? '<div class="faint" style="font-size:12px;margin-top:8px">祝日のカレンダーは変えられない。</div>' : ''}
+    ${s.err ? `<div class="err" style="margin-top:8px">${esc(s.err)}</div>` : ''}
     ${editable ? `<div class="row" style="margin-top:16px">${!isNew ? `<button class="btn ${s.confirmDel ? 'danger' : 'ghost'}" data-act="csDelete" ${s.saving ? 'disabled' : ''}>${s.confirmDel ? '本当に消す' : '消す'}</button>${s.confirmDel ? '<button class="btn ghost" data-act="csKeep">やめる</button>' : ''}` : ''}<span class="spacer"></span><button class="btn primary" data-act="csSave" ${s.saving ? 'disabled' : ''}>${s.saving ? '送っている…' : isNew ? '追加する' : '保存する'}</button></div>` : ''}
   </div></div>`;
 }
